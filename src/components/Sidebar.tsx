@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { DocumentIcon, GearIcon, LeafIcon, UsersIcon } from "./icons";
 
 export type SidebarPage = "products" | "settings" | "preview" | "customers";
@@ -5,13 +6,14 @@ export type SidebarPage = "products" | "settings" | "preview" | "customers";
 interface NavItem {
   id: SidebarPage;
   label: string;
+  href?: string;
   icon: (props: { className?: string }) => React.JSX.Element;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "products", label: "Vælg produkter", icon: LeafIcon },
-  { id: "settings", label: "Opsætning", icon: GearIcon },
-  { id: "preview", label: "Preview / Rediger", icon: DocumentIcon },
+  { id: "products", label: "Vælg produkter", href: "/", icon: LeafIcon },
+  { id: "settings", label: "Opsætning", href: "/opsaetning", icon: GearIcon },
+  { id: "preview", label: "Preview / Rediger", href: "/preview", icon: DocumentIcon },
   { id: "customers", label: "Kunder", icon: UsersIcon },
 ];
 
@@ -53,17 +55,29 @@ export function Sidebar({ active }: SidebarProps) {
           {NAV_ITEMS.map((item) => {
             const isActive = item.id === active;
             const Icon = item.icon;
+            const className = `flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium ${
+              isActive ? "bg-surface-active text-ink" : "text-ink-muted"
+            }`;
+
+            if (!item.href) {
+              return (
+                <div key={item.id} className={className}>
+                  <Icon className="h-3.75 w-3.75" />
+                  {item.label}
+                </div>
+              );
+            }
+
             return (
-              <div
+              <Link
                 key={item.id}
+                href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium ${
-                  isActive ? "bg-surface-active text-ink" : "text-ink-muted"
-                }`}
+                className={className}
               >
                 <Icon className="h-3.75 w-3.75" />
                 {item.label}
-              </div>
+              </Link>
             );
           })}
         </nav>
