@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { mockShopData } from "@/lib/mock/mockShopifyData";
 import { ChevronRightIcon } from "@/components/icons";
 import { PageHeader } from "@/components/PageHeader";
@@ -9,15 +10,19 @@ import { ProductTable } from "@/components/ProductTable";
 import { SelectionCounter } from "@/components/SelectionCounter";
 import { SelectionFooter } from "@/components/SelectionFooter";
 import { Sidebar } from "@/components/Sidebar";
+import { useNewsletter } from "@/context/NewsletterContext";
 
 export default function Home() {
   const { products } = mockShopData;
+  const router = useRouter();
+  const { selectedProductIds, setSelectedProductIds, toggleProduct } = useNewsletter();
 
   const [search, setSearch] = useState("");
   const [productType, setProductType] = useState("");
   const [tag, setTag] = useState("");
   const [onlyWithImage, setOnlyWithImage] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const selectedIds = useMemo(() => new Set(selectedProductIds), [selectedProductIds]);
 
   const productTypes = useMemo(
     () => Array.from(new Set(products.map((p) => p.productType))).sort(),
@@ -49,20 +54,8 @@ export default function Home() {
     });
   }, [products, search, productType, tag, onlyWithImage]);
 
-  function toggleProduct(id: string) {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
-
   function toggleAllVisible(checked: boolean) {
-    setSelectedIds((current) => {
+    setSelectedProductIds((current) => {
       const next = new Set(current);
       for (const product of filteredProducts) {
         if (checked) {
@@ -71,8 +64,12 @@ export default function Home() {
           next.delete(product.id);
         }
       }
-      return next;
+      return Array.from(next);
     });
+  }
+
+  function goToNextStep() {
+    router.push("/opsaetning");
   }
 
   return (
@@ -88,6 +85,7 @@ export default function Home() {
               <SelectionCounter count={selectedIds.size} />
               <button
                 type="button"
+                onClick={goToNextStep}
                 disabled={selectedIds.size === 0}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:opacity-100"
               >
@@ -122,6 +120,7 @@ export default function Home() {
           shown={filteredProducts.length}
           total={products.length}
           nextDisabled={selectedIds.size === 0}
+          onNext={goToNextStep}
         />
       </div>
     </div>

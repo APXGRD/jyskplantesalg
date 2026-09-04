@@ -50,30 +50,52 @@ REGLER
 
 // Bygger selve bruger-beskeden med den friske Shopify-data indsat.
 // Kaldes hver gang nogen trykker "Generér nyhedsbrev" i editoren.
-export function buildNewsletterUserPrompt(shopData: {
-  storeName: string;
-  brandTone: string;
-  products: Array<{
-    id: string;
-    title: string;
-    price: string;
-    imageUrl: string;
-    url: string;
-    isBestSeller?: boolean;
-    isNew?: boolean;
-  }>;
-}) {
+export function buildNewsletterUserPrompt(
+  shopData: {
+    storeName: string;
+    brandTone: string;
+    products: Array<{
+      id: string;
+      title: string;
+      price: string;
+      imageUrl: string;
+      url: string;
+      isBestSeller?: boolean;
+      isNew?: boolean;
+    }>;
+  },
+  options?: {
+    customerType?: "privat" | "erhverv";
+    instructions?: string;
+  },
+) {
   const systemPrompt = NEWSLETTER_SYSTEM_PROMPT.replace(
     "{{STORE_NAME}}",
     shopData.storeName,
   ).replace("{{BRAND_TONE}}", shopData.brandTone);
+
+  const audienceLine =
+    options?.customerType === "erhverv"
+      ? `Målgruppen er ERHVERVSKUNDER. Priserne i produktdata herunder er allerede EKSKL. moms.
+Skriv "ekskl. moms" lige efter hver pris, du nævner i teksten. Skriv i et fagligt,
+præcist sprog med fokus på specifikationer og robusthed.`
+      : `Målgruppen er PRIVATKUNDER. Priserne i produktdata herunder er allerede INKL. moms.
+Nævn IKKE moms eksplicit i teksten. Skriv i et tilgængeligt, inspirerende sprog med
+fokus på udtryk og haveoplevelse.`;
+
+  const instructionsLine = options?.instructions?.trim()
+    ? `\nBrugerens yderligere instrukser (må KUN bruges til tone/fokus/vinkel – se reglerne
+i systemprompten): "${options.instructions.trim()}"\n`
+    : "";
 
   const userPrompt = `
 Her er dagens produktdata fra ${shopData.storeName}s Shopify-butik. Generér nyhedsbrevets
 fire felter udelukkende ud fra disse produkter – vælg selv, hvilke der er mest relevante:
 
 ${JSON.stringify(shopData.products, null, 2)}
-`;
+
+${audienceLine}
+${instructionsLine}`;
 
   return { systemPrompt, userPrompt };
 }
