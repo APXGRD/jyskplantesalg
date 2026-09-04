@@ -76,9 +76,10 @@ export function buildNewsletterUserPrompt(
 
   const audienceLine =
     options?.customerType === "erhverv"
-      ? `Målgruppen er ERHVERVSKUNDER. Priserne i produktdata herunder er allerede EKSKL. moms.
-Skriv "ekskl. moms" lige efter hver pris, du nævner i teksten. Skriv i et fagligt,
-præcist sprog med fokus på specifikationer og robusthed.`
+      ? `Målgruppen er ERHVERVSKUNDER. Priserne i produktdata herunder er allerede formateret
+korrekt som EKSKL. moms (inkl. teksten "ekskl. moms") – brug dem præcis som angivet, uden
+at ændre eller gentage moms-teksten. Skriv i et fagligt, præcist sprog med fokus på
+specifikationer og robusthed.`
       : `Målgruppen er PRIVATKUNDER. Priserne i produktdata herunder er allerede INKL. moms.
 Nævn IKKE moms eksplicit i teksten. Skriv i et tilgængeligt, inspirerende sprog med
 fokus på udtryk og haveoplevelse.`;
