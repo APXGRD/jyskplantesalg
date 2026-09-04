@@ -18,6 +18,9 @@
   --surface-active: #e8efe7;
   --surface-selected: #f1f5f0;
   --surface-badge: #ecf0eb;
+
+  --card-footer: #f5f7f4;
+  --card-body-text: #4a5565;
 }
 
 @theme inline {
@@ -39,7 +42,11 @@
   --color-surface-selected: var(--surface-selected);
   --color-surface-badge: var(--surface-badge);
 
+  --color-card-footer: var(--card-footer);
+  --color-card-body-text: var(--card-body-text);
+
   --font-sans: var(--font-dm-sans);
+  --font-serif: var(--font-instrument-serif);
 }
 
 body {

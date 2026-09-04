@@ -8,9 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { mockShopData } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterUserPrompt } from "@/lib/prompts/newsletterPrompt";
-import { formatPrice } from "@/lib/format";
-
-type CustomerType = "privat" | "erhverv";
+import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 
 interface GenerateNewsletterBody {
   productIds?: string[];
@@ -20,18 +18,6 @@ interface GenerateNewsletterBody {
 
 function isCustomerType(value: unknown): value is CustomerType {
   return value === "privat" || value === "erhverv";
-}
-
-// Erhvervspriser vises ekskl. moms (prisen i mockData er inkl. 25% moms).
-function formatPriceForCustomer(price: number, customerType: CustomerType): string {
-  if (customerType === "erhverv") {
-    const priceExVat = Math.round((price / 1.25) * 100) / 100;
-    return `${priceExVat.toLocaleString("da-DK", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })} kr`;
-  }
-  return formatPrice(price);
 }
 
 export async function POST(req: NextRequest) {

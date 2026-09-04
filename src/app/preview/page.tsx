@@ -1,57 +1,146 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { PageHeader } from "@/components/PageHeader";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { mockShopData } from "@/lib/mock/mockShopifyData";
+import { buildNewsletterHtml, buildNewsletterText } from "@/lib/newsletterExport";
 import { Sidebar } from "@/components/Sidebar";
+import { SegmentedControl } from "@/components/preview/SegmentedControl";
+import { NewsletterCard } from "@/components/preview/NewsletterCard";
+import { EditorBlockList } from "@/components/preview/EditorBlockList";
+import { ArrowLeftIcon, CheckIcon, CopyIcon, DesktopIcon, MobileIcon } from "@/components/icons";
 import { useNewsletter } from "@/context/NewsletterContext";
 
+type View = "preview" | "rediger";
+type Viewport = "desktop" | "mobil";
+type CopyState = "idle" | "copied" | "error";
+
 export default function PreviewPage() {
-  const { result } = useNewsletter();
+  const router = useRouter();
+  const { result, setResult, customerType, selectedProductIds } = useNewsletter();
+
+  const [activeView, setActiveView] = useState<View>("preview");
+  const [viewport, setViewport] = useState<Viewport>("desktop");
+  const [copyState, setCopyState] = useState<CopyState>("idle");
+
+  const selectedProducts = useMemo(
+    () => mockShopData.products.filter((product) => selectedProductIds.includes(product.id)),
+    [selectedProductIds],
+  );
+
+  const customerTypeLabel =
+    customerType === "erhverv"
+      ? "Erhvervskunder – priser vist ekskl. moms"
+      : "Privatkunder – priser vist inkl. moms";
+
+  async function handleCopy() {
+    if (!result) return;
+
+    const html = buildNewsletterHtml(result, customerType, selectedProducts);
+    const text = buildNewsletterText(result, customerType, selectedProducts);
+
+    try {
+      if (typeof ClipboardItem !== "undefined") {
+        const item = new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        });
+        await navigator.clipboard.write([item]);
+      } else {
+        await navigator.clipboard.writeText(text);
+      }
+      setCopyState("copied");
+    } catch (err) {
+      console.error("Kunne ikke kopiere nyhedsbrevet:", err);
+      setCopyState("error");
+    } finally {
+      setTimeout(() => setCopyState("idle"), 2000);
+    }
+  }
 
   return (
     <div className="flex h-screen bg-background">
       <Sidebar active="preview" />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface">
-        <PageHeader title="Preview / Rediger" subtitle="Sådan ser det genererede nyhedsbrev ud" />
+        <div className="flex flex-col gap-3 border-b border-border bg-surface px-8 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <SegmentedControl<View>
+                value={activeView}
+                onChange={setActiveView}
+                options={[
+                  { value: "preview", label: "Preview" },
+                  { value: "rediger", label: "Rediger" },
+                ]}
+              />
+              {activeView === "preview" && (
+                <SegmentedControl<Viewport>
+                  value={viewport}
+                  onChange={setViewport}
+                  options={[
+                    { value: "desktop", label: "Desktop", icon: DesktopIcon },
+                    { value: "mobil", label: "Mobil", icon: MobileIcon },
+                  ]}
+                />
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleCopy}
+                disabled={!result}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {copyState === "copied" ? (
+                  <CheckIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <CopyIcon className="h-3.5 w-3.5" />
+                )}
+                {copyState === "copied" ? "Kopieret!" : "Kopiér nyhedsbrev"}
+              </button>
+            </div>
+          </div>
+
+          <span className="inline-flex w-fit items-center rounded-full bg-surface-active px-2.5 py-1 text-[11px] font-medium text-ink">
+            {customerTypeLabel}
+          </span>
+        </div>
 
         <div className="flex-1 overflow-y-auto p-8">
           {!result ? (
-            <div className="flex max-w-xl flex-col gap-2 rounded-xl border border-border bg-white p-6">
+            <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-white p-6">
               <p className="text-sm font-semibold text-ink">Intet nyhedsbrev genereret endnu</p>
               <p className="text-sm text-ink-muted">
-                Gå til{" "}
-                <Link href="/opsaetning" className="font-medium text-ink underline">
-                  Opsætning
-                </Link>{" "}
-                for at vælge målgruppe og generere nyhedsbrevet.
+                Gå til Opsætning for at vælge målgruppe og generere nyhedsbrevet, før du kan
+                forhåndsvise eller redigere det her.
               </p>
+              <button
+                type="button"
+                onClick={() => router.push("/opsaetning")}
+                className="mt-1 inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                <ArrowLeftIcon className="h-3.5 w-3.5" />
+                Til Opsætning
+              </button>
+            </div>
+          ) : activeView === "preview" ? (
+            <div className="flex justify-center">
+              <NewsletterCard
+                result={result}
+                customerType={customerType}
+                products={selectedProducts}
+                viewport={viewport}
+              />
             </div>
           ) : (
-            <div className="max-w-xl overflow-hidden rounded-xl border border-border bg-white">
-              <div className="relative h-56 w-full bg-surface-active">
-                <Image
-                  src={result.image.imageUrl}
-                  alt={result.image.altText}
-                  fill
-                  sizes="576px"
-                  className="object-cover"
-                />
-              </div>
-              <div className="flex flex-col gap-3 p-6">
-                <h2 className="text-xl font-semibold text-ink">{result.heading}</h2>
-                <p className="text-sm leading-relaxed text-ink-muted">{result.bodyText}</p>
-                <a
-                  href={result.cta.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex w-fit items-center rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white hover:opacity-90"
-                >
-                  {result.cta.text}
-                </a>
-              </div>
-            </div>
+            <EditorBlockList
+              result={result}
+              onChange={setResult}
+              products={selectedProducts}
+              customerType={customerType}
+            />
           )}
         </div>
       </div>

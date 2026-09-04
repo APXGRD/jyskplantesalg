@@ -1,8 +1,9 @@
 "use client";
 
 import { createContext, useContext, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import type { CustomerType } from "@/lib/format";
 
-export type CustomerType = "privat" | "erhverv";
+export type { CustomerType };
 
 export interface GeneratedNewsletter {
   heading: string;
