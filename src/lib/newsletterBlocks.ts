@@ -5,6 +5,7 @@
 
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import type { CustomerType } from "@/lib/format";
+import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 
 export type BlockType =
   | "header"
@@ -88,6 +89,10 @@ const CLOSING_TEXT =
 export function createDefaultBlocks(
   result: GeneratedNewsletter,
   customerType: CustomerType,
+  // De produkter, brugeren valgte på "Vælg produkter"-siden – bruges kun som
+  // fallback for billede-blokken, hvis AI-svarets productId ikke kan slås op
+  // (se nedenfor).
+  selectedProducts: ShopifyProduct[],
 ): NewsletterBlock[] {
   return DEFAULT_BLOCK_TYPES.map((type) => {
     const block: NewsletterBlock = { id: type, type, hidden: false };
@@ -96,6 +101,20 @@ export function createDefaultBlocks(
       block.content = [greetingFor(customerType), result.bodyText, CLOSING_TEXT]
         .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
         .join("");
+    }
+    if (type === "billede") {
+      // Slå produktet op i den fulde mockShopData ud fra det productId, AI'en
+      // pegede på – vi stoler ikke på, at Gemini har kopieret imageUrl'en
+      // korrekt videre, kun på at productId identificerer det rigtige produkt.
+      // Findes det ikke (fx tomt/forkert productId), falder vi tilbage til det
+      // først valgte produkt, så blokken stadig starter med et rigtigt billede.
+      const matchedProduct =
+        mockShopData.products.find((product) => product.id === result.image.productId) ??
+        selectedProducts[0];
+      if (matchedProduct) {
+        block.imageUrl = matchedProduct.imageUrl;
+        block.altText = matchedProduct.title;
+      }
     }
     if (type === "cta") {
       block.content = result.cta.text;
