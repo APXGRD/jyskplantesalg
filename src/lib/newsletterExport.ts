@@ -10,6 +10,18 @@ function escapeAttr(value: string): string {
   return escapeHtml(value).replace(/"/g, "&quot;");
 }
 
+// heading/bodyText/cta.text kommer fra TextBlockEditor (Tiptap) og er derfor allerede
+// simpel, formateret HTML (fx "<p>Tekst med <strong>fed</strong></p>") – skal IKKE
+// escapes igen, ellers vises tags'ne som rå tekst i stedet for at blive fortolket.
+function stripHtml(html: string): string {
+  return html
+    .replace(/<\/(p|div|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
 function greetingFor(customerType: CustomerType): string {
   return customerType === "erhverv" ? "Kære erhvervskunde," : "Kære privatkunde,";
 }
@@ -43,13 +55,13 @@ export function buildNewsletterHtml(
     ${escapeHtml(mockShopData.storeName)}
   </div>
   <div style="padding:28px 32px;">
-    <h1 style="color:#3a5837;font-size:24px;margin:0 0 16px;">${escapeHtml(result.heading)}</h1>
+    <div style="color:#3a5837;font-size:24px;margin:0 0 16px;">${result.heading}</div>
     <p style="color:#4a5565;font-size:14px;line-height:1.6;margin:0 0 16px;">${escapeHtml(greetingFor(customerType))}</p>
-    <p style="color:#4a5565;font-size:14px;line-height:1.6;margin:0 0 16px;">${escapeHtml(result.bodyText)}</p>
+    <div style="color:#4a5565;font-size:14px;line-height:1.6;margin:0 0 16px;">${result.bodyText}</div>
     <table style="width:100%;border-collapse:collapse;margin:16px 0;">${productRows}</table>
     <p style="text-align:center;margin:24px 0 0;">
       <a href="${escapeAttr(result.cta.url)}" style="display:inline-block;background:#3a5837;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;">
-        ${escapeHtml(result.cta.text)}
+        ${result.cta.text}
       </a>
     </p>
   </div>
@@ -74,15 +86,15 @@ export function buildNewsletterText(
     .join("\n");
 
   return [
-    result.heading,
+    stripHtml(result.heading),
     "",
     greetingFor(customerType),
     "",
-    result.bodyText,
+    stripHtml(result.bodyText),
     "",
     productLines,
     "",
-    `${result.cta.text}: ${result.cta.url}`,
+    `${stripHtml(result.cta.text)}: ${result.cta.url}`,
     "",
     "Jysk Plantesalg · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890",
   ].join("\n");
