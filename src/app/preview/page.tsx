@@ -24,7 +24,7 @@ export default function PreviewPage() {
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [blocks, setBlocks] = useState<NewsletterBlock[]>(() =>
-    result ? createDefaultBlocks(result) : [],
+    result ? createDefaultBlocks(result, customerType) : [],
   );
 
   const selectedProducts = useMemo(

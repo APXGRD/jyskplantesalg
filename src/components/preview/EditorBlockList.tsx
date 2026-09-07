@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { TextBlockEditor } from "@/components/TextBlockEditor";
+import { ImageBlockControls } from "@/components/ImageBlockControls";
 import {
   ButtonIcon,
   DividerIcon,
@@ -39,6 +40,8 @@ import {
   duplicateBlock,
   type AddableBlockKind,
   type BlockType,
+  type ImageAlignment,
+  type ImageSize,
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 
@@ -90,6 +93,10 @@ interface BlockContentProps {
   onContentChange: (html: string) => void;
   onCtaUrlChange: (url: string) => void;
   onProductIdChange: (productId: string) => void;
+  onImageChange: (imageUrl: string) => void;
+  onAltTextChange: (altText: string) => void;
+  onAlignmentChange: (alignment: ImageAlignment) => void;
+  onSizeChange: (size: ImageSize) => void;
   products: ShopifyProduct[];
   customerType: CustomerType;
 }
@@ -99,6 +106,10 @@ function BlockContent({
   onContentChange,
   onCtaUrlChange,
   onProductIdChange,
+  onImageChange,
+  onAltTextChange,
+  onAlignmentChange,
+  onSizeChange,
   products,
   customerType,
 }: BlockContentProps) {
@@ -116,14 +127,19 @@ function BlockContent({
       return <TextBlockEditor content={block.content ?? ""} onChange={onContentChange} />;
 
     case "billede":
-      return (
-        <p className="text-xs text-ink-muted">
-          Produktbillede – vises som pladsholder, indtil rigtige fotos er tilkoblet.
-        </p>
-      );
-
     case "img":
-      return <p className="text-xs text-ink-muted">Tomt billede – ingen fil tilknyttet endnu.</p>;
+      return (
+        <ImageBlockControls
+          imageUrl={block.imageUrl}
+          altText={block.altText}
+          alignment={block.alignment ?? "center"}
+          size={block.size ?? "fuld"}
+          onImageChange={onImageChange}
+          onAltTextChange={onAltTextChange}
+          onAlignmentChange={onAlignmentChange}
+          onSizeChange={onSizeChange}
+        />
+      );
 
     case "produktvisning":
       return (
@@ -352,6 +368,22 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, productId } : block)));
   }
 
+  function handleImageChange(id: string, imageUrl: string) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, imageUrl } : block)));
+  }
+
+  function handleAltTextChange(id: string, altText: string) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, altText } : block)));
+  }
+
+  function handleAlignmentChange(id: string, alignment: ImageAlignment) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, alignment } : block)));
+  }
+
+  function handleSizeChange(id: string, size: ImageSize) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, size } : block)));
+  }
+
   function handleDuplicate(id: string) {
     const index = blocks.findIndex((block) => block.id === id);
     if (index === -1) return;
@@ -394,6 +426,10 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
                   onContentChange={(html) => handleContentChange(block.id, html)}
                   onCtaUrlChange={(url) => handleCtaUrlChange(block.id, url)}
                   onProductIdChange={(productId) => handleProductIdChange(block.id, productId)}
+                  onImageChange={(imageUrl) => handleImageChange(block.id, imageUrl)}
+                  onAltTextChange={(altText) => handleAltTextChange(block.id, altText)}
+                  onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
+                  onSizeChange={(size) => handleSizeChange(block.id, size)}
                   products={products}
                   customerType={customerType}
                 />
