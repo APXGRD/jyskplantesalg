@@ -11,7 +11,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "products", label: "Vælg produkter", href: "/", icon: LeafIcon },
+  { id: "products", label: "Vælg produkter", href: "/produkter", icon: LeafIcon },
   { id: "settings", label: "Opsætning", href: "/opsaetning", icon: GearIcon },
   { id: "preview", label: "Preview / Rediger", href: "/preview", icon: DocumentIcon },
   { id: "customers", label: "Kunder", href: "/kunder", icon: UsersIcon },
