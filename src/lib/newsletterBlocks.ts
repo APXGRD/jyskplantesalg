@@ -57,6 +57,10 @@ export interface NewsletterBlock {
   altText?: string;
   alignment?: ImageAlignment;
   size?: ImageSize;
+  // Baggrundsfarve for hele blokken – kun relevant for "cta" (knappens
+  // baggrund) og baggrunds-bærende struktur-blokke ("header"/"footer").
+  // Uden bgColor bruges blokkens eksisterende standardfarve.
+  bgColor?: string;
 }
 
 const DEFAULT_BLOCK_TYPES: BlockType[] = [
