@@ -10,6 +10,7 @@ import { NewsletterCard } from "@/components/preview/NewsletterCard";
 import { EditorBlockList } from "@/components/preview/EditorBlockList";
 import { ArrowLeftIcon, CheckIcon, CopyIcon, DesktopIcon, MobileIcon } from "@/components/icons";
 import { useNewsletter } from "@/context/NewsletterContext";
+import { DEFAULT_BLOCK_ORDER, type BlockId } from "@/lib/newsletterBlocks";
 
 type View = "preview" | "rediger";
 type Viewport = "desktop" | "mobil";
@@ -22,6 +23,7 @@ export default function PreviewPage() {
   const [activeView, setActiveView] = useState<View>("preview");
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [blockOrder, setBlockOrder] = useState<BlockId[]>(DEFAULT_BLOCK_ORDER);
 
   const selectedProducts = useMemo(
     () => mockShopData.products.filter((product) => selectedProductIds.includes(product.id)),
@@ -110,20 +112,22 @@ export default function PreviewPage() {
 
         <div className="flex-1 overflow-y-auto p-8">
           {!result ? (
-            <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-white p-6">
-              <p className="text-sm font-semibold text-ink">Intet nyhedsbrev genereret endnu</p>
-              <p className="text-sm text-ink-muted">
-                Gå til Opsætning for at vælge målgruppe og generere nyhedsbrevet, før du kan
-                forhåndsvise eller redigere det her.
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/opsaetning")}
-                className="mt-1 inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                <ArrowLeftIcon className="h-3.5 w-3.5" />
-                Til Opsætning
-              </button>
+            <div className="flex justify-center">
+              <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-white p-6">
+                <p className="text-sm font-semibold text-ink">Intet nyhedsbrev genereret endnu</p>
+                <p className="text-sm text-ink-muted">
+                  Gå til Opsætning for at vælge målgruppe og generere nyhedsbrevet, før du kan
+                  forhåndsvise eller redigere det her.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push("/opsaetning")}
+                  className="mt-1 inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+                >
+                  <ArrowLeftIcon className="h-3.5 w-3.5" />
+                  Til Opsætning
+                </button>
+              </div>
             </div>
           ) : activeView === "preview" ? (
             <div className="flex justify-center">
@@ -132,15 +136,20 @@ export default function PreviewPage() {
                 customerType={customerType}
                 products={selectedProducts}
                 viewport={viewport}
+                order={blockOrder}
               />
             </div>
           ) : (
-            <EditorBlockList
-              result={result}
-              onChange={setResult}
-              products={selectedProducts}
-              customerType={customerType}
-            />
+            <div className="flex justify-center">
+              <EditorBlockList
+                result={result}
+                onChange={setResult}
+                products={selectedProducts}
+                customerType={customerType}
+                order={blockOrder}
+                onReorder={setBlockOrder}
+              />
+            </div>
           )}
         </div>
       </div>
