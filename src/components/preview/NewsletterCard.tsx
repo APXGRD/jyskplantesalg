@@ -3,22 +3,22 @@ import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { ImagePlaceholderIcon, LeafIcon } from "@/components/icons";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
-import type { BlockId } from "@/lib/newsletterBlocks";
+import type { NewsletterBlock } from "@/lib/newsletterBlocks";
 
 interface NewsletterCardProps {
-  result: GeneratedNewsletter;
+  blocks: NewsletterBlock[];
+  image: GeneratedNewsletter["image"];
   customerType: CustomerType;
   products: ShopifyProduct[];
   viewport: "desktop" | "mobil";
-  order: BlockId[];
 }
 
-export function NewsletterCard({ result, customerType, products, viewport, order }: NewsletterCardProps) {
+export function NewsletterCard({ blocks, image, customerType, products, viewport }: NewsletterCardProps) {
   const greeting = customerType === "erhverv" ? "Kære erhvervskunde," : "Kære privatkunde,";
   const audience = customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
 
-  function renderBlock(id: BlockId): ReactNode {
-    switch (id) {
+  function renderBlock(block: NewsletterBlock): ReactNode {
+    switch (block.type) {
       case "header":
         return (
           <div className="flex items-center justify-center gap-3 bg-primary px-8 py-5">
@@ -34,7 +34,7 @@ export function NewsletterCard({ result, customerType, products, viewport, order
           <div className="px-8 py-3">
             <div
               className="font-serif text-[26px] leading-[1.2] text-ink [&_p]:m-0"
-              dangerouslySetInnerHTML={{ __html: result.heading }}
+              dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
         );
@@ -45,7 +45,7 @@ export function NewsletterCard({ result, customerType, products, viewport, order
             <p className="text-[13px] leading-relaxed text-card-body-text">{greeting}</p>
             <div
               className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0"
-              dangerouslySetInnerHTML={{ __html: result.bodyText }}
+              dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
             <p className="text-[13px] leading-relaxed text-card-body-text">
               Ønsker du at se planterne på stedet eller modtage et uforpligtende tilbud? Kontakt os
@@ -59,7 +59,7 @@ export function NewsletterCard({ result, customerType, products, viewport, order
           <div className="px-8 py-3">
             <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-xl bg-surface-active">
               <ImagePlaceholderIcon className="h-9 w-9 text-ink-faint" />
-              <p className="text-xs text-ink-faint">{result.image.altText}</p>
+              <p className="text-xs text-ink-faint">{image.altText}</p>
             </div>
           </div>
         );
@@ -95,16 +95,53 @@ export function NewsletterCard({ result, customerType, products, viewport, order
           </div>
         );
 
+      case "tekst":
+        return (
+          <div className="px-8 py-3">
+            <div
+              className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0"
+              dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
+            />
+          </div>
+        );
+
+      case "img":
+        return (
+          <div className="flex justify-center px-8 py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-active text-ink-muted">
+              <ImagePlaceholderIcon className="h-3.5 w-3.5" />
+            </div>
+          </div>
+        );
+
+      case "produkt": {
+        const product = products.find((item) => item.id === block.productId);
+        if (!product) return null;
+        return (
+          <div className="px-8 py-3">
+            <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+              <div>
+                <p className="text-xs font-medium text-ink">{product.title}</p>
+                <p className="text-[11px] text-ink-muted">{product.productType}</p>
+              </div>
+              <p className="text-xs font-semibold text-ink">
+                {formatPriceForCustomer(product.price, customerType)}
+              </p>
+            </div>
+          </div>
+        );
+      }
+
       case "cta":
         return (
           <div className="flex justify-center px-8 py-3">
             <a
-              href={result.cta.url}
+              href={block.ctaUrl || "#"}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 rounded-lg bg-ink px-6 py-2.5 text-[13px] font-semibold text-white [&_p]:m-0 [&_p]:inline"
             >
-              <span dangerouslySetInnerHTML={{ __html: result.cta.text }} />
+              <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />
               <span aria-hidden>→</span>
             </a>
           </div>
@@ -133,9 +170,11 @@ export function NewsletterCard({ result, customerType, products, viewport, order
         viewport === "mobil" ? "w-[375px]" : "w-[600px]"
       }`}
     >
-      {order.map((id) => (
-        <div key={id}>{renderBlock(id)}</div>
-      ))}
+      {blocks
+        .filter((block) => !block.hidden)
+        .map((block) => (
+          <div key={block.id}>{renderBlock(block)}</div>
+        ))}
     </div>
   );
 }
