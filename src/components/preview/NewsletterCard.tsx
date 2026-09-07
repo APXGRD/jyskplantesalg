@@ -4,6 +4,7 @@ import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { ImagePlaceholderIcon, LeafIcon } from "@/components/icons";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import { IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
+import { getContrastTextColor } from "@/lib/brandColors";
 
 const JUSTIFY_CLASS = {
   venstre: "justify-start",
@@ -24,15 +25,21 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
 
   function renderBlock(block: NewsletterBlock): ReactNode {
     switch (block.type) {
-      case "header":
+      case "header": {
+        const bgColor = block.bgColor || "#9caf88";
+        const textColor = getContrastTextColor(bgColor);
         return (
-          <div className="flex items-center justify-center gap-3 bg-primary px-8 py-5">
-            <LeafIcon className="h-6 w-6 text-white" />
-            <span className="text-xs font-medium tracking-[0.1em] text-white uppercase">
+          <div
+            className="flex items-center justify-center gap-3 px-8 py-5"
+            style={{ backgroundColor: bgColor, color: textColor }}
+          >
+            <LeafIcon className="h-6 w-6" />
+            <span className="text-xs font-medium tracking-[0.1em] uppercase">
               {mockShopData.storeName}
             </span>
           </div>
         );
+      }
 
       case "overskrift":
         return (
@@ -48,7 +55,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
         return (
           <div className="px-8 py-3">
             <div
-              className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0 [&_p+p]:mt-5"
+              className="text-[13px] leading-normal text-card-body-text [&_p]:m-0 [&_p]:mb-3.5 [&_p:last-child]:mb-0"
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -164,35 +171,44 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
         );
       }
 
-      case "cta":
+      case "cta": {
+        const bgColor = block.bgColor || "#3a5837";
+        const textColor = getContrastTextColor(bgColor);
         return (
           <div className="flex justify-center px-8 py-3">
             <a
               href={block.ctaUrl || "#"}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-lg bg-ink px-6 py-2.5 text-[13px] font-semibold text-white [&_p]:m-0 [&_p]:inline"
+              style={{ backgroundColor: bgColor, color: textColor }}
+              className="inline-flex items-center gap-1 rounded-lg px-6 py-2.5 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline"
             >
               <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />
-              <span aria-hidden>→</span>
             </a>
           </div>
         );
+      }
 
-      case "footer":
+      case "footer": {
+        const bgColor = block.bgColor || "#f5f7f4";
+        const textColor = getContrastTextColor(bgColor);
         return (
-          <div className="flex flex-col items-center gap-1.5 border-t border-border bg-card-footer px-8 py-5 text-center">
-            <p className="text-[11px] text-ink-muted">
+          <div
+            className="flex flex-col items-center gap-1.5 border-t border-border px-8 py-5 text-center"
+            style={{ backgroundColor: bgColor, color: textColor }}
+          >
+            <p className="text-[11px] opacity-80">
               Jysk Plantesalg · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890
             </p>
-            <p className="text-[11px] text-ink-muted">
+            <p className="text-[11px] opacity-80">
               Du modtager dette nyhedsbrev, fordi du er {audience}.
             </p>
-            <a href="#" className="pt-1 text-[11px] text-ink underline">
+            <a href="#" className="pt-1 text-[11px] underline">
               Afmeld nyhedsbrevet
             </a>
           </div>
         );
+      }
     }
   }
 

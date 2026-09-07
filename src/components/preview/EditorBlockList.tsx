@@ -22,6 +22,7 @@ import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { TextBlockEditor } from "@/components/TextBlockEditor";
 import { ImageBlockControls } from "@/components/ImageBlockControls";
+import { ColorSwatches } from "@/components/ColorSwatches";
 import {
   ButtonIcon,
   DividerIcon,
@@ -97,6 +98,7 @@ interface BlockContentProps {
   onAltTextChange: (altText: string) => void;
   onAlignmentChange: (alignment: ImageAlignment) => void;
   onSizeChange: (size: ImageSize) => void;
+  onBgColorChange: (color: string) => void;
   products: ShopifyProduct[];
   customerType: CustomerType;
 }
@@ -110,12 +112,18 @@ function BlockContent({
   onAltTextChange,
   onAlignmentChange,
   onSizeChange,
+  onBgColorChange,
   products,
   customerType,
 }: BlockContentProps) {
   switch (block.type) {
     case "header":
-      return <p className="text-xs text-ink-muted">Logo og butiksnavn – vises fast øverst i nyhedsbrevet.</p>;
+      return (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-ink-muted">Logo og butiksnavn – vises fast øverst i nyhedsbrevet.</p>
+          <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
+        </div>
+      );
 
     case "overskrift":
       return <TextBlockEditor content={block.content ?? ""} onChange={onContentChange} />;
@@ -184,11 +192,17 @@ function BlockContent({
             placeholder="Link"
             className={fieldClassName}
           />
+          <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
         </div>
       );
 
     case "footer":
-      return <p className="text-xs text-ink-muted">Adresse, CVR og afmeldingslink – vises fast nederst.</p>;
+      return (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-ink-muted">Adresse, CVR og afmeldingslink – vises fast nederst.</p>
+          <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
+        </div>
+      );
   }
 }
 
@@ -384,6 +398,10 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, size } : block)));
   }
 
+  function handleBgColorChange(id: string, bgColor: string) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, bgColor } : block)));
+  }
+
   function handleDuplicate(id: string) {
     const index = blocks.findIndex((block) => block.id === id);
     if (index === -1) return;
@@ -430,6 +448,7 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
                   onAltTextChange={(altText) => handleAltTextChange(block.id, altText)}
                   onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
                   onSizeChange={(size) => handleSizeChange(block.id, size)}
+                  onBgColorChange={(color) => handleBgColorChange(block.id, color)}
                   products={products}
                   customerType={customerType}
                 />

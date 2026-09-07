@@ -3,7 +3,8 @@
 import { useRef, useState, type FocusEvent } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
+import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
+import { ColorSwatches } from "@/components/ColorSwatches";
 
 interface TextBlockEditorProps {
   content: string;
@@ -36,6 +37,7 @@ const EDITOR_EXTENSIONS = [
   TextStyle,
   FontFamily,
   FontSize,
+  Color,
 ];
 
 export function TextBlockEditor({ content, onChange }: TextBlockEditorProps) {
@@ -79,6 +81,7 @@ export function TextBlockEditor({ content, onChange }: TextBlockEditorProps) {
     underline: false,
     fontFamily: "",
     fontSize: "",
+    color: "",
   };
 
   const activeState =
@@ -94,6 +97,7 @@ export function TextBlockEditor({ content, onChange }: TextBlockEditorProps) {
           underline: editor.isActive("underline"),
           fontFamily: editor.getAttributes("textStyle").fontFamily ?? "",
           fontSize: (editor.getAttributes("textStyle").fontSize ?? "").replace("px", ""),
+          color: editor.getAttributes("textStyle").color ?? "",
         };
       },
     }) ?? defaultActiveState;
@@ -197,6 +201,13 @@ export function TextBlockEditor({ content, onChange }: TextBlockEditorProps) {
           >
             U
           </button>
+
+          <div className="mx-0.5 h-5 w-px bg-border" />
+
+          <ColorSwatches
+            value={activeState.color}
+            onChange={(color) => applyCommand((chain) => chain.setColor(color))}
+          />
         </div>
       )}
 

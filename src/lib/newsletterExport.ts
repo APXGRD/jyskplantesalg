@@ -2,6 +2,7 @@ import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import { IMAGE_ALIGN_CSS, IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
+import { getContrastTextColor } from "@/lib/brandColors";
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -27,6 +28,20 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// Sætter samme afsnits-afstand som Preview-visningens `[&_p]:mb-3.5
+// [&_p:last-child]:mb-0` Tailwind-regler – 14px luft mellem hvert afsnit, ingen
+// luft under det sidste. Skrevet direkte som inline style pr. <p>, da det
+// kopierede HTML-fragment ikke kan bære en <style>-blok.
+function styleBrodtekstParagraphs(html: string): string {
+  const total = (html.match(/<p>/g) ?? []).length;
+  let index = 0;
+  return html.replace(/<p>/g, () => {
+    index += 1;
+    const marginBottom = index === total ? "0" : "14px";
+    return `<p style="margin:0 0 ${marginBottom} 0">`;
+  });
+}
+
 function audienceFor(customerType: CustomerType): string {
   return customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
 }
@@ -38,14 +53,17 @@ function renderBlockHtml(
   products: ShopifyProduct[],
 ): string {
   switch (block.type) {
-    case "header":
-      return `<div style="background:#9caf88;color:#ffffff;text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;">${escapeHtml(mockShopData.storeName)}</div>`;
+    case "header": {
+      const bgColor = block.bgColor || "#9caf88";
+      const textColor = getContrastTextColor(bgColor);
+      return `<div style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;">${escapeHtml(mockShopData.storeName)}</div>`;
+    }
 
     case "overskrift":
       return `<div style="padding:12px 32px;"><div style="color:#3a5837;font-size:24px;">${block.content ?? ""}</div></div>`;
 
     case "brodtekst":
-      return `<div style="padding:12px 32px;color:#4a5565;font-size:14px;line-height:1.6;">${block.content ?? ""}</div>`;
+      return `<div style="padding:12px 32px;color:#4a5565;font-size:14px;line-height:1.5;">${styleBrodtekstParagraphs(block.content ?? "")}</div>`;
 
     case "billede": {
       if (block.imageUrl) {
@@ -113,18 +131,24 @@ function renderBlockHtml(
       </div>`;
     }
 
-    case "cta":
+    case "cta": {
+      const bgColor = block.bgColor || "#3a5837";
+      const textColor = getContrastTextColor(bgColor);
       return `<div style="padding:12px 32px;text-align:center;">
-        <a href="${escapeAttr(block.ctaUrl || "#")}" style="display:inline-block;background:#3a5837;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;">
+        <a href="${escapeAttr(block.ctaUrl || "#")}" style="display:inline-block;background:${bgColor};color:${textColor};padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;">
           ${block.content ?? ""}
         </a>
       </div>`;
+    }
 
-    case "footer":
-      return `<div style="background:#f5f7f4;border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;color:#637862;font-size:11px;">
+    case "footer": {
+      const bgColor = block.bgColor || "#f5f7f4";
+      const textColor = getContrastTextColor(bgColor);
+      return `<div style="background:${bgColor};color:${textColor};border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;font-size:11px;">
         Jysk Plantesalg · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890<br/>
         Du modtager dette nyhedsbrev, fordi du er ${escapeHtml(audienceFor(customerType))}.
       </div>`;
+    }
   }
 }
 
