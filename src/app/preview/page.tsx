@@ -23,13 +23,14 @@ export default function PreviewPage() {
   const [activeView, setActiveView] = useState<View>("preview");
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [copyState, setCopyState] = useState<CopyState>("idle");
-  const [blocks, setBlocks] = useState<NewsletterBlock[]>(() =>
-    result ? createDefaultBlocks(result, customerType) : [],
-  );
 
   const selectedProducts = useMemo(
     () => mockShopData.products.filter((product) => selectedProductIds.includes(product.id)),
     [selectedProductIds],
+  );
+
+  const [blocks, setBlocks] = useState<NewsletterBlock[]>(() =>
+    result ? createDefaultBlocks(result, customerType, selectedProducts) : [],
   );
 
   const customerTypeLabel =
