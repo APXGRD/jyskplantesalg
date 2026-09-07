@@ -4,6 +4,13 @@ import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import { IMAGE_ALIGN_CSS, IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
 
+// Standard-skrifttype for HELE nyhedsbrevet, når hverken den globale
+// skrifttype-vælger eller en per-blok værdi er sat. HTML-tabeller nedarver
+// IKKE font-family pålideligt fra deres omgivelser i alle mail-klienter –
+// derfor sættes denne eksplicit på hver enkelt tekst-bærende <td>/<a>/<div> i
+// hele filen, i stedet for kun på den yderste <table>.
+const DEFAULT_FONT_FAMILY = "Arial,Helvetica,sans-serif";
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -64,14 +71,27 @@ function renderBlockHtml(
     case "header": {
       const bgColor = block.bgColor || "#9caf88";
       const textColor = getContrastTextColor(bgColor);
-      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;">${escapeHtml(mockShopData.storeName)}</td></tr>`;
+      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(mockShopData.storeName)}</td></tr>`;
     }
 
-    case "overskrift":
-      return `<tr><td style="padding:12px 32px;"><div style="color:#3a5837;font-size:24px;">${block.content ?? ""}</div></td></tr>`;
+    case "overskrift": {
+      const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      const colorStyle = block.textColor ? `color:${block.textColor};` : "";
+      // block.content er rå Tiptap-HTML (fx "<p>Overskriften</p>") uden nogen
+      // margin-styring – ubehandlet arver <p>'en browserens/mail-klientens
+      // egen standard-margin (typisk et helt afsnits luft, langt mere end de
+      // 12px padding, blokken allerede har). Preview nulstiller dette via en
+      // CSS-regel (`[&_p]:m-0`), som ikke findes i det kopierede HTML-fragment
+      // (ingen <style>-blok) – sat eksplicit her i stedet, så det matcher.
+      const heading = (block.content ?? "").replace(/<p>/g, '<p style="margin:0">');
+      return `<tr><td style="padding:12px 32px;"><div style="color:#3a5837;font-size:24px;font-family:${fontFamily};${colorStyle}">${heading}</div></td></tr>`;
+    }
 
-    case "brodtekst":
-      return `<tr><td style="padding:12px 32px;color:#4a5565;font-size:14px;line-height:1.5;">${styleBrodtekstParagraphs(block.content ?? "")}</td></tr>`;
+    case "brodtekst": {
+      const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      const colorStyle = block.textColor ? `color:${block.textColor};` : "";
+      return `<tr><td style="padding:12px 32px;color:#4a5565;font-size:14px;line-height:1.5;font-family:${fontFamily};${colorStyle}">${styleBrodtekstParagraphs(block.content ?? "")}</td></tr>`;
+    }
 
     case "billede": {
       if (block.imageUrl) {
@@ -83,7 +103,7 @@ function renderBlockHtml(
       }
       return `<tr><td style="padding:12px 32px;text-align:center;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr><td bgcolor="#e8efe7" style="background:#e8efe7;border-radius:12px;padding:32px;color:#87a084;font-size:11px;text-align:center;">${escapeHtml(image.altText)}</td></tr>
+          <tr><td bgcolor="#e8efe7" style="background:#e8efe7;border-radius:12px;padding:32px;color:#87a084;font-size:11px;text-align:center;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(image.altText)}</td></tr>
         </table>
       </td></tr>`;
     }
@@ -93,11 +113,11 @@ function renderBlockHtml(
         .map(
           (product) => `
         <tr>
-          <td style="padding:10px 0;border-top:1px solid #d2ddd1;">
+          <td style="padding:10px 0;border-top:1px solid #d2ddd1;font-family:${DEFAULT_FONT_FAMILY};">
             <div style="font-weight:600;color:#3a5837;font-size:13px;">${escapeHtml(product.title)}</div>
             <div style="color:#637862;font-size:12px;">${escapeHtml(product.productType)}</div>
           </td>
-          <td style="padding:10px 0;border-top:1px solid #d2ddd1;text-align:right;font-weight:600;color:#3a5837;font-size:13px;white-space:nowrap;">
+          <td style="padding:10px 0;border-top:1px solid #d2ddd1;text-align:right;font-weight:600;color:#3a5837;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
             ${escapeHtml(formatPriceForCustomer(product.price, customerType))}
           </td>
         </tr>`,
@@ -111,8 +131,11 @@ function renderBlockHtml(
     case "skillelinje":
       return `<tr><td style="padding:12px 32px;"><hr style="border:none;border-top:1px solid #d2ddd1;margin:0;" /></td></tr>`;
 
-    case "tekst":
-      return `<tr><td style="padding:12px 32px;"><div style="color:#4a5565;font-size:14px;line-height:1.6;">${block.content ?? ""}</div></td></tr>`;
+    case "tekst": {
+      const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      const colorStyle = block.textColor ? `color:${block.textColor};` : "";
+      return `<tr><td style="padding:12px 32px;"><div style="color:#4a5565;font-size:14px;line-height:1.6;font-family:${fontFamily};${colorStyle}">${block.content ?? ""}</div></td></tr>`;
+    }
 
     case "img": {
       if (block.imageUrl) {
@@ -122,7 +145,7 @@ function renderBlockHtml(
           <img src="${escapeAttr(block.imageUrl)}" alt="${escapeAttr(block.altText ?? "")}" style="width:${width};max-width:100%;border-radius:8px;" />
         </td></tr>`;
       }
-      return `<tr><td style="padding:12px 32px;text-align:center;color:#87a084;font-size:11px;">[Billede]</td></tr>`;
+      return `<tr><td style="padding:12px 32px;text-align:center;color:#87a084;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">[Billede]</td></tr>`;
     }
 
     case "produkt": {
@@ -131,11 +154,11 @@ function renderBlockHtml(
       return `<tr><td style="padding:12px 32px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
           <tr>
-            <td style="padding:10px;border:1px solid #d2ddd1;border-radius:12px;">
+            <td style="padding:10px;border:1px solid #d2ddd1;border-radius:12px;font-family:${DEFAULT_FONT_FAMILY};">
               <div style="font-weight:600;color:#3a5837;font-size:13px;">${escapeHtml(product.title)}</div>
               <div style="color:#637862;font-size:12px;">${escapeHtml(product.productType)}</div>
             </td>
-            <td style="padding:10px;border:1px solid #d2ddd1;text-align:right;font-weight:600;color:#3a5837;font-size:13px;white-space:nowrap;">
+            <td style="padding:10px;border:1px solid #d2ddd1;text-align:right;font-weight:600;color:#3a5837;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
               ${escapeHtml(formatPriceForCustomer(product.price, customerType))}
             </td>
           </tr>
@@ -145,13 +168,40 @@ function renderBlockHtml(
 
     case "cta": {
       const bgColor = block.bgColor || "#3a5837";
-      const textColor = getContrastTextColor(bgColor);
+      // Knap-TEKSTENS farve: en global/per-blok textColor-vælger vinder,
+      // ellers falder den tilbage til den automatisk udregnede kontrastfarve
+      // mod knappens baggrund (bgColor styres fortsat kun pr. blok).
+      const textColor = block.textColor || getContrastTextColor(bgColor);
+      const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      // font-family sættes BÅDE på <td> og på selve <a>'et – ikke kun ét sted.
+      // Nogle mail-klienters indsæt-sanering rører/erstatter specifikt
+      // <a>-tags' egen inline style (fx med deres eget standard-link-udseende),
+      // uden at røre den omkringliggende <td>. Uden en eksplicit værdi på
+      // cellen ville teksten i så fald arve klientens egen standardskrift
+      // (ofte en serif) i stedet – samme grundlæggende problem som
+      // overskriftens manglende margin tidligere.
+      //
+      // Padding herunder (10px 24px) er kopieret 1:1 fra Preview-knappens
+      // egne Tailwind-klasser (py-2.5 px-6 = 10px/24px ved 16px root), ikke
+      // gættet på ny.
+      //
+      // block.content kan – ligesom overskriften – være Tiptap-HTML pakket
+      // ind i <p>-tags (fx "<p>Se træet her</p>"), når knap-teksten er
+      // redigeret. Preview gør det uskadeligt ved at tvinge <p> til at være
+      // inline (`[&_p]:inline`), men den CSS-regel findes ikke i det
+      // kopierede fragment. I stedet for at prøve at neutralisere <p>'ens
+      // egen standard-margin med endnu en inline style, fjernes <p>-tagsene
+      // helt her – en knap-label er per definition én linje, så der er
+      // ingen grund til at bevare et blok-element, der kan blæse den
+      // "inline-block"-knappens højde markant op (bekræftet: uden denne
+      // fix blev den fulde knap 63px høj mod Previews 39,5px).
+      const label = (block.content ?? "").replace(/<\/?p[^>]*>/g, "");
       return `<tr><td style="padding:12px 32px;text-align:center;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td bgcolor="${bgColor}" style="background:${bgColor};border-radius:8px;padding:11px 22px;" align="center">
-              <a href="${escapeAttr(block.ctaUrl || "#")}" style="color:${textColor};text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-weight:600;font-size:13px;display:inline-block;">
-                ${block.content ?? ""}
+            <td bgcolor="${bgColor}" style="background:${bgColor};border-radius:8px;padding:10px 24px;font-family:${fontFamily};" align="center">
+              <a href="${escapeAttr(block.ctaUrl || "#")}" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-weight:600;font-size:13px;line-height:19.5px;display:inline-block;">
+                ${label}
               </a>
             </td>
           </tr>
@@ -162,7 +212,7 @@ function renderBlockHtml(
     case "footer": {
       const bgColor = block.bgColor || "#f5f7f4";
       const textColor = getContrastTextColor(bgColor);
-      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;font-size:11px;">
+      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">
         Jysk Plantesalg · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890<br/>
         Du modtager dette nyhedsbrev, fordi du er ${escapeHtml(audienceFor(customerType))}.
       </td></tr>`;
@@ -239,7 +289,7 @@ export function buildNewsletterHtml(
     .map((block) => renderBlockHtml(block, image, customerType, products))
     .join("\n");
 
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:100%;margin:0 auto;border:1px solid #d2ddd1;border-radius:16px;border-collapse:separate;border-spacing:0;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:100%;margin:0 auto;border:1px solid #d2ddd1;border-radius:16px;border-collapse:separate;border-spacing:0;overflow:hidden;font-family:${DEFAULT_FONT_FAMILY};">
     <tbody>${rows}</tbody>
   </table>`.trim();
 }

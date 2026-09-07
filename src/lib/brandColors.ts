@@ -39,3 +39,22 @@ export function getContrastTextColor(backgroundHex: string): string {
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
   return yiq >= 150 ? DARK_TEXT_COLOR : LIGHT_TEXT_COLOR;
 }
+
+// Fjerner kun color-deklarationer fra inline style-attributter i en bloks
+// HTML-indhold (fx et enkelt Tiptap-tekstudsnit, der tidligere fik sin egen
+// tekstfarve via værktøjslinjens farve-swatches) – uden at røre andre
+// stilarter som skrifttype eller -størrelse på samme element. Bruges når det
+// globale tekstfarve-valg sættes, så det reelt overskriver evt. tidligere
+// individuelle valg på enkelte blokke, i stedet for bare at blive overskygget
+// af dem. Matcher kun den eksakte "color"-egenskab, så fx "background-color"
+// på samme element ikke fjernes ved en fejl.
+export function stripColorStyles(html: string): string {
+  return html.replace(/style="([^"]*)"/g, (match, styleContent: string) => {
+    const cleaned = styleContent
+      .split(";")
+      .map((rule) => rule.trim())
+      .filter((rule) => rule && rule.split(":")[0]?.trim().toLowerCase() !== "color")
+      .join("; ");
+    return cleaned ? `style="${cleaned}"` : "";
+  });
+}
