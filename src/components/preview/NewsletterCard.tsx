@@ -3,7 +3,13 @@ import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { ImagePlaceholderIcon, LeafIcon } from "@/components/icons";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
-import type { NewsletterBlock } from "@/lib/newsletterBlocks";
+import { IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
+
+const JUSTIFY_CLASS = {
+  venstre: "justify-start",
+  center: "justify-center",
+  hoejre: "justify-end",
+} as const;
 
 interface NewsletterCardProps {
   blocks: NewsletterBlock[];
@@ -14,7 +20,6 @@ interface NewsletterCardProps {
 }
 
 export function NewsletterCard({ blocks, image, customerType, products, viewport }: NewsletterCardProps) {
-  const greeting = customerType === "erhverv" ? "Kære erhvervskunde," : "Kære privatkunde,";
   const audience = customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
 
   function renderBlock(block: NewsletterBlock): ReactNode {
@@ -41,20 +46,30 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
 
       case "brodtekst":
         return (
-          <div className="flex flex-col gap-5 px-8 py-3">
-            <p className="text-[13px] leading-relaxed text-card-body-text">{greeting}</p>
+          <div className="px-8 py-3">
             <div
-              className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0"
+              className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0 [&_p+p]:mt-5"
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
-            <p className="text-[13px] leading-relaxed text-card-body-text">
-              Ønsker du at se planterne på stedet eller modtage et uforpligtende tilbud? Kontakt os
-              direkte – vi rådgiver gerne om valg og placering.
-            </p>
           </div>
         );
 
-      case "billede":
+      case "billede": {
+        const alignment = block.alignment ?? "center";
+        const size = block.size ?? "fuld";
+        if (block.imageUrl) {
+          return (
+            <div className={`flex px-8 py-3 ${JUSTIFY_CLASS[alignment]}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- lokal blob:-object-URL, next/image kan ikke optimere den */}
+              <img
+                src={block.imageUrl}
+                alt={block.altText || image.altText}
+                style={{ width: IMAGE_SIZE_PX[size] }}
+                className="max-w-full rounded-xl object-cover"
+              />
+            </div>
+          );
+        }
         return (
           <div className="px-8 py-3">
             <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-xl bg-surface-active">
@@ -63,6 +78,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             </div>
           </div>
         );
+      }
 
       case "produktvisning":
         return (
@@ -105,7 +121,22 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           </div>
         );
 
-      case "img":
+      case "img": {
+        const alignment = block.alignment ?? "center";
+        const size = block.size ?? "fuld";
+        if (block.imageUrl) {
+          return (
+            <div className={`flex px-8 py-3 ${JUSTIFY_CLASS[alignment]}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- lokal blob:-object-URL, next/image kan ikke optimere den */}
+              <img
+                src={block.imageUrl}
+                alt={block.altText ?? ""}
+                style={{ width: IMAGE_SIZE_PX[size] }}
+                className="max-w-full rounded-lg object-cover"
+              />
+            </div>
+          );
+        }
         return (
           <div className="flex justify-center px-8 py-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-active text-ink-muted">
@@ -113,6 +144,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             </div>
           </div>
         );
+      }
 
       case "produkt": {
         const product = products.find((item) => item.id === block.productId);

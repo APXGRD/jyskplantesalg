@@ -4,6 +4,7 @@
 // rækkefølge, med samme synlighed og samme indhold.
 
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
+import type { CustomerType } from "@/lib/format";
 
 export type BlockType =
   | "header"
@@ -19,6 +20,22 @@ export type BlockType =
   | "img"
   | "produkt";
 
+export type ImageAlignment = "venstre" | "center" | "hoejre";
+export type ImageSize = "lille" | "mellem" | "fuld";
+
+// Fast bredde pr. størrelse, brugt både i Preview og i den kopierede HTML.
+export const IMAGE_SIZE_PX: Record<ImageSize, string> = {
+  lille: "200px",
+  mellem: "400px",
+  fuld: "100%",
+};
+
+export const IMAGE_ALIGN_CSS: Record<ImageAlignment, "left" | "center" | "right"> = {
+  venstre: "left",
+  center: "center",
+  hoejre: "right",
+};
+
 export interface NewsletterBlock {
   id: string;
   type: BlockType;
@@ -31,6 +48,14 @@ export interface NewsletterBlock {
   ctaUrl?: string;
   // Kun relevant for "produkt"-blokken (enkelt-produkt-visning).
   productId?: string;
+  // Kun relevant for billede-blokke ("billede"/"img"). imageUrl er pt. en
+  // base64 data-URI (client-side preview via FileReader) – se
+  // ImageBlockControls.tsx. Uden imageUrl falder blokken tilbage til sin
+  // eksisterende pladsholder-visning.
+  imageUrl?: string;
+  altText?: string;
+  alignment?: ImageAlignment;
+  size?: ImageSize;
 }
 
 const DEFAULT_BLOCK_TYPES: BlockType[] = [
@@ -44,11 +69,34 @@ const DEFAULT_BLOCK_TYPES: BlockType[] = [
   "footer",
 ];
 
-export function createDefaultBlocks(result: GeneratedNewsletter): NewsletterBlock[] {
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function greetingFor(customerType: CustomerType): string {
+  return customerType === "erhverv" ? "Kære erhvervskunde," : "Kære privatkunde,";
+}
+
+// Fast afsluttende linje, der altid vises efter selve AI-brødteksten. Den er
+// ikke en del af Geminis svar (bodyText er kun ÉT felt), men skal stadig være
+// synlig OG redigerbar i Edit-mode – ikke kun i Preview – så den flettes ind i
+// "brodtekst"-blokkens content som endnu et afsnit, i stedet for at blive
+// tilføjet separat (og usynligt for Edit-mode) i selve render-laget.
+const CLOSING_TEXT =
+  "Ønsker du at se planterne på stedet eller modtage et uforpligtende tilbud? Kontakt os direkte – vi rådgiver gerne om valg og placering.";
+
+export function createDefaultBlocks(
+  result: GeneratedNewsletter,
+  customerType: CustomerType,
+): NewsletterBlock[] {
   return DEFAULT_BLOCK_TYPES.map((type) => {
     const block: NewsletterBlock = { id: type, type, hidden: false };
     if (type === "overskrift") block.content = result.heading;
-    if (type === "brodtekst") block.content = result.bodyText;
+    if (type === "brodtekst") {
+      block.content = [greetingFor(customerType), result.bodyText, CLOSING_TEXT]
+        .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+        .join("");
+    }
     if (type === "cta") {
       block.content = result.cta.text;
       block.ctaUrl = result.cta.url;

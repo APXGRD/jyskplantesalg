@@ -1,7 +1,7 @@
 import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
-import type { NewsletterBlock } from "@/lib/newsletterBlocks";
+import { IMAGE_ALIGN_CSS, IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -15,21 +15,17 @@ function escapeAttr(value: string): string {
 // derfor allerede simpel, formateret HTML (fx "<p>Tekst med <strong>fed</strong></p>")
 // – skal IKKE escapes igen, ellers vises tags'ne som rå tekst i stedet for at blive
 // fortolket.
+// Bevarer afsnits-skift som blanklinjer (i stedet for enkelte linjeskift), så
+// fx en flerafsnits "brodtekst"-blok stadig læses som adskilte afsnit i
+// tekst-udgaven.
 function stripHtml(html: string): string {
   return html
-    .replace(/<\/(p|div|h[1-6])>/gi, "\n")
+    .replace(/<\/(p|div|h[1-6])>/gi, "\n\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, "")
-    .replace(/\n{2,}/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
-
-function greetingFor(customerType: CustomerType): string {
-  return customerType === "erhverv" ? "Kære erhvervskunde," : "Kære privatkunde,";
-}
-
-const CLOSING_TEXT =
-  "Ønsker du at se planterne på stedet eller modtage et uforpligtende tilbud? Kontakt os direkte – vi rådgiver gerne om valg og placering.";
 
 function audienceFor(customerType: CustomerType): string {
   return customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
@@ -49,16 +45,20 @@ function renderBlockHtml(
       return `<div style="padding:12px 32px;"><div style="color:#3a5837;font-size:24px;">${block.content ?? ""}</div></div>`;
 
     case "brodtekst":
-      return `<div style="padding:12px 32px;">
-        <p style="color:#4a5565;font-size:14px;line-height:1.6;margin:0 0 16px;">${escapeHtml(greetingFor(customerType))}</p>
-        <div style="color:#4a5565;font-size:14px;line-height:1.6;margin:0 0 16px;">${block.content ?? ""}</div>
-        <p style="color:#4a5565;font-size:14px;line-height:1.6;margin:0;">${escapeHtml(CLOSING_TEXT)}</p>
-      </div>`;
+      return `<div style="padding:12px 32px;color:#4a5565;font-size:14px;line-height:1.6;">${block.content ?? ""}</div>`;
 
-    case "billede":
+    case "billede": {
+      if (block.imageUrl) {
+        const align = IMAGE_ALIGN_CSS[block.alignment ?? "center"];
+        const width = IMAGE_SIZE_PX[block.size ?? "fuld"];
+        return `<div style="padding:12px 32px;text-align:${align};">
+          <img src="${escapeAttr(block.imageUrl)}" alt="${escapeAttr(block.altText || image.altText)}" style="width:${width};max-width:100%;border-radius:12px;" />
+        </div>`;
+      }
       return `<div style="padding:12px 32px;text-align:center;">
         <div style="background:#e8efe7;border-radius:12px;padding:32px;color:#87a084;font-size:11px;">${escapeHtml(image.altText)}</div>
       </div>`;
+    }
 
     case "produktvisning": {
       const rows = products
@@ -84,8 +84,16 @@ function renderBlockHtml(
     case "tekst":
       return `<div style="padding:12px 32px;"><div style="color:#4a5565;font-size:14px;line-height:1.6;">${block.content ?? ""}</div></div>`;
 
-    case "img":
+    case "img": {
+      if (block.imageUrl) {
+        const align = IMAGE_ALIGN_CSS[block.alignment ?? "center"];
+        const width = IMAGE_SIZE_PX[block.size ?? "fuld"];
+        return `<div style="padding:12px 32px;text-align:${align};">
+          <img src="${escapeAttr(block.imageUrl)}" alt="${escapeAttr(block.altText ?? "")}" style="width:${width};max-width:100%;border-radius:8px;" />
+        </div>`;
+      }
       return `<div style="padding:12px 32px;text-align:center;color:#87a084;font-size:11px;">[Billede]</div>`;
+    }
 
     case "produkt": {
       const product = products.find((item) => item.id === block.productId);
@@ -134,10 +142,10 @@ function renderBlockText(
       return stripHtml(block.content ?? "");
 
     case "brodtekst":
-      return [greetingFor(customerType), stripHtml(block.content ?? ""), CLOSING_TEXT].join("\n\n");
+      return stripHtml(block.content ?? "");
 
     case "billede":
-      return `[Billede: ${image.altText}]`;
+      return `[Billede: ${block.altText || image.altText}]`;
 
     case "produktvisning":
       return products
@@ -154,7 +162,7 @@ function renderBlockText(
       return stripHtml(block.content ?? "");
 
     case "img":
-      return "[Billede]";
+      return block.imageUrl ? `[Billede: ${block.altText || "uden beskrivelse"}]` : "[Billede]";
 
     case "produkt": {
       const product = products.find((item) => item.id === block.productId);
