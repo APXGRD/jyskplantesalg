@@ -22,8 +22,8 @@ export function ColorSwatches({ value, onChange, label }: ColorSwatchesProps) {
               aria-label={`Farve: ${color.label}`}
               aria-pressed={isActive}
               title={color.label}
-              className={`h-5 w-5 shrink-0 rounded-full border ${
-                isActive ? "ring-2 ring-ink ring-offset-1" : "border-border"
+              className={`h-5 w-5 shrink-0 rounded-full border border-black/10 transition-transform hover:scale-110 ${
+                isActive ? "ring-2 ring-ink ring-offset-1" : ""
               }`}
               style={{ backgroundColor: color.value }}
             />

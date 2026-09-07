@@ -46,6 +46,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           <div className="px-8 py-3">
             <div
               className="font-serif text-[26px] leading-[1.2] text-ink [&_p]:m-0"
+              style={{ fontFamily: block.fontFamily, color: block.textColor }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -56,6 +57,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           <div className="px-8 py-3">
             <div
               className="text-[13px] leading-normal text-card-body-text [&_p]:m-0 [&_p]:mb-3.5 [&_p:last-child]:mb-0"
+              style={{ fontFamily: block.fontFamily, color: block.textColor }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -123,6 +125,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           <div className="px-8 py-3">
             <div
               className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0"
+              style={{ fontFamily: block.fontFamily, color: block.textColor }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -173,14 +176,17 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
 
       case "cta": {
         const bgColor = block.bgColor || "#3a5837";
-        const textColor = getContrastTextColor(bgColor);
+        // Knap-TEKSTENS farve: en global/per-blok textColor-vælger vinder,
+        // ellers falder den tilbage til den automatisk udregnede kontrastfarve
+        // mod knappens baggrund (bgColor styres fortsat kun pr. blok).
+        const textColor = block.textColor || getContrastTextColor(bgColor);
         return (
           <div className="flex justify-center px-8 py-3">
             <a
               href={block.ctaUrl || "#"}
               target="_blank"
               rel="noreferrer"
-              style={{ backgroundColor: bgColor, color: textColor }}
+              style={{ backgroundColor: bgColor, color: textColor, fontFamily: block.fontFamily }}
               className="inline-flex items-center gap-1 rounded-lg px-6 py-2.5 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline"
             >
               <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />

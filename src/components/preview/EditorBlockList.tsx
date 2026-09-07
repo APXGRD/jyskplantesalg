@@ -23,12 +23,16 @@ import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { TextBlockEditor } from "@/components/TextBlockEditor";
 import { ImageBlockControls } from "@/components/ImageBlockControls";
 import { ColorSwatches } from "@/components/ColorSwatches";
+import { stripColorStyles } from "@/lib/brandColors";
+import { FONT_FAMILIES, stripFontFamilyStyles } from "@/lib/fontFamilies";
 import {
   ButtonIcon,
+  ChevronDownIcon,
   DividerIcon,
   DuplicateIcon,
   EyeIcon,
   EyeOffIcon,
+  GearIcon,
   GripIcon,
   ImagePlaceholderIcon,
   PlusIcon,
@@ -39,6 +43,7 @@ import {
 import {
   createNewBlock,
   duplicateBlock,
+  RICH_TEXT_BLOCK_TYPES,
   type AddableBlockKind,
   type BlockType,
   type ImageAlignment,
@@ -126,13 +131,34 @@ function BlockContent({
       );
 
     case "overskrift":
-      return <TextBlockEditor content={block.content ?? ""} onChange={onContentChange} />;
+      return (
+        <TextBlockEditor
+          content={block.content ?? ""}
+          onChange={onContentChange}
+          fontFamily={block.fontFamily}
+          textColor={block.textColor}
+        />
+      );
 
     case "brodtekst":
-      return <TextBlockEditor content={block.content ?? ""} onChange={onContentChange} />;
+      return (
+        <TextBlockEditor
+          content={block.content ?? ""}
+          onChange={onContentChange}
+          fontFamily={block.fontFamily}
+          textColor={block.textColor}
+        />
+      );
 
     case "tekst":
-      return <TextBlockEditor content={block.content ?? ""} onChange={onContentChange} />;
+      return (
+        <TextBlockEditor
+          content={block.content ?? ""}
+          onChange={onContentChange}
+          fontFamily={block.fontFamily}
+          textColor={block.textColor}
+        />
+      );
 
     case "billede":
     case "img":
@@ -185,7 +211,12 @@ function BlockContent({
     case "cta":
       return (
         <div className="flex flex-col gap-2">
-          <TextBlockEditor content={block.content ?? ""} onChange={onContentChange} />
+          <TextBlockEditor
+            content={block.content ?? ""}
+            onChange={onContentChange}
+            fontFamily={block.fontFamily}
+            textColor={block.textColor}
+          />
           <input
             value={block.ctaUrl ?? ""}
             onChange={(event) => onCtaUrlChange(event.target.value)}
@@ -402,6 +433,37 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, bgColor } : block)));
   }
 
+  // Sætter skrifttypen for ALLE tekst-blokke på én gang og fjerner samtidig
+  // evt. tidligere per-udsnit skrifttype-valg inde i selve indholdet (fra
+  // værktøjslinjens egen Skrifttype-dropdown) – ellers ville et gammelt
+  // individuelt valg blive ved med at overskygge det nye globale valg for
+  // netop det tekstudsnit. Går man bagefter ind i en enkelt bloks egen
+  // værktøjslinje og vælger en anden skrifttype dér, gælder det valg igen for
+  // lige præcis den blok, indtil næste globale skift.
+  function handleGlobalFontChange(fontFamily: string) {
+    onBlocksChange(
+      blocks.map((block) =>
+        RICH_TEXT_BLOCK_TYPES.includes(block.type)
+          ? { ...block, fontFamily, content: block.content ? stripFontFamilyStyles(block.content) : block.content }
+          : block,
+      ),
+    );
+  }
+
+  // Samme mønster som handleGlobalFontChange, men for TEKSTFARVEN på de samme
+  // blokke – for "cta" er det knap-tekstens farve, ikke knappens baggrund
+  // (bgColor), som fortsat kun styres pr. blok via "Knapfarve"-swatchene
+  // herunder.
+  function handleGlobalColorChange(textColor: string) {
+    onBlocksChange(
+      blocks.map((block) =>
+        RICH_TEXT_BLOCK_TYPES.includes(block.type)
+          ? { ...block, textColor, content: block.content ? stripColorStyles(block.content) : block.content }
+          : block,
+      ),
+    );
+  }
+
   function handleDuplicate(id: string) {
     const index = blocks.findIndex((block) => block.id === id);
     if (index === -1) return;
@@ -423,42 +485,87 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
     onBlocksChange([...blocks, createNewBlock(kind, products[0]?.id)]);
   }
 
-  return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex max-w-xl flex-col gap-3">
-          {blocks.map((block) => {
-            const meta = BLOCK_META[block.type];
-            return (
-              <SortableBlockRow
-                key={block.id}
-                block={block}
-                title={meta.title}
-                badge={meta.badge}
-                onDuplicate={() => handleDuplicate(block.id)}
-                onToggleHidden={() => handleToggleHidden(block.id)}
-                onDelete={() => handleDelete(block.id)}
-              >
-                <BlockContent
-                  block={block}
-                  onContentChange={(html) => handleContentChange(block.id, html)}
-                  onCtaUrlChange={(url) => handleCtaUrlChange(block.id, url)}
-                  onProductIdChange={(productId) => handleProductIdChange(block.id, productId)}
-                  onImageChange={(imageUrl) => handleImageChange(block.id, imageUrl)}
-                  onAltTextChange={(altText) => handleAltTextChange(block.id, altText)}
-                  onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
-                  onSizeChange={(size) => handleSizeChange(block.id, size)}
-                  onBgColorChange={(color) => handleBgColorChange(block.id, color)}
-                  products={products}
-                  customerType={customerType}
-                />
-              </SortableBlockRow>
-            );
-          })}
+  // Alle tekst-blokke sættes altid samlet af handleGlobalFontChange/
+  // handleGlobalColorChange, så deres fontFamily/textColor-felter i praksis
+  // er synkroniserede – vælgerne kan derfor bare aflæse værdien fra den
+  // første tekst-blok, uden deres egen state.
+  const firstTextBlock = blocks.find((block) => RICH_TEXT_BLOCK_TYPES.includes(block.type));
+  const globalFontFamily = firstTextBlock?.fontFamily ?? "";
+  const globalTextColor = firstTextBlock?.textColor;
 
-          <AddBlockMenu onAdd={handleAddBlock} />
+  return (
+    <div className="flex max-w-xl flex-col gap-4">
+      <div
+        className="flex h-11 w-fit shrink-0 items-center gap-1 self-start rounded-full border border-border bg-surface-active px-3 shadow-sm"
+        title="Indstillinger for hele nyhedsbrevet"
+      >
+        <GearIcon className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
+
+        <div className="mx-1 h-5 w-px bg-border" />
+
+        <div className="relative flex items-center">
+          <select
+            id="global-font-family"
+            value={globalFontFamily}
+            onChange={(event) => handleGlobalFontChange(event.target.value)}
+            aria-label="Skrifttype for hele nyhedsbrevet"
+            className="appearance-none rounded-full bg-transparent py-1 pr-6 pl-2 text-xs text-ink-muted hover:bg-surface focus:outline-none"
+          >
+            <option value="" disabled>
+              Skrifttype
+            </option>
+            {FONT_FAMILIES.map((font) => (
+              <option key={font.value} value={font.value}>
+                {font.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDownIcon className="pointer-events-none absolute right-1.5 h-2.5 w-2.5 text-ink-muted" />
         </div>
-      </SortableContext>
-    </DndContext>
+
+        <div className="mx-1 h-5 w-px bg-border" />
+
+        <div aria-label="Tekstfarve for hele nyhedsbrevet">
+          <ColorSwatches value={globalTextColor} onChange={handleGlobalColorChange} />
+        </div>
+      </div>
+
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
+          <div className="flex flex-col gap-3">
+            {blocks.map((block) => {
+              const meta = BLOCK_META[block.type];
+              return (
+                <SortableBlockRow
+                  key={block.id}
+                  block={block}
+                  title={meta.title}
+                  badge={meta.badge}
+                  onDuplicate={() => handleDuplicate(block.id)}
+                  onToggleHidden={() => handleToggleHidden(block.id)}
+                  onDelete={() => handleDelete(block.id)}
+                >
+                  <BlockContent
+                    block={block}
+                    onContentChange={(html) => handleContentChange(block.id, html)}
+                    onCtaUrlChange={(url) => handleCtaUrlChange(block.id, url)}
+                    onProductIdChange={(productId) => handleProductIdChange(block.id, productId)}
+                    onImageChange={(imageUrl) => handleImageChange(block.id, imageUrl)}
+                    onAltTextChange={(altText) => handleAltTextChange(block.id, altText)}
+                    onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
+                    onSizeChange={(size) => handleSizeChange(block.id, size)}
+                    onBgColorChange={(color) => handleBgColorChange(block.id, color)}
+                    products={products}
+                    customerType={customerType}
+                  />
+                </SortableBlockRow>
+              );
+            })}
+
+            <AddBlockMenu onAdd={handleAddBlock} />
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
   );
 }

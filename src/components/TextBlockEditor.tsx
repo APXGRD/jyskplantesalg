@@ -5,20 +5,29 @@ import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
 import { ColorSwatches } from "@/components/ColorSwatches";
+import { FONT_FAMILIES } from "@/lib/fontFamilies";
+import { BoldIcon, ChevronDownIcon, ItalicIcon, MinusIcon, PlusIcon, UnderlineIcon } from "@/components/icons";
 
 interface TextBlockEditorProps {
   content: string;
   onChange: (html: string) => void;
+  // Blokkens skrifttype- og tekstfarve-udgangspunkt sat af de globale vælgere
+  // i Edit-mode (se NewsletterBlock.fontFamily/.textColor) – vises som
+  // editorens standard, så den matcher Preview. Et enkelt tekstudsnit kan
+  // stadig afvige herfra via værktøjslinjens egne dropdown/farve-swatches
+  // herunder.
+  fontFamily?: string;
+  textColor?: string;
 }
 
-const FONT_FAMILIES = [
-  { label: "Arial", value: "Arial, sans-serif" },
-  { label: "Georgia", value: "Georgia, serif" },
-  { label: "Verdana", value: "Verdana, sans-serif" },
-  { label: "Times New Roman", value: "'Times New Roman', serif" },
-];
+const DEFAULT_FONT_SIZE = 13;
+const MIN_FONT_SIZE = 10;
+const MAX_FONT_SIZE = 36;
 
-const FONT_SIZES = ["14", "16", "18", "20", "24"];
+const toolbarIconButtonClassName = (active: boolean) =>
+  `flex h-7 w-7 items-center justify-center rounded-full ${
+    active ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
+  }`;
 
 const EDITOR_EXTENSIONS = [
   StarterKit.configure({
@@ -40,7 +49,7 @@ const EDITOR_EXTENSIONS = [
   Color,
 ];
 
-export function TextBlockEditor({ content, onChange }: TextBlockEditorProps) {
+export function TextBlockEditor({ content, onChange, fontFamily, textColor }: TextBlockEditorProps) {
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // Klik på værktøjslinjen (knapper/dropdowns) flytter DOM-fokus væk fra selve
@@ -56,7 +65,14 @@ export function TextBlockEditor({ content, onChange }: TextBlockEditorProps) {
       content,
       editorProps: {
         attributes: {
-          class: "outline-none text-[13px] text-ink leading-relaxed",
+          // NB: ingen text-ink (farve) her – den skal komme fra wrapper-div'ens
+          // egen style/color herunder, så den reagerer på blokkens textColor.
+          // Sættes den her i stedet (som en class direkte på selve
+          // ProseMirror-elementet), vinder den altid over wrapperens nedarvede
+          // farve, uanset hvad textColor er sat til – uden at det giver fejl,
+          // ser det bare ud som om den globale/per-blok farve-vælger ikke gør
+          // noget i selve Edit-mode-listen.
+          class: "outline-none text-[13px] leading-relaxed",
         },
       },
       onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -73,6 +89,12 @@ export function TextBlockEditor({ content, onChange }: TextBlockEditorProps) {
     const chain = editor.chain().focus().setTextSelection(savedSelectionRef.current);
     run(chain);
     chain.run();
+  }
+
+  function stepFontSize(delta: number) {
+    const current = Number(activeState.fontSize) || DEFAULT_FONT_SIZE;
+    const next = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, current + delta));
+    applyCommand((chain) => chain.setFontSize(`${next}px`));
   }
 
   const defaultActiveState = {
@@ -119,90 +141,104 @@ export function TextBlockEditor({ content, onChange }: TextBlockEditorProps) {
   }
 
   return (
-    <div ref={containerRef} onFocus={handleFocus} onBlur={handleBlur} className="relative">
+    <div
+      ref={containerRef}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className="relative"
+      style={{ fontFamily, color: textColor || "var(--ink)" }}
+    >
       {isFocused && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-white p-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-          <select
-            value={activeState.fontFamily}
-            onMouseDown={() => {
-              if (editor) {
-                const { from, to } = editor.state.selection;
-                savedSelectionRef.current = { from, to };
-              }
-            }}
-            onChange={(event) => {
-              const value = event.target.value;
-              applyCommand((chain) => chain.setFontFamily(value));
-            }}
-            className="rounded-md border border-border bg-white px-2 py-1 text-xs text-ink-muted focus:outline-none"
-          >
-            <option value="">Skrifttype</option>
-            {FONT_FAMILIES.map((font) => (
-              <option key={font.value} value={font.value}>
-                {font.label}
-              </option>
-            ))}
-          </select>
+        <div className="absolute bottom-full left-0 z-10 mb-2 flex h-11 w-fit items-center gap-0.5 rounded-full border border-border bg-white px-2 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+          <div className="relative flex items-center">
+            <select
+              value={activeState.fontFamily}
+              onMouseDown={() => {
+                if (editor) {
+                  const { from, to } = editor.state.selection;
+                  savedSelectionRef.current = { from, to };
+                }
+              }}
+              onChange={(event) => {
+                const value = event.target.value;
+                applyCommand((chain) => chain.setFontFamily(value));
+              }}
+              aria-label="Skrifttype"
+              className="appearance-none rounded-full bg-transparent py-1 pr-5 pl-2 text-xs text-ink-muted hover:bg-surface-active focus:outline-none"
+            >
+              <option value="">Skrifttype</option>
+              {FONT_FAMILIES.map((font) => (
+                <option key={font.value} value={font.value}>
+                  {font.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="pointer-events-none absolute right-1.5 h-2.5 w-2.5 text-ink-muted" />
+          </div>
 
-          <select
-            value={activeState.fontSize}
-            onMouseDown={() => {
-              if (editor) {
-                const { from, to } = editor.state.selection;
-                savedSelectionRef.current = { from, to };
-              }
-            }}
-            onChange={(event) => {
-              const value = `${event.target.value}px`;
-              applyCommand((chain) => chain.setFontSize(value));
-            }}
-            className="rounded-md border border-border bg-white px-2 py-1 text-xs text-ink-muted focus:outline-none"
-          >
-            <option value="">Str.</option>
-            {FONT_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+          <div className="mx-1 h-5 w-px bg-border" />
 
-          <div className="mx-0.5 h-5 w-px bg-border" />
+          <div className="flex items-center gap-0.5" aria-label="Skriftstørrelse">
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => stepFontSize(-1)}
+              aria-label="Mindre skrift"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-ink-muted hover:bg-surface-active"
+            >
+              <MinusIcon className="h-3 w-3" />
+            </button>
+            <span className="w-4 text-center text-[11px] tabular-nums text-ink-muted">
+              {activeState.fontSize || DEFAULT_FONT_SIZE}
+            </span>
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => stepFontSize(1)}
+              aria-label="Større skrift"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-ink-muted hover:bg-surface-active"
+            >
+              <PlusIcon className="h-3 w-3" />
+            </button>
+          </div>
+
+          <div className="mx-1 h-5 w-px bg-border" />
 
           <button
             type="button"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => applyCommand((chain) => chain.toggleBold())}
             aria-pressed={activeState.bold}
-            className={`flex h-7 w-7 items-center justify-center rounded-md text-sm font-bold ${
-              activeState.bold ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
-            }`}
+            aria-label="Fed"
+            title="Fed"
+            className={toolbarIconButtonClassName(activeState.bold)}
           >
-            B
+            <BoldIcon className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => applyCommand((chain) => chain.toggleItalic())}
             aria-pressed={activeState.italic}
-            className={`flex h-7 w-7 items-center justify-center rounded-md text-sm italic ${
-              activeState.italic ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
-            }`}
+            aria-label="Kursiv"
+            title="Kursiv"
+            className={toolbarIconButtonClassName(activeState.italic)}
           >
-            I
+            <ItalicIcon className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => applyCommand((chain) => chain.toggleUnderline())}
             aria-pressed={activeState.underline}
-            className={`flex h-7 w-7 items-center justify-center rounded-md text-sm underline ${
-              activeState.underline ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
-            }`}
+            aria-label="Understreget"
+            title="Understreget"
+            className={toolbarIconButtonClassName(activeState.underline)}
           >
-            U
+            <UnderlineIcon className="h-3.5 w-3.5" />
           </button>
 
-          <div className="mx-0.5 h-5 w-px bg-border" />
+          <div className="mx-1 h-5 w-px bg-border" />
 
           <ColorSwatches
             value={activeState.color}

@@ -61,7 +61,25 @@ export interface NewsletterBlock {
   // baggrund) og baggrunds-bærende struktur-blokke ("header"/"footer").
   // Uden bgColor bruges blokkens eksisterende standardfarve.
   bgColor?: string;
+  // Blokkens skrifttype-udgangspunkt – kun relevant for tekst-blokke
+  // (overskrift/brodtekst/tekst/cta), sat af den globale skrifttype-vælger i
+  // Edit-mode (se FONT_FAMILIES). Et enkelt tekstudsnit inde i selve
+  // "content"-HTML'en kan stadig afvige herfra via et Tiptap-mark fra den
+  // per-blok værktøjslinje – det inline mark vinder naturligt over denne
+  // block-brede standard i CSS-cascaden.
+  fontFamily?: string;
+  // Blokkens TEKSTFARVE-udgangspunkt – samme mønster som fontFamily herover,
+  // sat af den globale farve-vælger i Edit-mode (BRAND_COLORS). For "cta" er
+  // dette knap-TEKSTENS farve, ikke knappens baggrund (den styres fortsat
+  // udelukkende af bgColor, kun pr. blok) – uden textColor bruger CTA'en sin
+  // automatisk udregnede kontrastfarve i stedet.
+  textColor?: string;
 }
+
+// De blok-typer, hvis indhold redigeres som fri tekst via TextBlockEditor
+// (Tiptap) – dem, den globale skrifttype-vælger i Edit-mode sætter på én
+// gang.
+export const RICH_TEXT_BLOCK_TYPES: BlockType[] = ["overskrift", "brodtekst", "tekst", "cta"];
 
 const DEFAULT_BLOCK_TYPES: BlockType[] = [
   "header",
