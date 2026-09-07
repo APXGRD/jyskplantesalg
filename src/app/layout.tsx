@@ -16,7 +16,7 @@ const instrumentSerif = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: "Jysk Plantesalg – Nyhedsbrevsværktøj",
-  description: "Vælg produkter til nyhedsbrevet",
+  description: "Nyhedsbrev-generator til Jysk Plantesalg",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
