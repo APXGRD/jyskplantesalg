@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { mockShopData } from "@/lib/mock/mockShopifyData";
+import { collectionUrls, mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterUserPrompt } from "@/lib/prompts/newsletterPrompt";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 
@@ -18,6 +18,29 @@ interface GenerateNewsletterBody {
 
 function isCustomerType(value: unknown): value is CustomerType {
   return value === "privat" || value === "erhverv";
+}
+
+// CTA-linket bestemmes deterministisk i kode ud fra de faktisk valgte
+// produkter – ikke af AI'en – så det altid er forudsigeligt og korrekt:
+// - Er ALLE valgte produkter af samme productType (fx "vælg hele
+//   Multistammet-kategorien"), peger CTA'en på selve kategori-siden
+//   (collectionUrls) i stedet for ét enkelt produkt deri.
+// - Ellers (blandet/håndplukket valg, eller en kategori uden en kendt
+//   collection-URL endnu) peges der på det primære/første valgte produkts
+//   egen url, som hidtil.
+function resolveCtaUrl(selectedProducts: ShopifyProduct[]): string {
+  const primaryUrl = selectedProducts[0].url;
+  // .every() er trivielt sandt for et enkelt element, så "kategori-scenarie"
+  // kræver EKSPLICIT også mere end ét valgt produkt – ellers ville et enkelt
+  // valgt produkt fejlagtigt pege på hele kategori-siden i stedet for sin
+  // egen produktside.
+  const isCategoryScenario =
+    selectedProducts.length > 1 &&
+    selectedProducts.every((product) => product.productType === selectedProducts[0].productType);
+  if (isCategoryScenario) {
+    return collectionUrls[selectedProducts[0].productType] ?? primaryUrl;
+  }
+  return primaryUrl;
 }
 
 export async function POST(req: NextRequest) {
@@ -69,6 +92,7 @@ export async function POST(req: NextRequest) {
     price: formatPriceForCustomer(product.price, customerType),
     imageUrl: product.imageUrl,
     url: product.url,
+    productType: product.productType,
   }));
 
   const { systemPrompt, userPrompt } = buildNewsletterUserPrompt(
@@ -97,6 +121,9 @@ export async function POST(req: NextRequest) {
     }
 
     const newsletter = JSON.parse(text);
+    // Overskriver AI'ens eget cta.url-valg med den deterministiske logik
+    // herover – AI'en må stadig selv formulere cta.text.
+    newsletter.cta = { ...newsletter.cta, url: resolveCtaUrl(selectedProducts) };
     return NextResponse.json(newsletter);
   } catch (err) {
     console.error("generate-newsletter fejlede:", err);

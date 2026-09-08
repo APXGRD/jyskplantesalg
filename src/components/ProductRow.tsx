@@ -32,7 +32,6 @@ export function ProductRow({ product, selected, onToggle }: ProductRowProps) {
           </div>
           <div>
             <p className="text-[13px] font-medium text-ink">{product.title}</p>
-            <p className="text-xs text-ink-muted">{product.subtitle}</p>
           </div>
         </div>
       </td>

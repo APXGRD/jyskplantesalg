@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { ImagePlaceholderIcon, LeafIcon } from "@/components/icons";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
-import { IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
+import { CTA_BORDER_RADIUS_PX, CTA_PADDING_PX, IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
 
 const JUSTIFY_CLASS = {
@@ -176,18 +176,34 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
 
       case "cta": {
         const bgColor = block.bgColor || "#3a5837";
-        // Knap-TEKSTENS farve: en global/per-blok textColor-vælger vinder,
-        // ellers falder den tilbage til den automatisk udregnede kontrastfarve
-        // mod knappens baggrund (bgColor styres fortsat kun pr. blok).
-        const textColor = block.textColor || getContrastTextColor(bgColor);
+        const padding = CTA_PADDING_PX[block.ctaPadding ?? "normal"];
+        const borderRadius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "afrundet"];
+        const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
+        // "kontur": ingen baggrund, kun en 2px kant i bgColor, og knap-teksten
+        // får samme farve som konturen. "udfyldt": knap-TEKSTENS farve følger
+        // en global/per-blok textColor-vælger hvis sat, ellers den automatisk
+        // udregnede kontrastfarve mod baggrunden.
+        const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
+        const ctaStyle: CSSProperties = {
+          fontFamily: block.fontFamily,
+          borderRadius,
+          paddingTop: padding.vertical,
+          paddingBottom: padding.vertical,
+          paddingLeft: padding.horizontal,
+          paddingRight: padding.horizontal,
+          color: textColor,
+          ...(isOutline
+            ? { backgroundColor: "transparent", border: `2px solid ${bgColor}` }
+            : { backgroundColor: bgColor }),
+        };
         return (
           <div className="flex justify-center px-8 py-3">
             <a
               href={block.ctaUrl || "#"}
               target="_blank"
               rel="noreferrer"
-              style={{ backgroundColor: bgColor, color: textColor, fontFamily: block.fontFamily }}
-              className="inline-flex items-center gap-1 rounded-lg px-6 py-2.5 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline"
+              style={ctaStyle}
+              className="inline-flex items-center gap-1 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline"
             >
               <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />
             </a>

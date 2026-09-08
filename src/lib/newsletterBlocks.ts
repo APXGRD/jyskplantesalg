@@ -37,6 +37,32 @@ export const IMAGE_ALIGN_CSS: Record<ImageAlignment, "left" | "center" | "right"
   hoejre: "right",
 };
 
+// CTA-knappens kuraterede padding-valg – anvendes 1:1 i både Preview og den
+// tabel-baserede, Outlook-kompatible eksport, så de to altid matcher.
+export type CtaPadding = "kompakt" | "normal" | "rummelig";
+
+export const CTA_PADDING_PX: Record<CtaPadding, { vertical: number; horizontal: number }> = {
+  kompakt: { vertical: 8, horizontal: 16 },
+  normal: { vertical: 11, horizontal: 22 },
+  rummelig: { vertical: 14, horizontal: 28 },
+};
+
+// CTA-knappens kuraterede hjørne-former. Outlook ignorerer border-radius og
+// falder pænt tilbage til skarpe hjørner uanset værdi her – acceptabelt,
+// jf. opgavebeskrivelsen.
+export type CtaBorderRadius = "skarp" | "afrundet" | "pille";
+
+export const CTA_BORDER_RADIUS_PX: Record<CtaBorderRadius, number> = {
+  skarp: 0,
+  afrundet: 8,
+  pille: 999,
+};
+
+// "udfyldt" (standard) = baggrundsfarve fra bgColor. "kontur" = ingen
+// baggrund, kun en 2px kant og tekst i bgColor's farve – samme farvefelt
+// genbruges bare med en anden visuel betydning afhængig af stilen.
+export type CtaStyle = "udfyldt" | "kontur";
+
 export interface NewsletterBlock {
   id: string;
   type: BlockType;
@@ -74,6 +100,11 @@ export interface NewsletterBlock {
   // udelukkende af bgColor, kun pr. blok) – uden textColor bruger CTA'en sin
   // automatisk udregnede kontrastfarve i stedet.
   textColor?: string;
+  // Kun relevant for "cta"-blokken – se CTA_PADDING_PX/CTA_BORDER_RADIUS_PX
+  // ovenfor. Uden en værdi bruges nuværende standard (normal/afrundet/udfyldt).
+  ctaPadding?: CtaPadding;
+  ctaBorderRadius?: CtaBorderRadius;
+  ctaStyle?: CtaStyle;
 }
 
 // De blok-typer, hvis indhold redigeres som fri tekst via TextBlockEditor

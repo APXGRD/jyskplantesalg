@@ -43,9 +43,13 @@ import {
 import {
   createNewBlock,
   duplicateBlock,
+  CTA_BORDER_RADIUS_PX,
   RICH_TEXT_BLOCK_TYPES,
   type AddableBlockKind,
   type BlockType,
+  type CtaBorderRadius,
+  type CtaPadding,
+  type CtaStyle,
   type ImageAlignment,
   type ImageSize,
   type NewsletterBlock,
@@ -94,6 +98,130 @@ function Badge({ type }: { type: BlockBadge }) {
 const fieldClassName =
   "w-full rounded-lg border border-border px-3 py-2 text-[13px] text-ink focus:outline-none focus:border-ink-faintest";
 
+// Kompakt gruppe af gensidigt udelukkende valg (samme mønster som
+// ImageBlockControls' justering/størrelse-knapper) – bruges til CTA-knappens
+// padding/knap-form/stil, med et valgfrit lille preview-element pr. knap (fx
+// en hjørne-forhåndsvisning for knap-formerne).
+function SegmentedButtons<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string; preview?: React.ReactNode }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="flex gap-1">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-pressed={value === option.value}
+          title={option.label}
+          className={`flex flex-1 flex-col items-center gap-1 rounded-md px-2 py-1.5 text-[10px] leading-none ${
+            value === option.value ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
+          }`}
+        >
+          {option.preview}
+          <span>{option.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const CTA_PADDING_OPTIONS: { value: CtaPadding; label: string }[] = [
+  { value: "kompakt", label: "Kompakt" },
+  { value: "normal", label: "Normal" },
+  { value: "rummelig", label: "Rummelig" },
+];
+
+const CTA_BORDER_RADIUS_OPTIONS: { value: CtaBorderRadius; label: string }[] = [
+  { value: "skarp", label: "Skarpe hjørner" },
+  { value: "afrundet", label: "Let afrundet" },
+  { value: "pille", label: "Pilleform" },
+];
+
+const CTA_STYLE_OPTIONS: { value: CtaStyle; label: string }[] = [
+  { value: "udfyldt", label: "Udfyldt" },
+  { value: "kontur", label: "Kontur" },
+];
+
+// CTA-blokkens udvidede styling (Padding/Knap-form/Stil) er sammenklappet som
+// standard – kun URL-feltet og Knapfarve-vælgeren vises med det samme. Åben/
+// lukket er lokal, ikke-persisteret UI-state pr. blok-instans (ikke en del af
+// selve blokken i blocks-state), så den altid starter sammenklappet igen ved
+// genindlæsning, og lukker/åbner uden at ændre nogen af de valgte værdier.
+function CtaAdvancedControls({
+  block,
+  onCtaPaddingChange,
+  onCtaBorderRadiusChange,
+  onCtaStyleChange,
+}: {
+  block: NewsletterBlock;
+  onCtaPaddingChange: (padding: CtaPadding) => void;
+  onCtaBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
+  onCtaStyleChange: (style: CtaStyle) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={isOpen}
+        className="flex items-center gap-1 self-start text-[11px] font-medium text-ink-muted hover:text-ink"
+      >
+        Flere indstillinger
+        <span
+          className="inline-flex"
+          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 150ms ease" }}
+        >
+          <ChevronDownIcon className="h-2.5 w-2.5" />
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-muted">Padding</span>
+            <SegmentedButtons
+              options={CTA_PADDING_OPTIONS}
+              value={block.ctaPadding ?? "normal"}
+              onChange={onCtaPaddingChange}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-muted">Knap-form</span>
+            <SegmentedButtons
+              value={block.ctaBorderRadius ?? "afrundet"}
+              onChange={onCtaBorderRadiusChange}
+              options={CTA_BORDER_RADIUS_OPTIONS.map((option) => ({
+                ...option,
+                preview: (
+                  <span
+                    className="h-3 w-6 border border-current"
+                    style={{ borderRadius: CTA_BORDER_RADIUS_PX[option.value] }}
+                  />
+                ),
+              }))}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-muted">Stil</span>
+            <SegmentedButtons options={CTA_STYLE_OPTIONS} value={block.ctaStyle ?? "udfyldt"} onChange={onCtaStyleChange} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface BlockContentProps {
   block: NewsletterBlock;
   onContentChange: (html: string) => void;
@@ -104,6 +232,9 @@ interface BlockContentProps {
   onAlignmentChange: (alignment: ImageAlignment) => void;
   onSizeChange: (size: ImageSize) => void;
   onBgColorChange: (color: string) => void;
+  onCtaPaddingChange: (padding: CtaPadding) => void;
+  onCtaBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
+  onCtaStyleChange: (style: CtaStyle) => void;
   products: ShopifyProduct[];
   customerType: CustomerType;
 }
@@ -118,6 +249,9 @@ function BlockContent({
   onAlignmentChange,
   onSizeChange,
   onBgColorChange,
+  onCtaPaddingChange,
+  onCtaBorderRadiusChange,
+  onCtaStyleChange,
   products,
   customerType,
 }: BlockContentProps) {
@@ -224,6 +358,13 @@ function BlockContent({
             className={fieldClassName}
           />
           <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
+
+          <CtaAdvancedControls
+            block={block}
+            onCtaPaddingChange={onCtaPaddingChange}
+            onCtaBorderRadiusChange={onCtaBorderRadiusChange}
+            onCtaStyleChange={onCtaStyleChange}
+          />
         </div>
       );
 
@@ -433,6 +574,18 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, bgColor } : block)));
   }
 
+  function handleCtaPaddingChange(id: string, ctaPadding: CtaPadding) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ctaPadding } : block)));
+  }
+
+  function handleCtaBorderRadiusChange(id: string, ctaBorderRadius: CtaBorderRadius) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ctaBorderRadius } : block)));
+  }
+
+  function handleCtaStyleChange(id: string, ctaStyle: CtaStyle) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ctaStyle } : block)));
+  }
+
   // Sætter skrifttypen for ALLE tekst-blokke på én gang og fjerner samtidig
   // evt. tidligere per-udsnit skrifttype-valg inde i selve indholdet (fra
   // værktøjslinjens egen Skrifttype-dropdown) – ellers ville et gammelt
@@ -555,6 +708,9 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
                     onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
                     onSizeChange={(size) => handleSizeChange(block.id, size)}
                     onBgColorChange={(color) => handleBgColorChange(block.id, color)}
+                    onCtaPaddingChange={(padding) => handleCtaPaddingChange(block.id, padding)}
+                    onCtaBorderRadiusChange={(borderRadius) => handleCtaBorderRadiusChange(block.id, borderRadius)}
+                    onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}
                     products={products}
                     customerType={customerType}
                   />

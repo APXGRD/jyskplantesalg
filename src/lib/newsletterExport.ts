@@ -1,7 +1,13 @@
 import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
-import { IMAGE_ALIGN_CSS, IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
+import {
+  CTA_BORDER_RADIUS_PX,
+  CTA_PADDING_PX,
+  IMAGE_ALIGN_CSS,
+  IMAGE_SIZE_PX,
+  type NewsletterBlock,
+} from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
 
 // Standard-skrifttype for HELE nyhedsbrevet, når hverken den globale
@@ -168,11 +174,28 @@ function renderBlockHtml(
 
     case "cta": {
       const bgColor = block.bgColor || "#3a5837";
-      // Knap-TEKSTENS farve: en global/per-blok textColor-vælger vinder,
-      // ellers falder den tilbage til den automatisk udregnede kontrastfarve
-      // mod knappens baggrund (bgColor styres fortsat kun pr. blok).
-      const textColor = block.textColor || getContrastTextColor(bgColor);
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      const padding = CTA_PADDING_PX[block.ctaPadding ?? "normal"];
+      const borderRadius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "afrundet"];
+      const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
+      const paddingStyle = `padding:${padding.vertical}px ${padding.horizontal}px;`;
+      // border-radius er kun her for Gmail/Apple Mail/browsere – Outlook
+      // ignorerer den og viser pænt et firkantet hjørne i stedet (acceptabelt,
+      // jf. opgavebeskrivelsen).
+      const radiusStyle = `border-radius:${borderRadius}px;`;
+      // "kontur": ingen baggrund (så intet bgcolor-attribut heller, kun en
+      // 2px kant i bgColor). "udfyldt": bgcolor-attribut BÅDE som attribut
+      // (for Outlook) og som style (for alt andet) – samme mønster som
+      // header/footer.
+      const cellBgcolorAttr = isOutline ? "" : ` bgcolor="${bgColor}"`;
+      const cellFillStyle = isOutline
+        ? `border:2px solid ${bgColor};`
+        : `background:${bgColor};`;
+      // Knap-TEKSTENS farve: i kontur-stil er den altid selve kant-farven
+      // (bgColor); i udfyldt stil følger den en global/per-blok
+      // textColor-vælger hvis sat, ellers den automatisk udregnede
+      // kontrastfarve mod baggrunden.
+      const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
       // font-family sættes BÅDE på <td> og på selve <a>'et – ikke kun ét sted.
       // Nogle mail-klienters indsæt-sanering rører/erstatter specifikt
       // <a>-tags' egen inline style (fx med deres eget standard-link-udseende),
@@ -180,10 +203,6 @@ function renderBlockHtml(
       // cellen ville teksten i så fald arve klientens egen standardskrift
       // (ofte en serif) i stedet – samme grundlæggende problem som
       // overskriftens manglende margin tidligere.
-      //
-      // Padding herunder (10px 24px) er kopieret 1:1 fra Preview-knappens
-      // egne Tailwind-klasser (py-2.5 px-6 = 10px/24px ved 16px root), ikke
-      // gættet på ny.
       //
       // block.content kan – ligesom overskriften – være Tiptap-HTML pakket
       // ind i <p>-tags (fx "<p>Se træet her</p>"), når knap-teksten er
@@ -199,7 +218,7 @@ function renderBlockHtml(
       return `<tr><td style="padding:12px 32px;text-align:center;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
-            <td bgcolor="${bgColor}" style="background:${bgColor};border-radius:8px;padding:10px 24px;font-family:${fontFamily};" align="center">
+            <td${cellBgcolorAttr} style="${cellFillStyle}${radiusStyle}${paddingStyle}font-family:${fontFamily};" align="center">
               <a href="${escapeAttr(block.ctaUrl || "#")}" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-weight:600;font-size:13px;line-height:19.5px;display:inline-block;">
                 ${label}
               </a>
