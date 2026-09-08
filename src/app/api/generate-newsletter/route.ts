@@ -1,12 +1,15 @@
 // src/app/api/generate-newsletter/route.ts
 //
 // Modtager de valgte produkt-id'er + målgruppe + evt. instrukser fra Opsætnings-siden,
-// slår produkterne op i mockShopData, bygger AI-prompten og beder Gemini om at generere
-// nyhedsbrevets fire felter (heading/bodyText/image/cta) som struktureret JSON.
+// slår produkterne op i Shopifys rigtige katalog (fetchShopifyProducts), bygger
+// AI-prompten og beder Gemini om at generere nyhedsbrevets fire felter
+// (heading/bodyText/image/cta) som struktureret JSON.
 
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { collectionUrls, mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import { collectionUrls, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import { fetchShopifyProducts } from "@/lib/shopify/fetchProducts";
+import { shopBranding } from "@/lib/shopBranding";
 import { buildNewsletterUserPrompt } from "@/lib/prompts/newsletterPrompt";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 
@@ -75,9 +78,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const selectedProducts = mockShopData.products.filter((product) =>
-    productIds.includes(product.id),
-  );
+  let allProducts: ShopifyProduct[];
+  try {
+    allProducts = await fetchShopifyProducts();
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Kunne ikke hente produkter fra Shopify." },
+      { status: 502 },
+    );
+  }
+
+  const selectedProducts = allProducts.filter((product) => productIds.includes(product.id));
 
   if (selectedProducts.length === 0) {
     return NextResponse.json(
@@ -97,8 +108,8 @@ export async function POST(req: NextRequest) {
 
   const { systemPrompt, userPrompt } = buildNewsletterUserPrompt(
     {
-      storeName: mockShopData.storeName,
-      brandTone: mockShopData.brandTone,
+      storeName: shopBranding.storeName,
+      brandTone: shopBranding.brandTone,
       products: productsForPrompt,
     },
     { customerType, instructions },

@@ -1,10 +1,11 @@
 import type { CSSProperties, ReactNode } from "react";
-import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { ImagePlaceholderIcon, LeafIcon } from "@/components/icons";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import { CTA_BORDER_RADIUS_PX, CTA_PADDING_PX, IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
+import { shopBranding } from "@/lib/shopBranding";
 
 const JUSTIFY_CLASS = {
   venstre: "justify-start",
@@ -35,7 +36,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           >
             <LeafIcon className="h-6 w-6" />
             <span className="text-xs font-medium tracking-[0.1em] uppercase">
-              {mockShopData.storeName}
+              {shopBranding.storeName}
             </span>
           </div>
         );
@@ -225,9 +226,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             <p className="text-[11px] opacity-80">
               Du modtager dette nyhedsbrev, fordi du er {audience}.
             </p>
-            <a href="#" className="pt-1 text-[11px] underline">
-              Afmeld nyhedsbrevet
-            </a>
+            <p className="pt-1 text-[11px]">Afmeld nyhedsbrevet</p>
           </div>
         );
       }

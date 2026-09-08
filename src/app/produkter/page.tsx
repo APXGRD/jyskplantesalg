@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { mockShopData } from "@/lib/mock/mockShopifyData";
+import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { ChevronRightIcon } from "@/components/icons";
+import { ErrorCard, LoadingCard } from "@/components/FetchStateCard";
 import { PageHeader } from "@/components/PageHeader";
 import { ProductFilterBar } from "@/components/ProductFilterBar";
 import { ProductTable } from "@/components/ProductTable";
@@ -13,14 +14,51 @@ import { Sidebar } from "@/components/Sidebar";
 import { useNewsletter } from "@/context/NewsletterContext";
 
 export default function Home() {
-  const { products } = mockShopData;
   const router = useRouter();
   const { selectedProductIds, setSelectedProductIds, toggleProduct } = useNewsletter();
+
+  const [products, setProducts] = useState<ShopifyProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   const [search, setSearch] = useState("");
   const [productType, setProductType] = useState("");
   const [tag, setTag] = useState("");
   const [onlyWithImage, setOnlyWithImage] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const response = await fetch("/api/shopify/products");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error ?? "Kunne ikke hente produkter fra Shopify.");
+        }
+        if (!cancelled) {
+          setProducts(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [retryToken]);
+
+  function retryLoadProducts() {
+    setRetryToken((token) => token + 1);
+  }
 
   const selectedIds = useMemo(() => new Set(selectedProductIds), [selectedProductIds]);
 
@@ -96,32 +134,40 @@ export default function Home() {
           }
         />
 
-        <ProductFilterBar
-          search={search}
-          onSearchChange={setSearch}
-          productType={productType}
-          onProductTypeChange={setProductType}
-          productTypes={productTypes}
-          tag={tag}
-          onTagChange={setTag}
-          tags={tags}
-          onlyWithImage={onlyWithImage}
-          onOnlyWithImageChange={setOnlyWithImage}
-        />
+        {isLoading ? (
+          <LoadingCard message="Henter produkter fra Shopify..." />
+        ) : loadError ? (
+          <ErrorCard title="Kunne ikke hente produkter" message={loadError} onRetry={retryLoadProducts} />
+        ) : (
+          <>
+            <ProductFilterBar
+              search={search}
+              onSearchChange={setSearch}
+              productType={productType}
+              onProductTypeChange={setProductType}
+              productTypes={productTypes}
+              tag={tag}
+              onTagChange={setTag}
+              tags={tags}
+              onlyWithImage={onlyWithImage}
+              onOnlyWithImageChange={setOnlyWithImage}
+            />
 
-        <ProductTable
-          products={filteredProducts}
-          selectedIds={selectedIds}
-          onToggle={toggleProduct}
-          onSelectAllChange={toggleAllVisible}
-        />
+            <ProductTable
+              products={filteredProducts}
+              selectedIds={selectedIds}
+              onToggle={toggleProduct}
+              onSelectAllChange={toggleAllVisible}
+            />
 
-        <SelectionFooter
-          shown={filteredProducts.length}
-          total={products.length}
-          nextDisabled={selectedIds.size === 0}
-          onNext={goToNextStep}
-        />
+            <SelectionFooter
+              shown={filteredProducts.length}
+              total={products.length}
+              nextDisabled={selectedIds.size === 0}
+              onNext={goToNextStep}
+            />
+          </>
+        )}
       </div>
     </div>
   );

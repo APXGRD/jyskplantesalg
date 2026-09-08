@@ -1,4 +1,4 @@
-import { mockShopData, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
@@ -9,6 +9,7 @@ import {
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
+import { shopBranding } from "@/lib/shopBranding";
 
 // Standard-skrifttype for HELE nyhedsbrevet, når hverken den globale
 // skrifttype-vælger eller en per-blok værdi er sat. HTML-tabeller nedarver
@@ -77,7 +78,7 @@ function renderBlockHtml(
     case "header": {
       const bgColor = block.bgColor || "#9caf88";
       const textColor = getContrastTextColor(bgColor);
-      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(mockShopData.storeName)}</td></tr>`;
+      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(shopBranding.storeName)}</td></tr>`;
     }
 
     case "overskrift": {
@@ -247,7 +248,7 @@ function renderBlockText(
 ): string {
   switch (block.type) {
     case "header":
-      return mockShopData.storeName;
+      return shopBranding.storeName;
 
     case "overskrift":
       return stripHtml(block.content ?? "");

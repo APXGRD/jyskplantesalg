@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { mockShopData } from "@/lib/mock/mockShopifyData";
+import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterHtml, buildNewsletterText } from "@/lib/newsletterExport";
+import { ErrorCard, LoadingCard } from "@/components/FetchStateCard";
 import { Sidebar } from "@/components/Sidebar";
 import { SegmentedControl } from "@/components/preview/SegmentedControl";
 import { NewsletterCard } from "@/components/preview/NewsletterCard";
@@ -23,9 +24,47 @@ export default function PreviewPage() {
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [copyState, setCopyState] = useState<CopyState>("idle");
 
+  const [allProducts, setAllProducts] = useState<ShopifyProduct[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsLoadingProducts(true);
+      setProductsError(null);
+      try {
+        const response = await fetch("/api/shopify/products");
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error ?? "Kunne ikke hente produkter fra Shopify.");
+        }
+        if (!cancelled) {
+          setAllProducts(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setProductsError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingProducts(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [retryToken]);
+
+  function retryLoadProducts() {
+    setRetryToken((token) => token + 1);
+  }
+
   const selectedProducts = useMemo(
-    () => mockShopData.products.filter((product) => selectedProductIds.includes(product.id)),
-    [selectedProductIds],
+    () => allProducts.filter((product) => selectedProductIds.includes(product.id)),
+    [allProducts, selectedProductIds],
   );
 
   const customerTypeLabel =
@@ -127,6 +166,10 @@ export default function PreviewPage() {
                 </button>
               </div>
             </div>
+          ) : isLoadingProducts ? (
+            <LoadingCard message="Henter produkter fra Shopify..." />
+          ) : productsError ? (
+            <ErrorCard title="Kunne ikke hente produkter" message={productsError} onRetry={retryLoadProducts} />
           ) : activeView === "preview" ? (
             <div className="flex justify-center">
               <NewsletterCard
