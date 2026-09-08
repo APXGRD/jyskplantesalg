@@ -10,7 +10,6 @@ import { NewsletterCard } from "@/components/preview/NewsletterCard";
 import { EditorBlockList } from "@/components/preview/EditorBlockList";
 import { ArrowLeftIcon, CheckIcon, CopyIcon, DesktopIcon, MobileIcon } from "@/components/icons";
 import { useNewsletter } from "@/context/NewsletterContext";
-import { createDefaultBlocks, type NewsletterBlock } from "@/lib/newsletterBlocks";
 
 type View = "preview" | "rediger";
 type Viewport = "desktop" | "mobil";
@@ -18,7 +17,7 @@ type CopyState = "idle" | "copied" | "error";
 
 export default function PreviewPage() {
   const router = useRouter();
-  const { result, customerType, selectedProductIds } = useNewsletter();
+  const { result, customerType, selectedProductIds, blocks, setBlocks } = useNewsletter();
 
   const [activeView, setActiveView] = useState<View>("preview");
   const [viewport, setViewport] = useState<Viewport>("desktop");
@@ -27,10 +26,6 @@ export default function PreviewPage() {
   const selectedProducts = useMemo(
     () => mockShopData.products.filter((product) => selectedProductIds.includes(product.id)),
     [selectedProductIds],
-  );
-
-  const [blocks, setBlocks] = useState<NewsletterBlock[]>(() =>
-    result ? createDefaultBlocks(result, customerType, selectedProducts) : [],
   );
 
   const customerTypeLabel =
