@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Instrument_Serif } from "next/font/google";
-import { NewsletterProvider } from "@/context/NewsletterContext";
+import { ClientOnlyNewsletterProvider } from "@/context/ClientOnlyNewsletterProvider";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${dmSans.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <NewsletterProvider>{children}</NewsletterProvider>
+        <ClientOnlyNewsletterProvider>{children}</ClientOnlyNewsletterProvider>
       </body>
     </html>
   );
