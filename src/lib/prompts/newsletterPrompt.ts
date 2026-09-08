@@ -60,6 +60,7 @@ export function buildNewsletterUserPrompt(
       price: string;
       imageUrl: string;
       url: string;
+      productType: string;
       isBestSeller?: boolean;
       isNew?: boolean;
     }>;
@@ -89,6 +90,22 @@ fokus på udtryk og haveoplevelse.`;
 i systemprompten): "${options.instructions.trim()}"\n`
     : "";
 
+  // "Kategori-scenarie": alle leverede produkter er af samme productType, og der er
+  // mere end ét – fx "vælg hele Multistammet-kategorien". CTA-linkets URL er allerede
+  // rettet til at pege på selve kategori-siden i dette tilfælde (se
+  // generate-newsletter/route.ts) – denne note sikrer, at knap-TEKSTEN AI'en
+  // genererer også matcher (flertal/hele udvalget), i stedet for at lyde som om
+  // linket peger på ét enkelt produkt.
+  const isCategoryScenario =
+    shopData.products.length > 1 &&
+    shopData.products.every((product) => product.productType === shopData.products[0].productType);
+
+  const categoryNote = isCategoryScenario
+    ? `\nBemærk: Dette nyhedsbrev viser flere produkter fra kategorien "${shopData.products[0].productType}".
+CTA-knappens tekst SKAL derfor være i flertal og henvise til hele udvalget (fx "Se udvalget her",
+"Se sortimentet her", "Se dem alle her") – IKKE til ét enkelt produkt (undgå fx "Se træet her").\n`
+    : "";
+
   const userPrompt = `
 Her er dagens produktdata fra ${shopData.storeName}s Shopify-butik. Generér nyhedsbrevets
 fire felter udelukkende ud fra disse produkter – vælg selv, hvilke der er mest relevante:
@@ -96,7 +113,7 @@ fire felter udelukkende ud fra disse produkter – vælg selv, hvilke der er mes
 ${JSON.stringify(shopData.products, null, 2)}
 
 ${audienceLine}
-${instructionsLine}`;
+${instructionsLine}${categoryNote}`;
 
   return { systemPrompt, userPrompt };
 }
