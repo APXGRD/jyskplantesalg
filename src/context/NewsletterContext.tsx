@@ -12,7 +12,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { CustomerType } from "@/lib/format";
-import { mockShopData } from "@/lib/mock/mockShopifyData";
+import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { createDefaultBlocks, type NewsletterBlock } from "@/lib/newsletterBlocks";
 
 export type { CustomerType };
@@ -116,17 +116,26 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   // i preview/page.tsx havde ved første mount, blot nu ved selve
   // genererings-tidspunktet i stedet for ved Preview-siden mount (så et nyt
   // resultat altid giver en frisk blok-liste, uanset om Preview-siden er
-  // mountet endnu).
+  // mountet endnu). Slår selv de valgte produkter op mod Shopifys rigtige
+  // katalog (i stedet for mock-data) – fejler opslaget, bygges blokkene
+  // stadig, blot uden produktdata, i stedet for at blokere hele
+  // genereringsflowet.
   const setResult = useCallback(
-    (newResult: GeneratedNewsletter | null) => {
+    async (newResult: GeneratedNewsletter | null) => {
       setResultState(newResult);
       if (!newResult) {
         setBlocks([]);
         return;
       }
-      const selectedProducts = mockShopData.products.filter((product) =>
-        selectedProductIds.includes(product.id),
-      );
+      let selectedProducts: ShopifyProduct[] = [];
+      try {
+        const response = await fetch("/api/shopify/products");
+        const data = await response.json();
+        const allProducts: ShopifyProduct[] = response.ok ? data : [];
+        selectedProducts = allProducts.filter((product) => selectedProductIds.includes(product.id));
+      } catch {
+        // Ignoreres bevidst – se kommentaren ovenfor.
+      }
       setBlocks(createDefaultBlocks(newResult, customerType, selectedProducts));
     },
     [selectedProductIds, customerType],

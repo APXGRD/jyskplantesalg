@@ -1,16 +1,19 @@
-// Samler al datahentning for Kunder-siden ét sted. Når det rigtige Shopify
-// Admin API er koblet på (se kommentaren øverst i mockCustomers.ts), er det
-// KUN getCustomers(), der skal ændres til et rigtigt (async) API-kald – resten
-// af Kunder-siden og dens komponenter kender ikke til, om data kommer fra
-// mock eller Shopify.
+// Samler al datahentning for Kunder-siden ét sted – resten af Kunder-siden og
+// dens komponenter kender ikke til, at data reelt hentes fra Shopify via
+// /api/shopify/customers.
 
-import { mockCustomers, type ShopifyCustomer } from "@/lib/mock/mockCustomers";
+import type { ShopifyCustomer } from "@/lib/mock/mockCustomers";
 import type { CustomerType } from "@/lib/format";
 
 export type { ShopifyCustomer };
 
-export function getCustomers(): ShopifyCustomer[] {
-  return mockCustomers;
+export async function getCustomers(): Promise<ShopifyCustomer[]> {
+  const response = await fetch("/api/shopify/customers");
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.error ?? "Kunne ikke hente kunder fra Shopify.");
+  }
+  return data;
 }
 
 export function getCustomerType(customer: ShopifyCustomer): CustomerType {
