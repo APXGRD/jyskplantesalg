@@ -19,7 +19,8 @@ export type BlockType =
   // Typer der (kun) kan tilføjes via "+ Tilføj blok":
   | "tekst"
   | "img"
-  | "produkt";
+  | "produkt"
+  | "galleri";
 
 export type ImageAlignment = "venstre" | "center" | "hoejre";
 export type ImageSize = "lille" | "mellem" | "fuld";
@@ -63,6 +64,33 @@ export const CTA_BORDER_RADIUS_PX: Record<CtaBorderRadius, number> = {
 // genbruges bare med en anden visuel betydning afhængig af stilen.
 export type CtaStyle = "udfyldt" | "kontur";
 
+// "Billedgalleri"-blokkens tre kuraterede layout-valg – bevidst ingen fri
+// indtastning af antal, jf. opgavebeskrivelsen. "6" er IKKE 6 kolonner i én
+// række, men "6 billeder" – 2 rækker × 3 kolonner (se GALLERY_ROW_SIZE_PX
+// og rendering i NewsletterCard.tsx/newsletterExport.ts).
+export type GalleryColumns = 2 | 3 | 6;
+
+// Fast billedbredde pr. layout-valg i den kopierede, tabel-baserede HTML
+// (samme Outlook-kompatible teknik som CTA-knappen bruger – CSS
+// flexbox/grid understøttes ikke pålideligt af Outlook, så billederne skal
+// side om side via en <table>, ikke via CSS-layout). "6 billeder" bruger
+// samme billedbredde som 3-kolonne-layoutet, jf. opgavebeskrivelsen.
+export const GALLERY_IMAGE_WIDTH_PX: Record<GalleryColumns, number> = {
+  2: 280,
+  3: 180,
+  6: 180,
+};
+
+// Antal billeder pr. række/tabel – bruges til at bryde "6 billeder"-layoutet
+// op i to efterfølgende 3-kolonne-rækker (i stedet for én 6-cellers tabel/
+// grid-række), både i Preview (CSS grid ombryder automatisk til 2 rækker
+// ved 3 kolonner) og i den kopierede HTML (to selvstændige <table>'er).
+export const GALLERY_ROW_SIZE: Record<GalleryColumns, number> = {
+  2: 2,
+  3: 3,
+  6: 3,
+};
+
 export interface NewsletterBlock {
   id: string;
   type: BlockType;
@@ -105,23 +133,20 @@ export interface NewsletterBlock {
   ctaPadding?: CtaPadding;
   ctaBorderRadius?: CtaBorderRadius;
   ctaStyle?: CtaStyle;
+  // Kun relevant for "galleri"-blokken – de udvalgte produkters id'er (blandt
+  // de produkter, der allerede er valgt på "Vælg produkter"-siden, samme
+  // liste som resten af nyhedsbrevet bruger) og antal kolonner i layoutet.
+  // Antallet af id'er holdes altid inden for galleryColumns af
+  // GalleryBlockControls, så rendering aldrig skal håndtere flere billeder,
+  // end layoutet reelt har plads til.
+  galleryProductIds?: string[];
+  galleryColumns?: GalleryColumns;
 }
 
 // De blok-typer, hvis indhold redigeres som fri tekst via TextBlockEditor
 // (Tiptap) – dem, den globale skrifttype-vælger i Edit-mode sætter på én
 // gang.
 export const RICH_TEXT_BLOCK_TYPES: BlockType[] = ["overskrift", "brodtekst", "tekst", "cta"];
-
-const DEFAULT_BLOCK_TYPES: BlockType[] = [
-  "header",
-  "overskrift",
-  "brodtekst",
-  "billede",
-  "produktvisning",
-  "skillelinje",
-  "cta",
-  "footer",
-];
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -139,15 +164,59 @@ function greetingFor(customerType: CustomerType): string {
 const CLOSING_TEXT =
   "Ønsker du at se planterne på stedet eller modtage et uforpligtende tilbud? Kontakt os direkte – vi rådgiver gerne om valg og placering.";
 
+// Bruges kun til at PRIORITERE blandt de allerede valgte produkter, når
+// galleriet forudfyldes automatisk (se pickGalleryProducts) – ShopifyProduct
+// har intet dedikeret isBestSeller-felt, så det nærmeste tilsvarende er et
+// tag, der nævner "bestseller" (fx sat manuelt i Shopify-admin). Findes et
+// sådant tag ikke på nok produkter, falder forudfyldningen roligt tilbage
+// til de først valgte produkter i stedet for at fejle eller vise intet.
+function isBestSeller(product: ShopifyProduct): boolean {
+  return product.tags.some((tag) => /best[\s-]?seller/i.test(tag));
+}
+
+// Vælger de produkter, "Galleri"-blokken forudfyldes med ved automatisk
+// blok-opbygning – kun blandt produkter med et rigtigt billede (samme regel
+// som GalleryBlockControls bruger ved manuelt valg, så den automatiske
+// starttilstand aldrig kan give et tomt src-attribut). Er mindst `count`
+// produkter tagget som bestseller, bruges de (i den rækkefølge, de blev
+// valgt); ellers bruges simpelthen de først valgte `count` produkter.
+function pickGalleryProducts(products: ShopifyProduct[], count: number): ShopifyProduct[] {
+  const withImages = products.filter((product) => product.hasImage && product.imageUrl);
+  const bestSellers = withImages.filter(isBestSeller);
+  if (bestSellers.length >= count) {
+    return bestSellers.slice(0, count);
+  }
+  return withImages.slice(0, count);
+}
+
 export function createDefaultBlocks(
   result: GeneratedNewsletter,
   customerType: CustomerType,
-  // De produkter, brugeren valgte på "Vælg produkter"-siden – bruges kun som
+  // De produkter, brugeren valgte på "Vælg produkter"-siden – bruges som
   // fallback for billede-blokken, hvis AI-svarets productId ikke kan slås op
-  // (se nedenfor).
+  // (se nedenfor), OG afgør, om der automatisk indsættes en "Billede"- eller
+  // "Galleri"-blok (se blockTypes herunder).
   selectedProducts: ShopifyProduct[],
 ): NewsletterBlock[] {
-  return DEFAULT_BLOCK_TYPES.map((type) => {
+  // Præcis ét valgt produkt: almindelig Billede-blok, som hidtil. Mere end
+  // ét: en Galleri-blok på samme plads i stedet – galleriet er ikke beregnet
+  // til at vise ALLE valgte produkter på én gang (ligesom Produktvisnings-
+  // blokken heller ikke er begrænset, men et repræsentativt udsnit på 2-3),
+  // kun et kurateret udsnit. Dette er kun den automatiske starttilstand;
+  // brugeren kan altid erstatte den manuelt i Edit-mode bagefter.
+  const imageBlockType: "billede" | "galleri" = selectedProducts.length > 1 ? "galleri" : "billede";
+  const blockTypes: BlockType[] = [
+    "header",
+    "overskrift",
+    "brodtekst",
+    imageBlockType,
+    "produktvisning",
+    "skillelinje",
+    "cta",
+    "footer",
+  ];
+
+  return blockTypes.map((type) => {
     const block: NewsletterBlock = { id: type, type, hidden: false };
     if (type === "overskrift") block.content = result.heading;
     if (type === "brodtekst") {
@@ -169,6 +238,15 @@ export function createDefaultBlocks(
         block.altText = matchedProduct.title;
       }
     }
+    if (type === "galleri") {
+      // 2 valgte produkter i alt: begge med i et 2-kolonne galleri. 3 eller
+      // flere: kun et udsnit af 3 i et 3-kolonne galleri (se
+      // pickGalleryProducts).
+      const columns: GalleryColumns = selectedProducts.length === 2 ? 2 : 3;
+      const galleryProducts = pickGalleryProducts(selectedProducts, columns);
+      block.galleryProductIds = galleryProducts.map((product) => product.id);
+      block.galleryColumns = columns;
+    }
     if (type === "cta") {
       block.content = result.cta.text;
       block.ctaUrl = result.cta.url;
@@ -184,8 +262,8 @@ export function duplicateBlock(block: NewsletterBlock): NewsletterBlock {
   };
 }
 
-// De fem typer, der kan tilføjes via "+ Tilføj blok"-menuen.
-export type AddableBlockKind = "tekst" | "billede" | "produkt" | "knap" | "skillelinje";
+// De typer, der kan tilføjes via "+ Tilføj blok"-menuen.
+export type AddableBlockKind = "tekst" | "billede" | "produkt" | "knap" | "skillelinje" | "galleri";
 
 export const ADDABLE_BLOCK_KINDS: AddableBlockKind[] = [
   "tekst",
@@ -193,6 +271,7 @@ export const ADDABLE_BLOCK_KINDS: AddableBlockKind[] = [
   "produkt",
   "knap",
   "skillelinje",
+  "galleri",
 ];
 
 export function createNewBlock(kind: AddableBlockKind, defaultProductId?: string): NewsletterBlock {
@@ -209,5 +288,10 @@ export function createNewBlock(kind: AddableBlockKind, defaultProductId?: string
       return { id, type: "cta", hidden: false, content: "Se sortimentet", ctaUrl: "" };
     case "skillelinje":
       return { id, type: "skillelinje", hidden: false };
+    case "galleri":
+      // Tom som udgangspunkt – brugeren vælger selv 2-3 produkter i
+      // GalleryBlockControls, jf. opgavebeskrivelsen ("default til INGEN
+      // valgt", ligesom det øvrige billede-flow ikke gætter for brugeren).
+      return { id, type: "galleri", hidden: false, galleryProductIds: [], galleryColumns: 2 };
   }
 }

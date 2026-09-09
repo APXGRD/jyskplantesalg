@@ -4,6 +4,8 @@ import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
   CTA_BORDER_RADIUS_PX,
   CTA_PADDING_PX,
+  GALLERY_IMAGE_WIDTH_PX,
+  GALLERY_ROW_SIZE,
   IMAGE_ALIGN_CSS,
   IMAGE_SIZE_PX,
   type NewsletterBlock,
@@ -138,6 +140,46 @@ function renderBlockHtml(
     case "skillelinje":
       return `<tr><td style="padding:12px 32px;"><hr style="border:none;border-top:1px solid #d2ddd1;margin:0;" /></td></tr>`;
 
+    case "galleri": {
+      const columns = block.galleryColumns ?? 2;
+      const galleryProducts = (block.galleryProductIds ?? [])
+        .map((id) => products.find((product) => product.id === id))
+        .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl));
+      if (galleryProducts.length === 0) return "";
+      // Outlooks Word-baserede rendering-motor understøtter ikke CSS
+      // flexbox/grid pålideligt – billederne sættes derfor side om side via
+      // <table>'er (samme teknik som CTA-knappen), med en fast bredde pr.
+      // billede afhængig af layoutet, i stedet for CSS-layout. "6
+      // billeder"-layoutet brydes bevidst op i TO EFTERFØLGENDE 3-kolonne-
+      // tabeller (én pr. række) i stedet for én stor 6-cellers tabel, så
+      // strukturen forbliver simpel og forudsigelig i kopieret HTML.
+      const imageWidth = GALLERY_IMAGE_WIDTH_PX[columns];
+      const rowSize = GALLERY_ROW_SIZE[columns];
+      const rows: ShopifyProduct[][] = [];
+      for (let i = 0; i < galleryProducts.length; i += rowSize) {
+        rows.push(galleryProducts.slice(i, i + rowSize));
+      }
+      const tables = rows
+        .map((rowProducts, rowIndex) => {
+          const cells = rowProducts
+            .map((product, index) => {
+              const isLast = index === rowProducts.length - 1;
+              return `<td style="width:${imageWidth}px;${isLast ? "" : "padding-right:8px;"}" valign="top">
+                <img src="${escapeAttr(product.imageUrl)}" alt="${escapeAttr(product.title)}" width="${imageWidth}" style="width:${imageWidth}px;max-width:100%;border-radius:8px;display:block;" />
+              </td>`;
+            })
+            .join("");
+          const marginTop = rowIndex === 0 ? "0" : "8px";
+          return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:${marginTop} auto 0;">
+            <tr>${cells}</tr>
+          </table>`;
+        })
+        .join("");
+      return `<tr><td style="padding:12px 32px;">
+        ${tables}
+      </td></tr>`;
+    }
+
     case "tekst": {
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
       const colorStyle = block.textColor ? `color:${block.textColor};` : "";
@@ -269,6 +311,13 @@ function renderBlockText(
 
     case "skillelinje":
       return "—————————";
+
+    case "galleri":
+      return (block.galleryProductIds ?? [])
+        .map((id) => products.find((product) => product.id === id))
+        .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl))
+        .map((product) => `[Billede: ${product.title}]`)
+        .join("  ");
 
     case "tekst":
       return stripHtml(block.content ?? "");

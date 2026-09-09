@@ -22,6 +22,7 @@ import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { TextBlockEditor } from "@/components/TextBlockEditor";
 import { ImageBlockControls } from "@/components/ImageBlockControls";
+import { GalleryBlockControls } from "@/components/GalleryBlockControls";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { stripColorStyles } from "@/lib/brandColors";
 import { FONT_FAMILIES, stripFontFamilyStyles } from "@/lib/fontFamilies";
@@ -32,6 +33,7 @@ import {
   DuplicateIcon,
   EyeIcon,
   EyeOffIcon,
+  GalleryIcon,
   GearIcon,
   GripIcon,
   ImagePlaceholderIcon,
@@ -50,6 +52,7 @@ import {
   type CtaBorderRadius,
   type CtaPadding,
   type CtaStyle,
+  type GalleryColumns,
   type ImageAlignment,
   type ImageSize,
   type NewsletterBlock,
@@ -69,6 +72,7 @@ const BLOCK_META: Record<BlockType, { title: string; badge: BlockBadge }> = {
   tekst: { title: "Tekst", badge: "AI-tekst" },
   img: { title: "Billede", badge: "Struktur" },
   produkt: { title: "Produkt", badge: "Produktdata" },
+  galleri: { title: "Billedgalleri", badge: "Struktur" },
 };
 
 const ADD_BLOCK_OPTIONS: { kind: AddableBlockKind; label: string; icon: (props: { className?: string }) => React.JSX.Element }[] = [
@@ -77,6 +81,7 @@ const ADD_BLOCK_OPTIONS: { kind: AddableBlockKind; label: string; icon: (props: 
   { kind: "produkt", label: "Produkt", icon: ProductIcon },
   { kind: "knap", label: "Knap", icon: ButtonIcon },
   { kind: "skillelinje", label: "Skillelinje", icon: DividerIcon },
+  { kind: "galleri", label: "Galleri", icon: GalleryIcon },
 ];
 
 const BADGE_STYLES: Record<BlockBadge, string> = {
@@ -235,6 +240,8 @@ interface BlockContentProps {
   onCtaPaddingChange: (padding: CtaPadding) => void;
   onCtaBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
   onCtaStyleChange: (style: CtaStyle) => void;
+  onGalleryProductIdsChange: (productIds: string[]) => void;
+  onGalleryColumnsChange: (columns: GalleryColumns) => void;
   products: ShopifyProduct[];
   customerType: CustomerType;
 }
@@ -252,6 +259,8 @@ function BlockContent({
   onCtaPaddingChange,
   onCtaBorderRadiusChange,
   onCtaStyleChange,
+  onGalleryProductIdsChange,
+  onGalleryColumnsChange,
   products,
   customerType,
 }: BlockContentProps) {
@@ -341,6 +350,17 @@ function BlockContent({
 
     case "skillelinje":
       return <p className="text-xs text-ink-muted">Visuel luft mellem indhold og knappen.</p>;
+
+    case "galleri":
+      return (
+        <GalleryBlockControls
+          products={products}
+          selectedProductIds={block.galleryProductIds ?? []}
+          columns={block.galleryColumns ?? 2}
+          onProductIdsChange={onGalleryProductIdsChange}
+          onColumnsChange={onGalleryColumnsChange}
+        />
+      );
 
     case "cta":
       return (
@@ -586,6 +606,14 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ctaStyle } : block)));
   }
 
+  function handleGalleryProductIdsChange(id: string, galleryProductIds: string[]) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, galleryProductIds } : block)));
+  }
+
+  function handleGalleryColumnsChange(id: string, galleryColumns: GalleryColumns) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, galleryColumns } : block)));
+  }
+
   // Sætter skrifttypen for ALLE tekst-blokke på én gang og fjerner samtidig
   // evt. tidligere per-udsnit skrifttype-valg inde i selve indholdet (fra
   // værktøjslinjens egen Skrifttype-dropdown) – ellers ville et gammelt
@@ -711,6 +739,8 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
                     onCtaPaddingChange={(padding) => handleCtaPaddingChange(block.id, padding)}
                     onCtaBorderRadiusChange={(borderRadius) => handleCtaBorderRadiusChange(block.id, borderRadius)}
                     onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}
+                    onGalleryProductIdsChange={(productIds) => handleGalleryProductIdsChange(block.id, productIds)}
+                    onGalleryColumnsChange={(columns) => handleGalleryColumnsChange(block.id, columns)}
                     products={products}
                     customerType={customerType}
                   />
