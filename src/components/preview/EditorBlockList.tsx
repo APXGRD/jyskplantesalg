@@ -237,6 +237,11 @@ interface BlockContentProps {
   onAlignmentChange: (alignment: ImageAlignment) => void;
   onSizeChange: (size: ImageSize) => void;
   onBgColorChange: (color: string) => void;
+  // Sætter block.textColor for netop DENNE blok – bruges af Overskrift/
+  // Brødtekst/Tekst/CTA's egne "Tekstfarve"-swatches (til forskel fra
+  // handleGlobalColorChange, som sætter samme felt på ALLE tekst-blokke på
+  // én gang).
+  onTextColorChange: (color: string) => void;
   onCtaPaddingChange: (padding: CtaPadding) => void;
   onCtaBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
   onCtaStyleChange: (style: CtaStyle) => void;
@@ -256,6 +261,7 @@ function BlockContent({
   onAlignmentChange,
   onSizeChange,
   onBgColorChange,
+  onTextColorChange,
   onCtaPaddingChange,
   onCtaBorderRadiusChange,
   onCtaStyleChange,
@@ -275,32 +281,44 @@ function BlockContent({
 
     case "overskrift":
       return (
-        <TextBlockEditor
-          content={block.content ?? ""}
-          onChange={onContentChange}
-          fontFamily={block.fontFamily}
-          textColor={block.textColor}
-        />
+        <div className="flex flex-col gap-2">
+          <TextBlockEditor
+            content={block.content ?? ""}
+            onChange={onContentChange}
+            fontFamily={block.fontFamily}
+            textColor={block.textColor}
+            showColorPicker={false}
+          />
+          <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
+        </div>
       );
 
     case "brodtekst":
       return (
-        <TextBlockEditor
-          content={block.content ?? ""}
-          onChange={onContentChange}
-          fontFamily={block.fontFamily}
-          textColor={block.textColor}
-        />
+        <div className="flex flex-col gap-2">
+          <TextBlockEditor
+            content={block.content ?? ""}
+            onChange={onContentChange}
+            fontFamily={block.fontFamily}
+            textColor={block.textColor}
+            showColorPicker={false}
+          />
+          <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
+        </div>
       );
 
     case "tekst":
       return (
-        <TextBlockEditor
-          content={block.content ?? ""}
-          onChange={onContentChange}
-          fontFamily={block.fontFamily}
-          textColor={block.textColor}
-        />
+        <div className="flex flex-col gap-2">
+          <TextBlockEditor
+            content={block.content ?? ""}
+            onChange={onContentChange}
+            fontFamily={block.fontFamily}
+            textColor={block.textColor}
+            showColorPicker={false}
+          />
+          <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
+        </div>
       );
 
     case "billede":
@@ -370,6 +388,7 @@ function BlockContent({
             onChange={onContentChange}
             fontFamily={block.fontFamily}
             textColor={block.textColor}
+            showColorPicker={false}
           />
           <input
             value={block.ctaUrl ?? ""}
@@ -378,6 +397,11 @@ function BlockContent({
             className={fieldClassName}
           />
           <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
+          {(block.ctaStyle ?? "udfyldt") === "kontur" ? (
+            <p className="text-[11px] text-ink-faintest">I kontur-stil bruges knapfarven til både kant og tekst.</p>
+          ) : (
+            <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
+          )}
 
           <CtaAdvancedControls
             block={block}
@@ -563,7 +587,22 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
   }
 
   function handleContentChange(id: string, html: string) {
-    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, content: html } : block)));
+    onBlocksChange(
+      blocks.map((block) => {
+        if (block.id !== id) return block;
+        // Alle rich-text-blokkes per-udsnit farve-værktøj er skjult (se
+        // showColorPicker i BlockContent herunder), men en inline farve kan i
+        // princippet stadig snige sig ind via indsat/limet HTML – renses
+        // derfor altid væk her, så block.textColor forbliver den ENESTE
+        // kilde til blokkens tekstfarve. Uden dette ville en sådan inline
+        // farve kunne vise noget andet end block.textColor i Preview, og
+        // forsvinde usynligt igen næste gang blokkens tekst regenereres
+        // (almindelig gentagen generering ELLER en skabelon) – det var
+        // netop den fejl, der ramte "Gem som skabelon".
+        const content = RICH_TEXT_BLOCK_TYPES.includes(block.type) ? stripColorStyles(html) : html;
+        return { ...block, content };
+      }),
+    );
   }
 
   function handleCtaUrlChange(id: string, url: string) {
@@ -592,6 +631,17 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
 
   function handleBgColorChange(id: string, bgColor: string) {
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, bgColor } : block)));
+  }
+
+  // Sætter block.textColor DIREKTE for netop denne blok – til forskel fra
+  // handleGlobalColorChange (som sætter samme felt på ALLE tekst-blokke på én
+  // gang). Dette er blokkens EGEN, uafhængige tekstfarve-vælger (Overskrift/
+  // Brødtekst/Tekst/CTA); ved at skrive til block.textColor (i stedet for et
+  // per-udsnit Tiptap-mærke inde i selve content-HTML'en) overlever valget
+  // både almindelig gentagen generering OG "Gem som skabelon" – content
+  // regenereres frisk hver gang, men textColor gør ikke.
+  function handleTextColorChange(id: string, textColor: string) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, textColor } : block)));
   }
 
   function handleCtaPaddingChange(id: string, ctaPadding: CtaPadding) {
@@ -736,6 +786,7 @@ export function EditorBlockList({ blocks, onBlocksChange, products, customerType
                     onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
                     onSizeChange={(size) => handleSizeChange(block.id, size)}
                     onBgColorChange={(color) => handleBgColorChange(block.id, color)}
+                    onTextColorChange={(color) => handleTextColorChange(block.id, color)}
                     onCtaPaddingChange={(padding) => handleCtaPaddingChange(block.id, padding)}
                     onCtaBorderRadiusChange={(borderRadius) => handleCtaBorderRadiusChange(block.id, borderRadius)}
                     onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}

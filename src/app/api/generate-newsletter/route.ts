@@ -10,6 +10,8 @@ import { GoogleGenAI } from "@google/genai";
 import { collectionUrls, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { fetchShopifyProducts } from "@/lib/shopify/fetchProducts";
 import { shopBranding } from "@/lib/shopBranding";
+import { getSupabaseClient } from "@/lib/supabase";
+import { createBlocksFromTemplate, type NewsletterBlock, type TemplateBlock } from "@/lib/newsletterBlocks";
 import { buildNewsletterUserPrompt } from "@/lib/prompts/newsletterPrompt";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 
@@ -17,6 +19,31 @@ interface GenerateNewsletterBody {
   productIds?: string[];
   customerType?: CustomerType;
   instructions?: string;
+  // Skabelonens id fra "Skabelon"-dropdownen på Opsætnings-siden – undefined/
+  // null betyder "Standard layout" (nuværende, faste blok-struktur).
+  templateId?: string | null;
+}
+
+// Henter skabelonens gemte block_structure fra Supabase. Kastes der en fejl
+// (skabelonen findes ikke længere, Supabase utilgængelig osv.), fanges det
+// af kalderen – hele genereringen skal IKKE fejle, blot fordi den valgte
+// skabelon ikke kunne hentes; den falder da roligt tilbage til
+// standard-strukturen, som hvis "Standard layout" var valgt.
+async function fetchTemplateBlockStructure(templateId: string): Promise<TemplateBlock[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("templates")
+    .select("block_structure")
+    .eq("id", templateId)
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!Array.isArray(data?.block_structure)) {
+    throw new Error("Skabelonens block_structure er ugyldig");
+  }
+  return data.block_structure as TemplateBlock[];
 }
 
 function isCustomerType(value: unknown): value is CustomerType {
@@ -62,7 +89,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ugyldig JSON i request body" }, { status: 400 });
   }
 
-  const { productIds, customerType, instructions } = body;
+  const { productIds, customerType, instructions, templateId } = body;
 
   if (!Array.isArray(productIds) || productIds.length === 0) {
     return NextResponse.json(
@@ -135,7 +162,25 @@ export async function POST(req: NextRequest) {
     // Overskriver AI'ens eget cta.url-valg med den deterministiske logik
     // herover – AI'en må stadig selv formulere cta.text.
     newsletter.cta = { ...newsletter.cta, url: resolveCtaUrl(selectedProducts) };
-    return NextResponse.json(newsletter);
+
+    // Er en skabelon valgt (frem for "Standard layout"), bygges hele
+    // blocks-arrayet HER server-side ud fra dens gemte struktur/styling – se
+    // createBlocksFromTemplate. Fejler det (skabelonen findes ikke længere,
+    // Supabase utilgængelig osv.), falder vi roligt tilbage til INGEN
+    // `blocks`-felt i svaret, præcis som når "Standard layout" er valgt –
+    // NewsletterContext.setResult bygger da selv blocks-listen via
+    // createDefaultBlocks, som hidtil.
+    let blocks: NewsletterBlock[] | undefined;
+    if (typeof templateId === "string" && templateId) {
+      try {
+        const templateBlockStructure = await fetchTemplateBlockStructure(templateId);
+        blocks = createBlocksFromTemplate(templateBlockStructure, newsletter, customerType, selectedProducts);
+      } catch (err) {
+        console.error("Kunne ikke anvende den valgte skabelon (fortsætter med standard layout):", err);
+      }
+    }
+
+    return NextResponse.json(blocks ? { ...newsletter, blocks } : newsletter);
   } catch (err) {
     console.error("generate-newsletter fejlede:", err);
     return NextResponse.json(

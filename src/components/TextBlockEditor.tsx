@@ -18,6 +18,14 @@ interface TextBlockEditorProps {
   // herunder.
   fontFamily?: string;
   textColor?: string;
+  // Værktøjslinjens EGEN farve-swatches sætter et per-udsnit Tiptap-mærke
+  // direkte i content-HTML'en – uafhængigt af blokkens textColor-felt.  For
+  // CTA-knappens ét-linjes label giver det ingen mening (og gemmes IKKE i en
+  // skabelon, da hele content'en regenereres frisk ved hver generering – se
+  // newsletterBlocks.ts), så knappens tekstfarve skal UDELUKKENDE styres af
+  // det fælles textColor-felt. Default true (uændret for overskrift/
+  // brødtekst/tekst, hvor per-udsnit farve stadig er meningsfuldt).
+  showColorPicker?: boolean;
 }
 
 const DEFAULT_FONT_SIZE = 13;
@@ -49,7 +57,13 @@ const EDITOR_EXTENSIONS = [
   Color,
 ];
 
-export function TextBlockEditor({ content, onChange, fontFamily, textColor }: TextBlockEditorProps) {
+export function TextBlockEditor({
+  content,
+  onChange,
+  fontFamily,
+  textColor,
+  showColorPicker = true,
+}: TextBlockEditorProps) {
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // Klik på værktøjslinjen (knapper/dropdowns) flytter DOM-fokus væk fra selve
@@ -238,12 +252,16 @@ export function TextBlockEditor({ content, onChange, fontFamily, textColor }: Te
             <UnderlineIcon className="h-3.5 w-3.5" />
           </button>
 
-          <div className="mx-1 h-5 w-px bg-border" />
+          {showColorPicker && (
+            <>
+              <div className="mx-1 h-5 w-px bg-border" />
 
-          <ColorSwatches
-            value={activeState.color}
-            onChange={(color) => applyCommand((chain) => chain.setColor(color))}
-          />
+              <ColorSwatches
+                value={activeState.color}
+                onChange={(color) => applyCommand((chain) => chain.setColor(color))}
+              />
+            </>
+          )}
         </div>
       )}
 

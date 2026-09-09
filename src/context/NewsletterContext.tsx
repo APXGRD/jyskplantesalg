@@ -32,8 +32,18 @@ interface NewsletterContextValue {
   setCustomerType: (type: CustomerType) => void;
   instructions: string;
   setInstructions: (text: string) => void;
+  // Den valgte skabelon på Opsætnings-siden – null betyder "Standard layout"
+  // (nuværende, faste blok-struktur). Selve skabelonens indhold hentes ikke
+  // her, kun id'et, som sendes med til generate-newsletter/route.ts.
+  selectedTemplateId: string | null;
+  setSelectedTemplateId: Dispatch<SetStateAction<string | null>>;
   result: GeneratedNewsletter | null;
-  setResult: (result: GeneratedNewsletter | null) => void;
+  // `presetBlocks`, hvis givet, bruges DIREKTE som blocks-listen i stedet for
+  // at blive bygget her via createDefaultBlocks – det er sådan
+  // skabelon-baseret generering fungerer, da generate-newsletter/route.ts i
+  // så fald allerede har bygget den fulde blocks-liste server-side (se
+  // opsaetning/page.tsx).
+  setResult: (result: GeneratedNewsletter | null, presetBlocks?: NewsletterBlock[]) => void;
   // Blok-listen for Preview/Edit-mode – ligger her (i stedet for som lokal
   // state i preview/page.tsx), så den overlever navigation væk fra og tilbage
   // til Preview-siden, ligesom resten af context'en allerede gjorde.
@@ -51,6 +61,7 @@ interface PersistedState {
   selectedProductIds: string[];
   customerType: CustomerType;
   instructions: string;
+  selectedTemplateId: string | null;
   result: GeneratedNewsletter | null;
   blocks: NewsletterBlock[];
 }
@@ -59,6 +70,7 @@ const DEFAULT_PERSISTED_STATE: PersistedState = {
   selectedProductIds: [],
   customerType: "privat",
   instructions: "",
+  selectedTemplateId: null,
   result: null,
   blocks: [],
 };
@@ -83,6 +95,7 @@ function loadPersistedState(): PersistedState {
       selectedProductIds: Array.isArray(parsed.selectedProductIds) ? parsed.selectedProductIds : [],
       customerType: parsed.customerType === "erhverv" ? "erhverv" : "privat",
       instructions: typeof parsed.instructions === "string" ? parsed.instructions : "",
+      selectedTemplateId: typeof parsed.selectedTemplateId === "string" ? parsed.selectedTemplateId : null,
       result: parsed.result ?? null,
       blocks: Array.isArray(parsed.blocks) ? parsed.blocks : [],
     };
@@ -102,6 +115,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   );
   const [customerType, setCustomerType] = useState<CustomerType>(() => loadPersistedState().customerType);
   const [instructions, setInstructions] = useState(() => loadPersistedState().instructions);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    () => loadPersistedState().selectedTemplateId,
+  );
   const [result, setResultState] = useState<GeneratedNewsletter | null>(() => loadPersistedState().result);
   const [blocks, setBlocks] = useState<NewsletterBlock[]>(() => loadPersistedState().blocks);
 
@@ -120,11 +136,21 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   // katalog (i stedet for mock-data) – fejler opslaget, bygges blokkene
   // stadig, blot uden produktdata, i stedet for at blokere hele
   // genereringsflowet.
+  //
+  // Er `presetBlocks` givet (skabelon-baseret generering – se
+  // opsaetning/page.tsx), bruges den direkte i stedet: generate-newsletter/
+  // route.ts har i så fald allerede bygget hele blocks-listen server-side ud
+  // fra skabelonens struktur, og der er intet grund til at bygge den igen
+  // (eller lave endnu et /api/shopify/products-kald) her.
   const setResult = useCallback(
-    async (newResult: GeneratedNewsletter | null) => {
+    async (newResult: GeneratedNewsletter | null, presetBlocks?: NewsletterBlock[]) => {
       setResultState(newResult);
       if (!newResult) {
         setBlocks([]);
+        return;
+      }
+      if (presetBlocks) {
+        setBlocks(presetBlocks);
         return;
       }
       let selectedProducts: ShopifyProduct[] = [];
@@ -146,12 +172,19 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   // fejler den, fortsætter appen bare uden persistering i stedet for at gå ned.
   useEffect(() => {
     try {
-      const payload: PersistedState = { selectedProductIds, customerType, instructions, result, blocks };
+      const payload: PersistedState = {
+        selectedProductIds,
+        customerType,
+        instructions,
+        selectedTemplateId,
+        result,
+        blocks,
+      };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Ignoreres bevidst – se kommentaren ovenfor.
     }
-  }, [selectedProductIds, customerType, instructions, result, blocks]);
+  }, [selectedProductIds, customerType, instructions, selectedTemplateId, result, blocks]);
 
   const value = useMemo<NewsletterContextValue>(
     () => ({
@@ -162,12 +195,14 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       setCustomerType,
       instructions,
       setInstructions,
+      selectedTemplateId,
+      setSelectedTemplateId,
       result,
       setResult,
       blocks,
       setBlocks,
     }),
-    [selectedProductIds, customerType, instructions, result, blocks, setResult],
+    [selectedProductIds, customerType, instructions, selectedTemplateId, result, blocks, setResult],
   );
 
   return <NewsletterContext.Provider value={value}>{children}</NewsletterContext.Provider>;

@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { Sidebar } from "@/components/Sidebar";
 import { CustomerTypeCard } from "@/components/CustomerTypeCard";
-import { BoltIcon, SpinnerIcon } from "@/components/icons";
+import { BoltIcon, ChevronDownIcon, SpinnerIcon } from "@/components/icons";
+import type { NewsletterBlock } from "@/lib/newsletterBlocks";
 import { useNewsletter, type GeneratedNewsletter } from "@/context/NewsletterContext";
+
+interface TemplateSummary {
+  id: string;
+  name: string;
+  description: string | null;
+}
 
 export default function OpsaetningPage() {
   const router = useRouter();
@@ -16,13 +23,38 @@ export default function OpsaetningPage() {
     setCustomerType,
     instructions,
     setInstructions,
+    selectedTemplateId,
+    setSelectedTemplateId,
     setResult,
   } = useNewsletter();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
 
   const hasSelectedProducts = selectedProductIds.length > 0;
+
+  // Henter listen af gemte skabeloner til dropdownen. Fejler kaldet (fx
+  // Supabase midlertidigt utilgængelig), degraderer siden blot roligt til
+  // kun at vise "Standard layout" i stedet for at blokere resten af
+  // Opsætnings-siden – dropdownen er ikke kritisk for selve generereingen.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/templates");
+        const data = await response.json();
+        if (!cancelled && response.ok && Array.isArray(data)) {
+          setTemplates(data);
+        }
+      } catch {
+        // Ignoreres bevidst – se kommentaren ovenfor.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleGenerate() {
     if (!hasSelectedProducts || isGenerating) {
@@ -40,6 +72,7 @@ export default function OpsaetningPage() {
           productIds: selectedProductIds,
           customerType,
           instructions: instructions.trim() || undefined,
+          templateId: selectedTemplateId,
         }),
       });
 
@@ -48,8 +81,11 @@ export default function OpsaetningPage() {
         throw new Error(body?.error ?? "Kunne ikke generere nyhedsbrevet. Prøv igen.");
       }
 
-      const data: GeneratedNewsletter = await response.json();
-      setResult(data);
+      // `blocks` er kun med i svaret, når en skabelon blev anvendt server-side
+      // (se generate-newsletter/route.ts) – ellers bygger setResult selv
+      // blocks-listen via createDefaultBlocks, som hidtil.
+      const { blocks, ...data }: GeneratedNewsletter & { blocks?: NewsletterBlock[] } = await response.json();
+      setResult(data, blocks);
       router.push("/preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
@@ -85,6 +121,28 @@ export default function OpsaetningPage() {
                   selected={customerType === "erhverv"}
                   onSelect={() => setCustomerType("erhverv")}
                 />
+              </div>
+            </section>
+
+            <section className="pt-8">
+              <p className="text-xs font-semibold tracking-wide text-ink uppercase">Skabelon</p>
+              <p className="pt-1.5 pb-3 text-xs text-ink-faint">
+                Genbrug en gemt blok-opbygning og styling, eller behold standard-layoutet
+              </p>
+              <div className="relative max-w-xs">
+                <select
+                  value={selectedTemplateId ?? ""}
+                  onChange={(event) => setSelectedTemplateId(event.target.value || null)}
+                  className="w-full appearance-none rounded-lg border border-border bg-white px-4 py-2.5 pr-8 text-[13px] text-ink focus:outline-none"
+                >
+                  <option value="">Standard layout</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-3 w-3 -translate-y-1/2 text-ink-muted" />
               </div>
             </section>
 
