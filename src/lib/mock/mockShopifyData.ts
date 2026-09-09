@@ -9,6 +9,8 @@
 // Skift denne fil ud med en rigtig fetchShopifyProducts()-funktion, når access-
 // token'en er på plads.
 
+import { brand } from "@/config/brand";
+
 export interface ShopifyProduct {
   id: string;
   title: string;
@@ -34,9 +36,8 @@ export const collectionUrls: Record<string, string> = {
 };
 
 export const mockShopData = {
-  storeName: "Jysk Plantesalg",
-  brandTone:
-    "vidende, professionel og jordnær – med fokus på kvalitet og ekspertise i store solitærtræer",
+  storeName: brand.name,
+  brandTone: brand.tone,
   products: [
     // ---- Multistammet: 7 produkter, til test af "vælg hele kategorien" ----
     {

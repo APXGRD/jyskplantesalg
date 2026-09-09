@@ -1,23 +1,10 @@
-// Kurateret sæt brand-farver til Edit-mode – bevidst IKKE en fri farvevælger
-// (input type="color"), kun disse faste swatches, genbrugt overalt hvor
-// brugeren kan vælge farve (tekst, CTA-knap, blok-baggrund).
-
-export interface BrandColor {
-  id: string;
-  label: string;
-  value: string;
-}
+// Farve-swatchene til Edit-mode (global værktøjslinje, per-blok
+// farve-vælgere osv.) bor nu i ColorSwatches.tsx selv, udledt live af
+// brand-indstillingerne via useBrandSettings – se den for det tidligere
+// faste 5-farve BRAND_COLORS-array, der stod her.
 
 export const DARK_TEXT_COLOR = "#1f2a1f";
 export const LIGHT_TEXT_COLOR = "#ffffff";
-
-export const BRAND_COLORS: BrandColor[] = [
-  { id: "skovgroen", label: "Skovgrøn", value: "#2f5233" },
-  { id: "moerk-tekst", label: "Mørk tekst", value: DARK_TEXT_COLOR },
-  { id: "cremehvid", label: "Cremehvid", value: "#fffefc" },
-  { id: "salvie", label: "Lys salvie", value: "#9caf88" },
-  { id: "terracotta", label: "Terracotta", value: "#c1622d" },
-];
 
 function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.replace("#", "");

@@ -14,6 +14,7 @@ import {
 import type { CustomerType } from "@/lib/format";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { createDefaultBlocks, type NewsletterBlock } from "@/lib/newsletterBlocks";
+import { useBrandSettings } from "@/context/BrandSettingsContext";
 
 export type { CustomerType };
 
@@ -105,6 +106,11 @@ function loadPersistedState(): PersistedState {
 }
 
 export function NewsletterProvider({ children }: { children: ReactNode }) {
+  // Bruges som starttilstand for FRISKE nyhedsbreve (se setResult herunder)
+  // – ProviderTræet sidder allerede inden i BrandSettingsProvider (se
+  // layout.tsx), så denne kan trygt bruges her.
+  const brand = useBrandSettings();
+
   // NewsletterProvider rendres kun på klienten (se
   // ClientOnlyNewsletterProvider.tsx, ssr:false) – der er derfor ingen
   // server-rendret HTML at være uenig med, og disse lazy-initializers må
@@ -162,9 +168,14 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       } catch {
         // Ignoreres bevidst – se kommentaren ovenfor.
       }
-      setBlocks(createDefaultBlocks(newResult, customerType, selectedProducts));
+      setBlocks(
+        createDefaultBlocks(newResult, customerType, selectedProducts, {
+          primaryColor: brand.colors[0],
+          primaryFont: brand.primaryFont,
+        }),
+      );
     },
-    [selectedProductIds, customerType],
+    [selectedProductIds, customerType, brand.colors, brand.primaryFont],
   );
 
   // Gemmer HELE udkastet til localStorage, hver gang noget i det ændrer sig.

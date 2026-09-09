@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { getBrandSettings } from "@/lib/brandSettings";
 
 export async function GET(req: NextRequest) {
   const clientId = process.env.SHOPIFY_CLIENT_ID;
@@ -78,12 +79,14 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Intet access token modtaget fra Shopify.", { status: 400 });
   }
 
+  const brandSettings = await getBrandSettings();
+
   const html = `<!doctype html>
 <html lang="da"><head><meta charset="utf-8"><title>Shopify forbundet</title>
 <style>
   body{font-family:system-ui,-apple-system,sans-serif;background:#f7f5f0;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;}
   .card{max-width:560px;background:#fff;border-radius:14px;padding:32px;box-shadow:0 8px 24px rgba(0,0,0,0.08);}
-  h1{font-size:18px;margin:0 0 12px;color:#2f5233;}
+  h1{font-size:18px;margin:0 0 12px;color:${brandSettings.brand_colors[1] ?? brandSettings.brand_colors[0]};}
   p{font-size:14px;color:#444;line-height:1.6;}
   code{display:block;background:#f1efe8;padding:14px;border-radius:8px;word-break:break-all;font-size:13px;margin:16px 0;}
 </style></head>

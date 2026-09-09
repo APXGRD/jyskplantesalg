@@ -4,7 +4,13 @@
   --background: #f4f0e8;
   --foreground: #181d1a;
 
+  /* --primary/--secondary's fallback værdier her matcher src/config/brand.ts
+     nøjagtigt – de overskrives i praksis altid af layout.tsx's inline style,
+     som læser de faktiske værdier fra brand.ts, så ÉN kilde (brand.ts) reelt
+     styrer dem begge. Fallback-værdierne holdes kun i sync manuelt, da en
+     CSS-fil ikke selv kan importere fra en TS-fil. */
   --primary: #9caf88;
+  --secondary: #2f5233;
 
   --ink: #3a5837;
   --ink-muted: #637862;
@@ -28,6 +34,7 @@
   --color-foreground: var(--foreground);
 
   --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
 
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);

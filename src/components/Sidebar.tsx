@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { DocumentIcon, GearIcon, LeafIcon, UsersIcon } from "./icons";
+import { DocumentIcon, GearIcon, PaletteIcon, UsersIcon } from "./icons";
+import { Logo } from "./Logo";
+import { brand } from "@/config/brand";
 
-export type SidebarPage = "products" | "settings" | "preview" | "customers";
+export type SidebarPage = "products" | "settings" | "preview" | "customers" | "brand-settings";
 
 interface NavItem {
   id: SidebarPage;
@@ -11,10 +13,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "products", label: "Vælg produkter", href: "/produkter", icon: LeafIcon },
+  { id: "products", label: "Vælg produkter", href: "/produkter", icon: Logo },
   { id: "settings", label: "Opsætning", href: "/opsaetning", icon: GearIcon },
   { id: "preview", label: "Preview / Rediger", href: "/preview", icon: DocumentIcon },
   { id: "customers", label: "Kunder", href: "/kunder", icon: UsersIcon },
+  { id: "brand-settings", label: "Indstillinger", href: "/indstillinger", icon: PaletteIcon },
 ];
 
 function formatDraftSavedAt(date: Date) {
@@ -35,15 +38,23 @@ interface SidebarProps {
 }
 
 export function Sidebar({ active }: SidebarProps) {
+  // Sidebar er app-chrome, ikke nyhedsbrevets EGET indhold – viser derfor
+  // bevidst app'ens statiske, faste navn/farve (brand.ts), IKKE kundens
+  // dynamiske brand-indstillinger fra Indstillinger-siden (se
+  // BrandSettingsContext.tsx). Navnet vises som to linjer (fx "Jysk" /
+  // "Plantesalg").
+  const [brandFirstWord, ...brandRestWords] = brand.name.split(" ");
+  const brandRest = brandRestWords.join(" ");
+
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
       <div className="flex items-center gap-3 border-b border-border p-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
-          <LeafIcon className="h-4 w-4" />
+          <Logo className="h-4 w-4" />
         </div>
         <div className="flex flex-col leading-tight">
-          <span className="text-xs font-semibold tracking-wide text-ink uppercase">Jysk</span>
-          <span className="text-[11px] text-ink-muted">Plantesalg</span>
+          <span className="text-xs font-semibold tracking-wide text-ink uppercase">{brandFirstWord}</span>
+          <span className="text-[11px] text-ink-muted">{brandRest}</span>
         </div>
       </div>
 

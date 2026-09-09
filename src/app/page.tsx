@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { mockCustomers } from "@/lib/mock/mockCustomers";
-import { ChevronRightIcon, LeafIcon, UsersIcon } from "@/components/icons";
+import { ChevronRightIcon, UsersIcon } from "@/components/icons";
+import { Logo } from "@/components/Logo";
+import { brand } from "@/config/brand";
 
 export default function HomePage() {
+  // Landingssiden er app-chrome, ikke nyhedsbrevets EGET indhold – viser
+  // derfor bevidst app'ens statiske, faste navn/farve (brand.ts), IKKE
+  // kundens dynamiske brand-indstillinger (se BrandSettingsContext.tsx).
   const activeCustomerCount = mockCustomers.filter(
     (customer) => customer.marketingConsentStatus === "SUBSCRIBED",
   ).length;
@@ -11,10 +16,10 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col items-center justify-center gap-10 bg-background px-6">
       <div className="flex flex-col items-center gap-4">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white">
-          <LeafIcon className="h-8 w-8" />
+          <Logo className="h-8 w-8" />
         </div>
         <div className="flex flex-col items-center gap-1 text-center leading-tight">
-          <h1 className="text-2xl font-semibold tracking-wide text-ink uppercase">JYSK Plantesalg</h1>
+          <h1 className="text-2xl font-semibold tracking-wide text-ink uppercase">{brand.name}</h1>
           <p className="text-sm text-ink-muted">Nyhedsbrev-generator</p>
         </div>
       </div>

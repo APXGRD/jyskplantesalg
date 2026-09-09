@@ -11,7 +11,8 @@ import {
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
-import { shopBranding } from "@/lib/shopBranding";
+import type { BrandSettings } from "@/context/BrandSettingsContext";
+import { brand as staticBrand } from "@/config/brand";
 
 // Standard-skrifttype for HELE nyhedsbrevet, når hverken den globale
 // skrifttype-vælger eller en per-blok værdi er sat. HTML-tabeller nedarver
@@ -75,12 +76,13 @@ function renderBlockHtml(
   image: GeneratedNewsletter["image"],
   customerType: CustomerType,
   products: ShopifyProduct[],
+  brand: BrandSettings,
 ): string {
   switch (block.type) {
     case "header": {
-      const bgColor = block.bgColor || "#9caf88";
+      const bgColor = block.bgColor || brand.colors[0] || staticBrand.colors[0];
       const textColor = getContrastTextColor(bgColor);
-      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(shopBranding.storeName)}</td></tr>`;
+      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(brand.name)}</td></tr>`;
     }
 
     case "overskrift": {
@@ -275,7 +277,7 @@ function renderBlockHtml(
       const bgColor = block.bgColor || "#f5f7f4";
       const textColor = getContrastTextColor(bgColor);
       return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">
-        Jysk Plantesalg · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890<br/>
+        ${escapeHtml(brand.name)} · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890<br/>
         Du modtager dette nyhedsbrev, fordi du er ${escapeHtml(audienceFor(customerType))}.
       </td></tr>`;
     }
@@ -287,10 +289,11 @@ function renderBlockText(
   image: GeneratedNewsletter["image"],
   customerType: CustomerType,
   products: ShopifyProduct[],
+  brand: BrandSettings,
 ): string {
   switch (block.type) {
     case "header":
-      return shopBranding.storeName;
+      return brand.name;
 
     case "overskrift":
       return stripHtml(block.content ?? "");
@@ -335,7 +338,7 @@ function renderBlockText(
       return `${stripHtml(block.content ?? "")}: ${block.ctaUrl ?? ""}`;
 
     case "footer":
-      return `Jysk Plantesalg · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890\nDu modtager dette nyhedsbrev, fordi du er ${audienceFor(customerType)}.`;
+      return `${brand.name} · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890\nDu modtager dette nyhedsbrev, fordi du er ${audienceFor(customerType)}.`;
   }
 }
 
@@ -352,10 +355,11 @@ export function buildNewsletterHtml(
   image: GeneratedNewsletter["image"],
   customerType: CustomerType,
   products: ShopifyProduct[],
+  brand: BrandSettings,
 ): string {
   const rows = blocks
     .filter((block) => !block.hidden)
-    .map((block) => renderBlockHtml(block, image, customerType, products))
+    .map((block) => renderBlockHtml(block, image, customerType, products, brand))
     .join("\n");
 
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:100%;margin:0 auto;border:1px solid #d2ddd1;border-radius:16px;border-collapse:separate;border-spacing:0;overflow:hidden;font-family:${DEFAULT_FONT_FAMILY};">
@@ -370,9 +374,10 @@ export function buildNewsletterText(
   image: GeneratedNewsletter["image"],
   customerType: CustomerType,
   products: ShopifyProduct[],
+  brand: BrandSettings,
 ): string {
   return blocks
     .filter((block) => !block.hidden)
-    .map((block) => renderBlockText(block, image, customerType, products))
+    .map((block) => renderBlockText(block, image, customerType, products, brand))
     .join("\n\n");
 }

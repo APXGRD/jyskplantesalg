@@ -6,6 +6,25 @@
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import type { CustomerType } from "@/lib/format";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import { FONT_FAMILIES } from "@/lib/fontFamilies";
+
+// De brand-værdier (fra Indstillinger/Supabase), et FRISKT nyhedsbrev skal
+// starte med som udgangspunkt – IKKE en låsning, brugeren kan altid ændre
+// det bagefter via de fire farve-swatches/skrifttype-vælgeren i Edit-mode.
+// primaryFont er FONT_FAMILIES' label (fx "Georgia"), samme kontrakt som
+// settings-tabellens primary_font-kolonne.
+export interface BrandDefaults {
+  primaryColor: string;
+  primaryFont: string;
+}
+
+// Slår primaryFont's label op i FONT_FAMILIES for at få den fulde CSS-
+// font-family-værdi (med fallback-stak) – falder tilbage til første
+// web-safe skrifttype, hvis label'et af en eller anden grund ikke matcher
+// nogen af de otte (fx en fremtidig værdi, appen ikke kender endnu).
+function resolveFontFamily(primaryFont: string): string {
+  return FONT_FAMILIES.find((font) => font.label === primaryFont)?.value ?? FONT_FAMILIES[0].value;
+}
 
 export type BlockType =
   | "header"
@@ -197,6 +216,7 @@ export function createDefaultBlocks(
   // (se nedenfor), OG afgør, om der automatisk indsættes en "Billede"- eller
   // "Galleri"-blok (se blockTypes herunder).
   selectedProducts: ShopifyProduct[],
+  brandDefaults: BrandDefaults,
 ): NewsletterBlock[] {
   // Præcis ét valgt produkt: almindelig Billede-blok, som hidtil. Mere end
   // ét: en Galleri-blok på samme plads i stedet – galleriet er ikke beregnet
@@ -215,9 +235,18 @@ export function createDefaultBlocks(
     "cta",
     "footer",
   ];
+  const defaultFontFamily = resolveFontFamily(brandDefaults.primaryFont);
 
   return blockTypes.map((type) => {
     const block: NewsletterBlock = { id: type, type, hidden: false };
+    // Starttilstand for ALLE rich-text-blokke (Overskrift/Brødtekst/CTA her)
+    // er kundens egen primære farve/skrifttype – kun et udgangspunkt, ikke
+    // en låsning; de fire farve-swatches/skrifttype-vælgeren i Edit-mode
+    // overskriver blot dette som ethvert andet valg.
+    if (RICH_TEXT_BLOCK_TYPES.includes(type)) {
+      block.fontFamily = defaultFontFamily;
+      block.textColor = brandDefaults.primaryColor;
+    }
     if (type === "overskrift") block.content = result.heading;
     if (type === "brodtekst") {
       block.content = [greetingFor(customerType), result.bodyText, CLOSING_TEXT]
@@ -316,8 +345,15 @@ export function createBlocksFromTemplate(
   result: GeneratedNewsletter,
   customerType: CustomerType,
   selectedProducts: ShopifyProduct[],
+  brandDefaults: BrandDefaults,
 ): NewsletterBlock[] {
+  const defaultFontFamily = resolveFontFamily(brandDefaults.primaryFont);
+
   return templateBlocks.map((templateBlock) => {
+    // Skabelonens EGEN gemte fontFamily/textColor vinder altid, hvis den er
+    // sat – brand-defaults fylder kun hullet ud, hvis skabelonen aldrig fik
+    // sat en eksplicit værdi for netop den blok (fx en skabelon gemt før
+    // nogen rørte den globale farve/skrifttype-vælger).
     const block: NewsletterBlock = {
       id: `${templateBlock.type}-${crypto.randomUUID()}`,
       type: templateBlock.type,
@@ -331,6 +367,10 @@ export function createBlocksFromTemplate(
       ctaBorderRadius: templateBlock.ctaBorderRadius,
       ctaStyle: templateBlock.ctaStyle,
     };
+    if (RICH_TEXT_BLOCK_TYPES.includes(block.type)) {
+      block.fontFamily = block.fontFamily ?? defaultFontFamily;
+      block.textColor = block.textColor ?? brandDefaults.primaryColor;
+    }
 
     if (block.type === "overskrift") block.content = result.heading;
     if (block.type === "brodtekst") {

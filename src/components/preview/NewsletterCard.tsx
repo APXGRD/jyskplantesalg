@@ -1,7 +1,10 @@
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
-import { ImagePlaceholderIcon, LeafIcon } from "@/components/icons";
+import { ImagePlaceholderIcon } from "@/components/icons";
+import { Logo } from "@/components/Logo";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
   CTA_BORDER_RADIUS_PX,
@@ -11,7 +14,8 @@ import {
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
-import { shopBranding } from "@/lib/shopBranding";
+import { useBrandSettings } from "@/context/BrandSettingsContext";
+import { brand as staticBrand } from "@/config/brand";
 
 const JUSTIFY_CLASS = {
   venstre: "justify-start",
@@ -28,21 +32,22 @@ interface NewsletterCardProps {
 }
 
 export function NewsletterCard({ blocks, image, customerType, products, viewport }: NewsletterCardProps) {
+  const brand = useBrandSettings();
   const audience = customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
 
   function renderBlock(block: NewsletterBlock): ReactNode {
     switch (block.type) {
       case "header": {
-        const bgColor = block.bgColor || "#9caf88";
+        const bgColor = block.bgColor || brand.colors[0] || staticBrand.colors[0];
         const textColor = getContrastTextColor(bgColor);
         return (
           <div
             className="flex items-center justify-center gap-3 px-8 py-5"
             style={{ backgroundColor: bgColor, color: textColor }}
           >
-            <LeafIcon className="h-6 w-6" />
+            <Logo className="h-6 w-6" name={brand.name} />
             <span className="text-xs font-medium tracking-[0.1em] uppercase">
-              {shopBranding.storeName}
+              {brand.name}
             </span>
           </div>
         );
@@ -261,7 +266,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             style={{ backgroundColor: bgColor, color: textColor }}
           >
             <p className="text-[11px] opacity-80">
-              Jysk Plantesalg · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890
+              {brand.name} · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890
             </p>
             <p className="text-[11px] opacity-80">
               Du modtager dette nyhedsbrev, fordi du er {audience}.

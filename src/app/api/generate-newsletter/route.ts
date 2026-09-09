@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { collectionUrls, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { fetchShopifyProducts } from "@/lib/shopify/fetchProducts";
-import { shopBranding } from "@/lib/shopBranding";
+import { getBrandSettings } from "@/lib/brandSettings";
 import { getSupabaseClient } from "@/lib/supabase";
 import { createBlocksFromTemplate, type NewsletterBlock, type TemplateBlock } from "@/lib/newsletterBlocks";
 import { buildNewsletterUserPrompt } from "@/lib/prompts/newsletterPrompt";
@@ -133,10 +133,12 @@ export async function POST(req: NextRequest) {
     productType: product.productType,
   }));
 
+  const brandSettings = await getBrandSettings();
+
   const { systemPrompt, userPrompt } = buildNewsletterUserPrompt(
     {
-      storeName: shopBranding.storeName,
-      brandTone: shopBranding.brandTone,
+      storeName: brandSettings.company_name,
+      brandTone: brandSettings.brand_tone,
       products: productsForPrompt,
     },
     { customerType, instructions },
@@ -174,7 +176,10 @@ export async function POST(req: NextRequest) {
     if (typeof templateId === "string" && templateId) {
       try {
         const templateBlockStructure = await fetchTemplateBlockStructure(templateId);
-        blocks = createBlocksFromTemplate(templateBlockStructure, newsletter, customerType, selectedProducts);
+        blocks = createBlocksFromTemplate(templateBlockStructure, newsletter, customerType, selectedProducts, {
+          primaryColor: brandSettings.brand_colors[0],
+          primaryFont: brandSettings.primary_font,
+        });
       } catch (err) {
         console.error("Kunne ikke anvende den valgte skabelon (fortsætter med standard layout):", err);
       }
