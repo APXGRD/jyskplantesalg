@@ -322,7 +322,11 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     type: block.type,
     hidden: block.hidden,
     fontFamily: block.fontFamily,
-    textColor: block.textColor,
+    // Produktvisning har ingen farve-vælger – altid fast sort, jf.
+    // NewsletterCard.tsx/newsletterExport.ts. Evt. tilbageværende textColor
+    // fra dengang blokken kortvarigt HAVDE en farve-vælger skal ikke leve
+    // videre i nye skabeloner.
+    textColor: block.type === "produktvisning" ? undefined : block.textColor,
     bgColor: block.bgColor,
     alignment: block.alignment,
     size: block.size,
@@ -359,7 +363,9 @@ export function createBlocksFromTemplate(
       type: templateBlock.type,
       hidden: templateBlock.hidden,
       fontFamily: templateBlock.fontFamily,
-      textColor: templateBlock.textColor,
+      // Produktvisning har ingen farve-vælger – ignorér evt. gammel gemt
+      // textColor fra en skabelon, i stedet for at genoplive den her.
+      textColor: templateBlock.type === "produktvisning" ? undefined : templateBlock.textColor,
       bgColor: templateBlock.bgColor,
       alignment: templateBlock.alignment,
       size: templateBlock.size,

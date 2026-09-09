@@ -22,6 +22,11 @@ export interface BrandSettingsRow {
   brand_colors: string[];
   brand_tone: string;
   primary_font: string;
+  // Base64 data-URI af et uploadet logo (Indstillinger-siden), eller null,
+  // hvis intet er uploadet endnu – der er intet statisk "fallback-billede"
+  // for denne, kun en kode-side fallback til det eksisterende leaf-logo (se
+  // NewsletterCard.tsx/newsletterExport.ts).
+  logo_data: string | null;
 }
 
 const FALLBACK_SETTINGS: BrandSettingsRow = {
@@ -30,6 +35,7 @@ const FALLBACK_SETTINGS: BrandSettingsRow = {
   brand_colors: brand.colors,
   brand_tone: brand.tone,
   primary_font: brand.primaryFont,
+  logo_data: null,
 };
 
 export async function getBrandSettings(): Promise<BrandSettingsRow> {
@@ -37,7 +43,7 @@ export async function getBrandSettings(): Promise<BrandSettingsRow> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from("settings")
-      .select("id, company_name, brand_colors, brand_tone, primary_font")
+      .select("id, company_name, brand_colors, brand_tone, primary_font, logo_data")
       .limit(1)
       .single();
 
