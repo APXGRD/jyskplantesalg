@@ -20,6 +20,7 @@ import {
   MobileIcon,
 } from "@/components/icons";
 import { useNewsletter } from "@/context/NewsletterContext";
+import { useBrandSettings } from "@/context/BrandSettingsContext";
 
 type View = "preview" | "rediger";
 type Viewport = "desktop" | "mobil";
@@ -29,6 +30,7 @@ type SaveTemplateState = "idle" | "saved";
 export default function PreviewPage() {
   const router = useRouter();
   const { result, customerType, selectedProductIds, blocks, setBlocks } = useNewsletter();
+  const brand = useBrandSettings();
 
   const [activeView, setActiveView] = useState<View>("preview");
   const [viewport, setViewport] = useState<Viewport>("desktop");
@@ -87,8 +89,8 @@ export default function PreviewPage() {
   async function handleCopy() {
     if (!result) return;
 
-    const html = buildNewsletterHtml(blocks, result.image, customerType, selectedProducts);
-    const text = buildNewsletterText(blocks, result.image, customerType, selectedProducts);
+    const html = buildNewsletterHtml(blocks, result.image, customerType, selectedProducts, brand);
+    const text = buildNewsletterText(blocks, result.image, customerType, selectedProducts, brand);
 
     try {
       if (typeof ClipboardItem !== "undefined") {
