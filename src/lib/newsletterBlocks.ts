@@ -262,6 +262,118 @@ export function duplicateBlock(block: NewsletterBlock): NewsletterBlock {
   };
 }
 
+// Den del af en blok, der er tilbage, når "Gem som skabelon" har fjernet alt
+// AI-genereret/produktspecifikt indhold – kun blok-type, synlighed og
+// stylingvalg, der gælder UANSET hvilket konkret nyhedsbrev/produkter en
+// senere bruger af skabelonen vælger. Bevidst ingen id (skabelonen er ikke
+// bundet til de originale blok-instansers id'er) og ingen content/ctaUrl/
+// productId/imageUrl/altText/galleryProductIds (alt sammen enten AI-tekst,
+// et konkret link, eller et konkret produkt-/billedvalg).
+export type TemplateBlock = Pick<
+  NewsletterBlock,
+  | "type"
+  | "hidden"
+  | "fontFamily"
+  | "textColor"
+  | "bgColor"
+  | "alignment"
+  | "size"
+  | "ctaPadding"
+  | "ctaBorderRadius"
+  | "ctaStyle"
+  | "galleryColumns"
+>;
+
+// Bygger den JSON-struktur, "Gem som skabelon" gemmer i Supabase, ud fra det
+// NUVÆRENDE blocks-array – rækkefølgen er selve array-rækkefølgen, så
+// createBlocksFromTemplate herunder kan genskabe præcis samme blok-opbygning
+// og styling for et nyt nyhedsbrev.
+export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): TemplateBlock[] {
+  return blocks.map((block) => ({
+    type: block.type,
+    hidden: block.hidden,
+    fontFamily: block.fontFamily,
+    textColor: block.textColor,
+    bgColor: block.bgColor,
+    alignment: block.alignment,
+    size: block.size,
+    ctaPadding: block.ctaPadding,
+    ctaBorderRadius: block.ctaBorderRadius,
+    ctaStyle: block.ctaStyle,
+    galleryColumns: block.galleryColumns,
+  }));
+}
+
+// Det omvendte af buildTemplateBlockStructure: genopbygger et fuldt
+// blocks-array ud fra en gemt skabelons struktur/styling + et FRISKT
+// AI-resultat og de PT. valgte produkter (ikke skabelonens oprindelige
+// produktvalg – de er jo strippet væk, og pointen med en skabelon er netop
+// at kunne genbruge den med et nyt produktvalg). Bruges af
+// generate-newsletter/route.ts, når brugeren har valgt en skabelon i stedet
+// for "Standard layout".
+export function createBlocksFromTemplate(
+  templateBlocks: TemplateBlock[],
+  result: GeneratedNewsletter,
+  customerType: CustomerType,
+  selectedProducts: ShopifyProduct[],
+): NewsletterBlock[] {
+  return templateBlocks.map((templateBlock) => {
+    const block: NewsletterBlock = {
+      id: `${templateBlock.type}-${crypto.randomUUID()}`,
+      type: templateBlock.type,
+      hidden: templateBlock.hidden,
+      fontFamily: templateBlock.fontFamily,
+      textColor: templateBlock.textColor,
+      bgColor: templateBlock.bgColor,
+      alignment: templateBlock.alignment,
+      size: templateBlock.size,
+      ctaPadding: templateBlock.ctaPadding,
+      ctaBorderRadius: templateBlock.ctaBorderRadius,
+      ctaStyle: templateBlock.ctaStyle,
+    };
+
+    if (block.type === "overskrift") block.content = result.heading;
+    if (block.type === "brodtekst") {
+      block.content = [greetingFor(customerType), result.bodyText, CLOSING_TEXT]
+        .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+        .join("");
+    }
+    // "billede" og "img" er samme visning/kontroller (se BlockContent i
+    // EditorBlockList.tsx) – en skabelon kan i princippet indeholde begge,
+    // hvis brugeren tilføjede en ekstra billedblok manuelt før den blev gemt.
+    if (block.type === "billede" || block.type === "img") {
+      const matchedProduct =
+        selectedProducts.find((product) => product.id === result.image.productId) ?? selectedProducts[0];
+      if (matchedProduct) {
+        block.imageUrl = matchedProduct.imageUrl;
+        block.altText = matchedProduct.title;
+      }
+    }
+    if (block.type === "produkt") {
+      block.productId = selectedProducts[0]?.id;
+    }
+    if (block.type === "galleri") {
+      const columns = templateBlock.galleryColumns ?? 2;
+      const galleryProducts = pickGalleryProducts(selectedProducts, columns);
+      block.galleryProductIds = galleryProducts.map((product) => product.id);
+      block.galleryColumns = columns;
+    }
+    if (block.type === "cta") {
+      block.content = result.cta.text;
+      block.ctaUrl = result.cta.url;
+    }
+    // "tekst" er frit indtastet af brugeren og derfor ikke AI-genereret – der
+    // er intet oprindeligt indhold at genskabe (det er strippet med vilje),
+    // så blokken starter med samme pladsholdertekst som når den tilføjes
+    // manuelt via "+ Tilføj blok" (se createNewBlock).
+    if (block.type === "tekst") {
+      block.content = "Ny tekstblok – redigér indholdet her";
+    }
+
+    return block;
+  });
+}
+
 // De typer, der kan tilføjes via "+ Tilføj blok"-menuen.
 export type AddableBlockKind = "tekst" | "billede" | "produkt" | "knap" | "skillelinje" | "galleri";
 

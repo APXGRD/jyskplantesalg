@@ -4,17 +4,27 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterHtml, buildNewsletterText } from "@/lib/newsletterExport";
+import { buildTemplateBlockStructure } from "@/lib/newsletterBlocks";
 import { ErrorCard, LoadingCard } from "@/components/FetchStateCard";
 import { Sidebar } from "@/components/Sidebar";
 import { SegmentedControl } from "@/components/preview/SegmentedControl";
 import { NewsletterCard } from "@/components/preview/NewsletterCard";
 import { EditorBlockList } from "@/components/preview/EditorBlockList";
-import { ArrowLeftIcon, CheckIcon, CopyIcon, DesktopIcon, MobileIcon } from "@/components/icons";
+import { SaveTemplateDialog } from "@/components/preview/SaveTemplateDialog";
+import {
+  ArrowLeftIcon,
+  CheckIcon,
+  CopyIcon,
+  DesktopIcon,
+  DocumentIcon,
+  MobileIcon,
+} from "@/components/icons";
 import { useNewsletter } from "@/context/NewsletterContext";
 
 type View = "preview" | "rediger";
 type Viewport = "desktop" | "mobil";
 type CopyState = "idle" | "copied" | "error";
+type SaveTemplateState = "idle" | "saved";
 
 export default function PreviewPage() {
   const router = useRouter();
@@ -23,6 +33,8 @@ export default function PreviewPage() {
   const [activeView, setActiveView] = useState<View>("preview");
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
+  const [saveTemplateState, setSaveTemplateState] = useState<SaveTemplateState>("idle");
 
   const [allProducts, setAllProducts] = useState<ShopifyProduct[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -97,6 +109,27 @@ export default function PreviewPage() {
     }
   }
 
+  async function handleSaveTemplate(name: string, description: string) {
+    const response = await fetch("/api/templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        description: description || undefined,
+        block_structure: buildTemplateBlockStructure(blocks),
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error ?? "Kunne ikke gemme skabelonen. Prøv igen.");
+    }
+
+    setIsSaveTemplateOpen(false);
+    setSaveTemplateState("saved");
+    setTimeout(() => setSaveTemplateState("idle"), 2000);
+  }
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar active="preview" />
@@ -126,6 +159,21 @@ export default function PreviewPage() {
             </div>
 
             <div className="flex items-center gap-2.5">
+              {activeView === "preview" && (
+                <button
+                  type="button"
+                  onClick={() => setIsSaveTemplateOpen(true)}
+                  disabled={!result || blocks.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saveTemplateState === "saved" ? (
+                    <CheckIcon className="h-3.5 w-3.5" />
+                  ) : (
+                    <DocumentIcon className="h-3.5 w-3.5" />
+                  )}
+                  {saveTemplateState === "saved" ? "Skabelon gemt!" : "Gem som skabelon"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleCopy}
@@ -192,6 +240,10 @@ export default function PreviewPage() {
           )}
         </div>
       </div>
+
+      {isSaveTemplateOpen && (
+        <SaveTemplateDialog onClose={() => setIsSaveTemplateOpen(false)} onSave={handleSaveTemplate} />
+      )}
     </div>
   );
 }
