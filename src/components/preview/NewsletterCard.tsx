@@ -45,7 +45,12 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             className="flex items-center justify-center gap-3 px-8 py-5"
             style={{ backgroundColor: bgColor, color: textColor }}
           >
-            <Logo className="h-6 w-6" name={brand.name} />
+            {brand.logoData ? (
+              // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
+              <img src={brand.logoData} alt="" className="h-6 w-6 object-contain" />
+            ) : (
+              <Logo className="h-6 w-6" name={brand.name} />
+            )}
             <span className="text-xs font-medium tracking-[0.1em] uppercase">
               {brand.name}
             </span>
@@ -104,19 +109,17 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
       case "produktvisning":
         return (
           <div className="px-8 py-3">
-            <div className="overflow-hidden rounded-xl border border-border">
+            <div className="overflow-hidden rounded-xl border" style={{ borderColor: "#1a1a1a" }}>
               {products.map((product, index) => (
                 <div
                   key={product.id}
-                  className={`flex items-center justify-between px-4 py-3 ${
-                    index > 0 ? "border-t border-border" : ""
-                  }`}
+                  className="flex items-center justify-between px-4 py-3"
+                  style={index > 0 ? { borderTop: "1px solid #1a1a1a" } : undefined}
                 >
-                  <div>
-                    <p className="text-xs font-medium text-ink">{product.title}</p>
-                    <p className="text-[11px] text-ink-muted">{product.productType}</p>
-                  </div>
-                  <p className="text-xs font-semibold text-ink">
+                  <p className="text-xs font-medium" style={{ color: "#1a1a1a" }}>
+                    {product.title}
+                  </p>
+                  <p className="text-xs font-semibold" style={{ color: "#1a1a1a" }}>
                     {formatPriceForCustomer(product.price, customerType)}
                   </p>
                 </div>

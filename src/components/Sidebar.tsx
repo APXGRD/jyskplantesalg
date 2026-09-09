@@ -1,7 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { DocumentIcon, GearIcon, PaletteIcon, UsersIcon } from "./icons";
 import { Logo } from "./Logo";
-import { brand } from "@/config/brand";
+import { useBrandSettings } from "@/context/BrandSettingsContext";
 
 export type SidebarPage = "products" | "settings" | "preview" | "customers" | "brand-settings";
 
@@ -38,24 +40,32 @@ interface SidebarProps {
 }
 
 export function Sidebar({ active }: SidebarProps) {
-  // Sidebar er app-chrome, ikke nyhedsbrevets EGET indhold – viser derfor
-  // bevidst app'ens statiske, faste navn/farve (brand.ts), IKKE kundens
-  // dynamiske brand-indstillinger fra Indstillinger-siden (se
-  // BrandSettingsContext.tsx). Navnet vises som to linjer (fx "Jysk" /
-  // "Plantesalg").
-  const [brandFirstWord, ...brandRestWords] = brand.name.split(" ");
-  const brandRest = brandRestWords.join(" ");
+  // Resten af Sidebar (nav-ikoner, badge-BAGGRUNDSFARVE, "Udkast gemt" osv.)
+  // er fortsat app-chrome og forbliver bevidst statisk – kun selve
+  // identitets-visningen øverst (logo-billede + firmanavn) er en PRÆCIST
+  // afgrænset undtagelse, der viser kundens rigtige brand-indstillinger, jf.
+  // opgavebeskrivelsen. Navnet vises PRÆCIST som skrevet i Indstillinger,
+  // ingen opsplitning/omformatering.
+  const settings = useBrandSettings();
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
       <div className="flex items-center gap-3 border-b border-border p-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
-          <Logo className="h-4 w-4" />
-        </div>
-        <div className="flex flex-col leading-tight">
-          <span className="text-xs font-semibold tracking-wide text-ink uppercase">{brandFirstWord}</span>
-          <span className="text-[11px] text-ink-muted">{brandRest}</span>
-        </div>
+        {settings.logoData ? (
+          // Intet farvet cirkel-badge her – et rigtigt, uploadet logo har
+          // typisk sin egen baggrund/form og skal vises rent, uden en
+          // ekstra ring/baggrund uden om. Badge-baggrunden (bg-primary,
+          // rounded-full) er bevidst KUN for fallback-ikonet nedenfor.
+          // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
+          <img src={settings.logoData} alt="" className="h-8 w-8 shrink-0 object-contain" />
+        ) : (
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white">
+            <Logo className="h-4 w-4" />
+          </div>
+        )}
+        <span className="truncate text-xs font-semibold tracking-wide text-ink uppercase" title={settings.name}>
+          {settings.name}
+        </span>
       </div>
 
       <div className="flex-1 px-3 py-4">

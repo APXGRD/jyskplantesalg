@@ -82,7 +82,14 @@ function renderBlockHtml(
     case "header": {
       const bgColor = block.bgColor || brand.colors[0] || staticBrand.colors[0];
       const textColor = getContrastTextColor(bgColor);
-      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(brand.name)}</td></tr>`;
+      // Intet statisk leaf-logo her – det er en CSS-maske i selve appen
+      // (Logo.tsx), som ikke oversætter til rå, kopieret e-mail-HTML.
+      // Uden et uploadet logo viser den kopierede header derfor kun
+      // firmanavnet som tekst, ligesom hidtil.
+      const logoImg = brand.logoData
+        ? `<img src="${escapeAttr(brand.logoData)}" width="24" height="24" alt="" style="display:inline-block;vertical-align:middle;margin-right:8px;border-radius:4px;" />`
+        : "";
+      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};text-align:center;padding:20px 32px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-size:12px;font-family:${DEFAULT_FONT_FAMILY};">${logoImg}<span style="vertical-align:middle;">${escapeHtml(brand.name)}</span></td></tr>`;
     }
 
     case "overskrift": {
@@ -124,11 +131,10 @@ function renderBlockHtml(
         .map(
           (product) => `
         <tr>
-          <td style="padding:10px 0;border-top:1px solid #d2ddd1;font-family:${DEFAULT_FONT_FAMILY};">
-            <div style="font-weight:600;color:#3a5837;font-size:13px;">${escapeHtml(product.title)}</div>
-            <div style="color:#637862;font-size:12px;">${escapeHtml(product.productType)}</div>
+          <td style="padding:10px 0;border-top:1px solid #1a1a1a;font-family:${DEFAULT_FONT_FAMILY};">
+            <div style="font-weight:600;color:#1a1a1a;font-size:13px;">${escapeHtml(product.title)}</div>
           </td>
-          <td style="padding:10px 0;border-top:1px solid #d2ddd1;text-align:right;font-weight:600;color:#3a5837;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
+          <td style="padding:10px 0;border-top:1px solid #1a1a1a;text-align:right;font-weight:600;color:#1a1a1a;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
             ${escapeHtml(formatPriceForCustomer(product.price, customerType))}
           </td>
         </tr>`,
