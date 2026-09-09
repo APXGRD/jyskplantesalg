@@ -44,6 +44,16 @@ export function ButtonIcon({ className }: IconProps) {
   );
 }
 
+export function GalleryIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="3" y="5" width="6" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="15" y="5" width="6" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="9.5" y="5" width="5" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 export function DividerIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className}>

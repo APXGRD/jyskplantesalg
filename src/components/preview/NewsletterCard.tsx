@@ -3,7 +3,13 @@ import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { ImagePlaceholderIcon, LeafIcon } from "@/components/icons";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
-import { CTA_BORDER_RADIUS_PX, CTA_PADDING_PX, IMAGE_SIZE_PX, type NewsletterBlock } from "@/lib/newsletterBlocks";
+import {
+  CTA_BORDER_RADIUS_PX,
+  CTA_PADDING_PX,
+  GALLERY_ROW_SIZE,
+  IMAGE_SIZE_PX,
+  type NewsletterBlock,
+} from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
 import { shopBranding } from "@/lib/shopBranding";
 
@@ -120,6 +126,40 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             <hr className="border-t border-border" />
           </div>
         );
+
+      case "galleri": {
+        const columns = block.galleryColumns ?? 2;
+        const galleryProducts = (block.galleryProductIds ?? [])
+          .map((id) => products.find((product) => product.id === id))
+          .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl));
+        if (galleryProducts.length === 0) {
+          return (
+            <div className="px-8 py-3">
+              <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-surface-active text-xs text-ink-faint">
+                Vælg produkter til galleriet
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="px-8 py-3">
+            <div className={`grid gap-3 ${GALLERY_ROW_SIZE[columns] === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+              {/* CSS grid ombryder automatisk til en ny række, når der er flere
+                  billeder end kolonner – "6 billeder"-layoutet (3 kolonner) giver
+                  derfor 2 pæne rækker af 3 helt af sig selv, uden ekstra markup. */}
+              {galleryProducts.map((product) => (
+                // eslint-disable-next-line @next/next/no-img-element -- Shopify-hostet billede-URL, samme mønster som produktvisning
+                <img
+                  key={product.id}
+                  src={product.imageUrl}
+                  alt={product.title}
+                  className="aspect-square w-full rounded-lg object-cover"
+                />
+              ))}
+            </div>
+          </div>
+        );
+      }
 
       case "tekst":
         return (
