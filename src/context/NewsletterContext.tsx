@@ -161,9 +161,15 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       }
       let selectedProducts: ShopifyProduct[] = [];
       try {
-        const response = await fetch("/api/shopify/products");
+        // Læser fra den lokale Supabase-cache (samme som "Vælg produkter"-
+        // siden), IKKE det direkte, fuldt paginerede /api/shopify/products –
+        // det sidste kan tage 20-30+ sekunder ved 900+ produkter, og blev
+        // desuden allerede kaldt/vist på "Vælg produkter"-siden. At kalde det
+        // IGEN her (og en tredje gang på selve Preview-siden) var den
+        // væsentligste kilde til en langsomt opfattet app.
+        const response = await fetch("/api/products/cached");
         const data = await response.json();
-        const allProducts: ShopifyProduct[] = response.ok ? data : [];
+        const allProducts: ShopifyProduct[] = response.ok ? data.products : [];
         selectedProducts = allProducts.filter((product) => selectedProductIds.includes(product.id));
       } catch {
         // Ignoreres bevidst – se kommentaren ovenfor.

@@ -1,14 +1,17 @@
 // src/app/api/generate-newsletter/route.ts
 //
 // Modtager de valgte produkt-id'er + målgruppe + evt. instrukser fra Opsætnings-siden,
-// slår produkterne op i Shopifys rigtige katalog (fetchShopifyProducts), bygger
-// AI-prompten og beder Gemini om at generere nyhedsbrevets fire felter
+// slår produkterne op i den lokale Supabase-cache (getCachedProducts – samme cache som
+// "Vælg produkter"-siden og NewsletterContext.setResult allerede bruger, IKKE det
+// direkte, fuldt paginerede fetchShopifyProducts, som tidligere gjorde netop dette kald
+// til den suverænt største flaskehals i hele generérings-flowet, ~21 sek. af ~23 sek.
+// total), bygger AI-prompten og beder Gemini om at generere nyhedsbrevets fire felter
 // (heading/bodyText/image/cta) som struktureret JSON.
 
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { collectionUrls, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
-import { fetchShopifyProducts } from "@/lib/shopify/fetchProducts";
+import { getCachedProducts } from "@/lib/cachedProducts";
 import { getBrandSettings } from "@/lib/brandSettings";
 import { getSupabaseClient } from "@/lib/supabase";
 import { createBlocksFromTemplate, type NewsletterBlock, type TemplateBlock } from "@/lib/newsletterBlocks";
@@ -107,10 +110,10 @@ export async function POST(req: NextRequest) {
 
   let allProducts: ShopifyProduct[];
   try {
-    allProducts = await fetchShopifyProducts();
+    allProducts = (await getCachedProducts()).products;
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Kunne ikke hente produkter fra Shopify." },
+      { error: err instanceof Error ? err.message : "Kunne ikke hente produkter." },
       { status: 502 },
     );
   }

@@ -49,13 +49,18 @@ export default function PreviewPage() {
       setIsLoadingProducts(true);
       setProductsError(null);
       try {
-        const response = await fetch("/api/shopify/products");
+        // Læser fra den lokale Supabase-cache (samme som "Vælg produkter"-
+        // siden), IKKE det direkte, fuldt paginerede /api/shopify/products –
+        // se samme kommentar i NewsletterContext.tsx's setResult, som denne
+        // fetch tidligere duplikerede (to fulde Shopify-kald i træk ved hver
+        // generér→preview-tur).
+        const response = await fetch("/api/products/cached");
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data?.error ?? "Kunne ikke hente produkter fra Shopify.");
+          throw new Error(data?.error ?? "Kunne ikke hente produkter.");
         }
         if (!cancelled) {
-          setAllProducts(data);
+          setAllProducts(data.products);
         }
       } catch (err) {
         if (!cancelled) {
@@ -217,7 +222,7 @@ export default function PreviewPage() {
               </div>
             </div>
           ) : isLoadingProducts ? (
-            <LoadingCard message="Henter produkter fra Shopify..." />
+            <LoadingCard message="Henter produkter..." />
           ) : productsError ? (
             <ErrorCard title="Kunne ikke hente produkter" message={productsError} onRetry={retryLoadProducts} />
           ) : activeView === "preview" ? (
