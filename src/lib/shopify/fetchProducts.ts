@@ -48,6 +48,14 @@ const PRODUCTS_QUERY = `
               }
             }
           }
+          collections(first: 1) {
+            edges {
+              node {
+                handle
+                title
+              }
+            }
+          }
         }
       }
       pageInfo {
@@ -67,6 +75,12 @@ interface ShopifyProductNode {
   tags: string[];
   images: { edges: { node: { url: string } }[] };
   variants: { edges: { node: { price: string } }[] };
+  // Kun de(t) FØRSTE collection produktet er medlem af (ingen sortKey angivet
+  // – Shopifys egen standardrækkefølge for et produkts collection-medlemskaber,
+  // som i praksis typisk lister den mest specifikke collection FØR en bred
+  // fangst-alt-collection som "Alle Planter", se undersøgelsen forud for denne
+  // ændring). Tom liste, hvis produktet ikke er medlem af nogen collection.
+  collections: { edges: { node: { handle: string; title: string } }[] };
 }
 
 interface ProductsQueryResponse {
@@ -104,6 +118,16 @@ function mapProductNode(node: ShopifyProductNode, shop: string): ShopifyProduct 
   // fra handle + shop-domænet direkte.
   const url = node.onlineStorePreviewUrl || `https://${shop}/products/${node.handle}`;
 
+  // Collection-siden har intet onlineStorePreviewUrl-modstykke i Admin
+  // API'et (kun handle) – bygges derfor altid ud fra shop-domænet, samme
+  // fallback-mønster som produkt-URL'en ovenfor. jyskplantesalg.myshopify.com
+  // redirecter (301) korrekt videre til den rigtige butiksdomæne, så dette
+  // er et gyldigt, klikbart link, selv når shop her IKKE er kundens eget
+  // domæne.
+  const primaryCollection = node.collections.edges[0]?.node;
+  const collectionHandle = primaryCollection?.handle ?? null;
+  const collectionUrl = collectionHandle ? `https://${shop}/collections/${collectionHandle}` : null;
+
   return {
     id: node.id,
     title: node.title,
@@ -113,6 +137,8 @@ function mapProductNode(node: ShopifyProductNode, shop: string): ShopifyProduct 
     productType: node.productType,
     tags: node.tags,
     hasImage: imageUrl.length > 0,
+    collectionHandle,
+    collectionUrl,
   };
 }
 

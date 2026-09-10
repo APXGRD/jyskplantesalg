@@ -1,4 +1,5 @@
 import { ChevronDownIcon, SearchIcon } from "./icons";
+import { OnlyWithImageCheckbox } from "./OnlyWithImageCheckbox";
 
 interface ProductFilterBarProps {
   search: string;
@@ -69,15 +70,7 @@ export function ProductFilterBar({
         <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-3 w-3 -translate-y-1/2 text-ink-muted" />
       </div>
 
-      <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-ink-muted">
-        <input
-          type="checkbox"
-          checked={onlyWithImage}
-          onChange={(event) => onOnlyWithImageChange(event.target.checked)}
-          className="h-3.5 w-3.5 rounded-sm border-zinc-400 accent-ink"
-        />
-        Kun med billede
-      </label>
+      <OnlyWithImageCheckbox checked={onlyWithImage} onChange={onOnlyWithImageChange} />
     </div>
   );
 }

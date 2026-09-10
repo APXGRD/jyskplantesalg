@@ -33,18 +33,47 @@ interface NewsletterContextValue {
   setCustomerType: (type: CustomerType) => void;
   instructions: string;
   setInstructions: (text: string) => void;
+  // Fritekst-emne fra det nye "Emne (valgfrit)"-felt på Opsætnings-siden –
+  // ADSKILT fra "instructions". Udfyldt betyder "find produkter automatisk
+  // via tekstsøgning" i stedet for de manuelt valgte produkter på "Vælg
+  // produkter"-siden (selectedProductIds ovenfor RØRES bevidst ikke af
+  // dette – de to flows er sideordnede, ikke sammenblandede).
+  topic: string;
+  setTopic: (text: string) => void;
+  // "Kun med billede"-kontakten ved siden af Emne-feltet – samme
+  // komponent/stil som "Vælg produkter"-sidens tilsvarende filter (se
+  // OnlyWithImageCheckbox.tsx). Default false, så eksisterende opførsel
+  // (alle matchende produkter, uanset billede) forbliver uændret, medmindre
+  // brugeren aktivt slår den til. Gemt sammen med topic, se
+  // generate-newsletter/route.ts og searchCachedProductsByTopic.
+  topicOnlyWithImage: boolean;
+  setTopicOnlyWithImage: (value: boolean) => void;
   // Den valgte skabelon på Opsætnings-siden – null betyder "Standard layout"
   // (nuværende, faste blok-struktur). Selve skabelonens indhold hentes ikke
   // her, kun id'et, som sendes med til generate-newsletter/route.ts.
   selectedTemplateId: string | null;
   setSelectedTemplateId: Dispatch<SetStateAction<string | null>>;
   result: GeneratedNewsletter | null;
+  // HELE det matchede produkt-sæt fra den SENESTE emne-søgnings-baserede
+  // generering (ikke kun det ene produkt, billede-blokken endte med at
+  // vise) – null, hvis det aktuelle resultat/blocks i stedet stammer fra
+  // almindeligt manuelt produktvalg. Bruges af Edit-mode's billede-/
+  // galleri-blok-kontroller (EditorBlockList.tsx) til at tilbyde hele
+  // emne-udvalget som vælgbare produkter, ikke kun det oprindeligt viste.
+  topicMatchedProductIds: string[] | null;
   // `presetBlocks`, hvis givet, bruges DIREKTE som blocks-listen i stedet for
   // at blive bygget her via createDefaultBlocks – det er sådan
   // skabelon-baseret generering fungerer, da generate-newsletter/route.ts i
   // så fald allerede har bygget den fulde blocks-liste server-side (se
-  // opsaetning/page.tsx).
-  setResult: (result: GeneratedNewsletter | null, presetBlocks?: NewsletterBlock[]) => void;
+  // opsaetning/page.tsx). `matchedProductIds`, hvis givet, er HELE
+  // emne-søgningens træfliste (se generate-newsletter/route.ts) – sættes som
+  // topicMatchedProductIds; udelades den, nulstilles topicMatchedProductIds
+  // (almindeligt manuelt produktvalg).
+  setResult: (
+    result: GeneratedNewsletter | null,
+    presetBlocks?: NewsletterBlock[],
+    matchedProductIds?: string[],
+  ) => void;
   // Blok-listen for Preview/Edit-mode – ligger her (i stedet for som lokal
   // state i preview/page.tsx), så den overlever navigation væk fra og tilbage
   // til Preview-siden, ligesom resten af context'en allerede gjorde.
@@ -62,8 +91,11 @@ interface PersistedState {
   selectedProductIds: string[];
   customerType: CustomerType;
   instructions: string;
+  topic: string;
+  topicOnlyWithImage: boolean;
   selectedTemplateId: string | null;
   result: GeneratedNewsletter | null;
+  topicMatchedProductIds: string[] | null;
   blocks: NewsletterBlock[];
 }
 
@@ -71,8 +103,11 @@ const DEFAULT_PERSISTED_STATE: PersistedState = {
   selectedProductIds: [],
   customerType: "privat",
   instructions: "",
+  topic: "",
+  topicOnlyWithImage: false,
   selectedTemplateId: null,
   result: null,
+  topicMatchedProductIds: null,
   blocks: [],
 };
 
@@ -96,8 +131,11 @@ function loadPersistedState(): PersistedState {
       selectedProductIds: Array.isArray(parsed.selectedProductIds) ? parsed.selectedProductIds : [],
       customerType: parsed.customerType === "erhverv" ? "erhverv" : "privat",
       instructions: typeof parsed.instructions === "string" ? parsed.instructions : "",
+      topic: typeof parsed.topic === "string" ? parsed.topic : "",
+      topicOnlyWithImage: typeof parsed.topicOnlyWithImage === "boolean" ? parsed.topicOnlyWithImage : false,
       selectedTemplateId: typeof parsed.selectedTemplateId === "string" ? parsed.selectedTemplateId : null,
       result: parsed.result ?? null,
+      topicMatchedProductIds: Array.isArray(parsed.topicMatchedProductIds) ? parsed.topicMatchedProductIds : null,
       blocks: Array.isArray(parsed.blocks) ? parsed.blocks : [],
     };
   } catch {
@@ -121,10 +159,17 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   );
   const [customerType, setCustomerType] = useState<CustomerType>(() => loadPersistedState().customerType);
   const [instructions, setInstructions] = useState(() => loadPersistedState().instructions);
+  const [topic, setTopic] = useState(() => loadPersistedState().topic);
+  const [topicOnlyWithImage, setTopicOnlyWithImage] = useState(
+    () => loadPersistedState().topicOnlyWithImage,
+  );
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     () => loadPersistedState().selectedTemplateId,
   );
   const [result, setResultState] = useState<GeneratedNewsletter | null>(() => loadPersistedState().result);
+  const [topicMatchedProductIds, setTopicMatchedProductIds] = useState<string[] | null>(
+    () => loadPersistedState().topicMatchedProductIds,
+  );
   const [blocks, setBlocks] = useState<NewsletterBlock[]>(() => loadPersistedState().blocks);
 
   function toggleProduct(id: string) {
@@ -149,8 +194,18 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   // fra skabelonens struktur, og der er intet grund til at bygge den igen
   // (eller lave endnu et /api/shopify/products-kald) her.
   const setResult = useCallback(
-    async (newResult: GeneratedNewsletter | null, presetBlocks?: NewsletterBlock[]) => {
+    async (
+      newResult: GeneratedNewsletter | null,
+      presetBlocks?: NewsletterBlock[],
+      matchedProductIds?: string[],
+    ) => {
       setResultState(newResult);
+      // Sat af generate-newsletter/route.ts, kun ved emne-søgning – HELE det
+      // matchede sæt, ikke kun det ene produkt, billede-blokken viser (se
+      // Edit-mode's billede-/galleri-blok-kontroller, som bruger denne til at
+      // tilbyde hele udvalget). Nulstilles ved almindeligt manuelt
+      // produktvalg (matchedProductIds er da undefined).
+      setTopicMatchedProductIds(matchedProductIds ?? null);
       if (!newResult) {
         setBlocks([]);
         return;
@@ -170,7 +225,20 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         const response = await fetch("/api/products/cached");
         const data = await response.json();
         const allProducts: ShopifyProduct[] = response.ok ? data.products : [];
-        selectedProducts = allProducts.filter((product) => selectedProductIds.includes(product.id));
+        if (matchedProductIds) {
+          // Emne-søgning: ÉT repræsentativt produkt til billede-blokken –
+          // generate-newsletter/route.ts har allerede sat
+          // newResult.image.productId til dette produkt, så
+          // createDefaultBlocks's egen opslagslogik finder det korrekt her.
+          // IKKE automatisk et galleri, selvom mange produkter matchede
+          // emnet – kun ÉT element i selectedProducts sikrer det.
+          const matchedProducts = allProducts.filter((product) => matchedProductIds.includes(product.id));
+          const representative =
+            matchedProducts.find((product) => product.id === newResult.image.productId) ?? matchedProducts[0];
+          selectedProducts = representative ? [representative] : [];
+        } else {
+          selectedProducts = allProducts.filter((product) => selectedProductIds.includes(product.id));
+        }
       } catch {
         // Ignoreres bevidst – se kommentaren ovenfor.
       }
@@ -193,15 +261,28 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         selectedProductIds,
         customerType,
         instructions,
+        topic,
+        topicOnlyWithImage,
         selectedTemplateId,
         result,
+        topicMatchedProductIds,
         blocks,
       };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Ignoreres bevidst – se kommentaren ovenfor.
     }
-  }, [selectedProductIds, customerType, instructions, selectedTemplateId, result, blocks]);
+  }, [
+    selectedProductIds,
+    customerType,
+    instructions,
+    topic,
+    topicOnlyWithImage,
+    selectedTemplateId,
+    result,
+    topicMatchedProductIds,
+    blocks,
+  ]);
 
   const value = useMemo<NewsletterContextValue>(
     () => ({
@@ -212,14 +293,30 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       setCustomerType,
       instructions,
       setInstructions,
+      topic,
+      setTopic,
+      topicOnlyWithImage,
+      setTopicOnlyWithImage,
       selectedTemplateId,
       setSelectedTemplateId,
       result,
+      topicMatchedProductIds,
       setResult,
       blocks,
       setBlocks,
     }),
-    [selectedProductIds, customerType, instructions, selectedTemplateId, result, blocks, setResult],
+    [
+      selectedProductIds,
+      customerType,
+      instructions,
+      topicOnlyWithImage,
+      topic,
+      selectedTemplateId,
+      result,
+      topicMatchedProductIds,
+      blocks,
+      setResult,
+    ],
   );
 
   return <NewsletterContext.Provider value={value}>{children}</NewsletterContext.Provider>;

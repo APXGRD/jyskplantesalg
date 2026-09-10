@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { Sidebar } from "@/components/Sidebar";
 import { CustomerTypeCard } from "@/components/CustomerTypeCard";
+import { OnlyWithImageCheckbox } from "@/components/OnlyWithImageCheckbox";
 import { BoltIcon, ChevronDownIcon, SpinnerIcon } from "@/components/icons";
 import type { NewsletterBlock } from "@/lib/newsletterBlocks";
 import { useNewsletter, type GeneratedNewsletter } from "@/context/NewsletterContext";
@@ -22,6 +23,10 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
     setCustomerType,
     instructions,
     setInstructions,
+    topic,
+    setTopic,
+    topicOnlyWithImage,
+    setTopicOnlyWithImage,
     selectedTemplateId,
     setSelectedTemplateId,
     setResult,
@@ -34,9 +39,13 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
   const [templates] = useState<TemplateSummary[]>(initialTemplates);
 
   const hasSelectedProducts = selectedProductIds.length > 0;
+  const hasTopic = topic.trim().length > 0;
+  // Emne-søgning er et ALTERNATIVT, sideordnet flow til manuelt produktvalg
+  // (se generate-newsletter/route.ts) – enten er nok til at kunne generere.
+  const canGenerate = hasSelectedProducts || hasTopic;
 
   async function handleGenerate() {
-    if (!hasSelectedProducts || isGenerating) {
+    if (!canGenerate || isGenerating) {
       return;
     }
 
@@ -52,6 +61,8 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
           customerType,
           instructions: instructions.trim() || undefined,
           templateId: selectedTemplateId,
+          topic: topic.trim() || undefined,
+          topicOnlyWithImage,
         }),
       });
 
@@ -62,9 +73,15 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
 
       // `blocks` er kun med i svaret, når en skabelon blev anvendt server-side
       // (se generate-newsletter/route.ts) – ellers bygger setResult selv
-      // blocks-listen via createDefaultBlocks, som hidtil.
-      const { blocks, ...data }: GeneratedNewsletter & { blocks?: NewsletterBlock[] } = await response.json();
-      setResult(data, blocks);
+      // blocks-listen via createDefaultBlocks, som hidtil. `matchedProductIds`
+      // er kun med ved emne-søgning – HELE det matchede produkt-sæt, se
+      // NewsletterContext.setResult.
+      const {
+        blocks,
+        matchedProductIds,
+        ...data
+      }: GeneratedNewsletter & { blocks?: NewsletterBlock[]; matchedProductIds?: string[] } = await response.json();
+      setResult(data, blocks, matchedProductIds);
       router.push("/preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
@@ -126,6 +143,24 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
             </section>
 
             <section className="pt-8">
+              <p className="text-xs font-semibold tracking-wide text-ink uppercase">Emne (valgfrit)</p>
+              <p className="pt-1.5 pb-3 text-xs text-ink-faint">
+                Alternativ til manuelt produktvalg – find automatisk alle matchende produkter ud fra en
+                fritekst-søgning, i stedet for de valgte produkter på forrige side
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={topic}
+                  onChange={(event) => setTopic(event.target.value)}
+                  placeholder="F.eks. 'ahorn' – find automatisk alle matchende produkter"
+                  className="flex-1 rounded-xl border border-border bg-white px-4 py-3 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
+                />
+                <OnlyWithImageCheckbox checked={topicOnlyWithImage} onChange={setTopicOnlyWithImage} />
+              </div>
+            </section>
+
+            <section className="pt-8">
               <p className="text-xs font-semibold tracking-wide text-ink uppercase">
                 Yderligere instrukser
               </p>
@@ -147,7 +182,7 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
               <button
                 type="button"
                 onClick={handleGenerate}
-                disabled={!hasSelectedProducts || isGenerating}
+                disabled={!canGenerate || isGenerating}
                 className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-7 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:opacity-100"
               >
                 {isGenerating ? (
@@ -157,9 +192,10 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
                 )}
                 {isGenerating ? "Genererer..." : "Generér nyhedsbrev"}
               </button>
-              {!hasSelectedProducts && (
+              {!canGenerate && (
                 <p className="pt-2 text-xs text-ink-faint">
-                  Vælg mindst ét produkt på forrige side, før du kan generere nyhedsbrevet.
+                  Vælg mindst ét produkt på forrige side, eller angiv et emne ovenfor, før du kan generere
+                  nyhedsbrevet.
                 </p>
               )}
             </div>

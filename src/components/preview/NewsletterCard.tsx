@@ -4,13 +4,15 @@ import type { CSSProperties, ReactNode } from "react";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { ImagePlaceholderIcon } from "@/components/icons";
-import { Logo } from "@/components/Logo";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
   CTA_BORDER_RADIUS_PX,
   CTA_PADDING_PX,
   GALLERY_ROW_SIZE,
   IMAGE_SIZE_PX,
+  PRODUCT_ROW_PADDING_PX,
+  isGalleryLayout,
+  type GalleryColumns,
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
@@ -45,11 +47,9 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             className="flex items-center justify-center gap-3 px-8 py-5"
             style={{ backgroundColor: bgColor, color: textColor }}
           >
-            {brand.logoData ? (
+            {brand.logoData && (
               // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
               <img src={brand.logoData} alt="" className="h-6 w-6 object-contain" />
-            ) : (
-              <Logo className="h-6 w-6" name={brand.name} />
             )}
             <span className="text-xs font-medium tracking-[0.1em] uppercase">
               {brand.name}
@@ -80,7 +80,49 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           </div>
         );
 
-      case "billede": {
+      // "billede" er den eneste type, ny kode fra nu af producerer; "img" og
+      // "galleri" er kun stadig anerkendte type-strenge, så allerede gemte
+      // nyhedsbrev-udkast/skabeloner fra FØR Billede og Galleri blev
+      // konsolideret til én blok-type stadig render'es korrekt. Selve
+      // layout-valget (enkelt billede vs. galleri) afgøres udelukkende af
+      // block.galleryColumns, ikke af hvilken af de tre typer det er.
+      case "billede":
+      case "img":
+      case "galleri": {
+        if (isGalleryLayout(block.galleryColumns)) {
+          const columns = block.galleryColumns as GalleryColumns;
+          const galleryProducts = (block.galleryProductIds ?? [])
+            .map((id) => products.find((product) => product.id === id))
+            .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl));
+          if (galleryProducts.length === 0) {
+            return (
+              <div className="px-8 py-3">
+                <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-surface-active text-xs text-ink-faint">
+                  Vælg produkter til galleriet
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="px-8 py-3">
+              <div className={`grid gap-3 ${GALLERY_ROW_SIZE[columns] === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+                {/* CSS grid ombryder automatisk til en ny række, når der er flere
+                    billeder end kolonner – "6 billeder"-layoutet (3 kolonner) giver
+                    derfor 2 pæne rækker af 3 helt af sig selv, uden ekstra markup. */}
+                {galleryProducts.map((product) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- Shopify-hostet billede-URL, samme mønster som produktvisning
+                  <img
+                    key={product.id}
+                    src={product.imageUrl}
+                    alt={product.title}
+                    className="aspect-square w-full rounded-lg object-cover"
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        }
+
         const alignment = block.alignment ?? "center";
         const size = block.size ?? "fuld";
         if (block.imageUrl) {
@@ -106,15 +148,27 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
         );
       }
 
-      case "produktvisning":
+      case "produktvisning": {
+        // undefined betyder "vis alle tilgængelige produkter" – den
+        // oprindelige, uændrede opførsel, før dette valg fandtes (se
+        // NewsletterBlock.productDisplayIds i newsletterBlocks.ts).
+        const displayProducts = block.productDisplayIds
+          ? products.filter((product) => block.productDisplayIds!.includes(product.id))
+          : products;
+        const borderRadius = CTA_BORDER_RADIUS_PX[block.productBorderRadius ?? "afrundet"];
+        const rowPaddingY = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
         return (
           <div className="px-8 py-3">
-            <div className="overflow-hidden rounded-xl border" style={{ borderColor: "#1a1a1a" }}>
-              {products.map((product, index) => (
+            <div className="overflow-hidden border" style={{ borderColor: "#1a1a1a", borderRadius }}>
+              {displayProducts.map((product, index) => (
                 <div
                   key={product.id}
-                  className="flex items-center justify-between px-4 py-3"
-                  style={index > 0 ? { borderTop: "1px solid #1a1a1a" } : undefined}
+                  className="flex items-center justify-between px-4"
+                  style={{
+                    paddingTop: rowPaddingY,
+                    paddingBottom: rowPaddingY,
+                    ...(index > 0 ? { borderTop: "1px solid #1a1a1a" } : {}),
+                  }}
                 >
                   <p className="text-xs font-medium" style={{ color: "#1a1a1a" }}>
                     {product.title}
@@ -127,6 +181,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             </div>
           </div>
         );
+      }
 
       case "skillelinje":
         return (
@@ -134,40 +189,6 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             <hr className="border-t border-border" />
           </div>
         );
-
-      case "galleri": {
-        const columns = block.galleryColumns ?? 2;
-        const galleryProducts = (block.galleryProductIds ?? [])
-          .map((id) => products.find((product) => product.id === id))
-          .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl));
-        if (galleryProducts.length === 0) {
-          return (
-            <div className="px-8 py-3">
-              <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-surface-active text-xs text-ink-faint">
-                Vælg produkter til galleriet
-              </div>
-            </div>
-          );
-        }
-        return (
-          <div className="px-8 py-3">
-            <div className={`grid gap-3 ${GALLERY_ROW_SIZE[columns] === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-              {/* CSS grid ombryder automatisk til en ny række, når der er flere
-                  billeder end kolonner – "6 billeder"-layoutet (3 kolonner) giver
-                  derfor 2 pæne rækker af 3 helt af sig selv, uden ekstra markup. */}
-              {galleryProducts.map((product) => (
-                // eslint-disable-next-line @next/next/no-img-element -- Shopify-hostet billede-URL, samme mønster som produktvisning
-                <img
-                  key={product.id}
-                  src={product.imageUrl}
-                  alt={product.title}
-                  className="aspect-square w-full rounded-lg object-cover"
-                />
-              ))}
-            </div>
-          </div>
-        );
-      }
 
       case "tekst":
         return (
@@ -179,31 +200,6 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             />
           </div>
         );
-
-      case "img": {
-        const alignment = block.alignment ?? "center";
-        const size = block.size ?? "fuld";
-        if (block.imageUrl) {
-          return (
-            <div className={`flex px-8 py-3 ${JUSTIFY_CLASS[alignment]}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- lokal blob:-object-URL, next/image kan ikke optimere den */}
-              <img
-                src={block.imageUrl}
-                alt={block.altText ?? ""}
-                style={{ width: IMAGE_SIZE_PX[size] }}
-                className="max-w-full rounded-lg object-cover"
-              />
-            </div>
-          );
-        }
-        return (
-          <div className="flex justify-center px-8 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-active text-ink-muted">
-              <ImagePlaceholderIcon className="h-3.5 w-3.5" />
-            </div>
-          </div>
-        );
-      }
 
       case "produkt": {
         const product = products.find((item) => item.id === block.productId);

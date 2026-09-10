@@ -90,6 +90,13 @@ export function buildNewsletterUserPrompt(
   options?: {
     customerType?: "privat" | "erhverv";
     instructions?: string;
+    // Sat når nyhedsbrevet er genereret via "Emne"-feltet (fritekst-
+    // produktsøgning) på Opsætnings-siden i stedet for manuelt valgte
+    // produkter – se generate-newsletter/route.ts. Tvinger kategori-
+    // scenariet nedenfor til at være aktivt, uanset om de fundne produkters
+    // productType matcher på tværs (det gør de typisk IKKE ved en fritekst-
+    // søgning), og bruger selve emne-teksten i stedet for et kategorinavn.
+    topicSearchTerm?: string;
   },
 ) {
   const systemPrompt = NEWSLETTER_SYSTEM_PROMPT.replace(
@@ -124,11 +131,16 @@ i systemprompten): "${options.instructions.trim()}"\n`
   // – denne note sikrer, at knap-TEKSTEN AI'en genererer også matcher (flertal/hele
   // udvalget), i stedet for at lyde som om linket peger på ét enkelt produkt.
   const isCategoryScenario =
-    shopData.products.length > 1 &&
-    shopData.products.every((product) => product.productType === shopData.products[0].productType);
+    Boolean(options?.topicSearchTerm) ||
+    (shopData.products.length > 1 &&
+      shopData.products.every((product) => product.productType === shopData.products[0].productType));
+
+  const categoryDescription = options?.topicSearchTerm
+    ? `produkter relateret til "${options.topicSearchTerm}"`
+    : `flere produkter fra kategorien "${shopData.products[0]?.productType}"`;
 
   const categoryNote = isCategoryScenario
-    ? `\nBemærk: Dette nyhedsbrev viser flere produkter fra kategorien "${shopData.products[0].productType}".
+    ? `\nBemærk: Dette nyhedsbrev viser ${categoryDescription}.
 CTA-knappens tekst SKAL derfor være i flertal og henvise til hele udvalget (fx "Se udvalget her",
 "Se sortimentet her", "Se dem alle her") – IKKE til ét enkelt produkt (undgå ental som "Se produktet her").\n`
     : "";

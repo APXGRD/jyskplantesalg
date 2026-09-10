@@ -8,6 +8,9 @@ import {
   GALLERY_ROW_SIZE,
   IMAGE_ALIGN_CSS,
   IMAGE_SIZE_PX,
+  PRODUCT_ROW_PADDING_PX,
+  isGalleryLayout,
+  type GalleryColumns,
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
@@ -111,7 +114,55 @@ function renderBlockHtml(
       return `<tr><td style="padding:12px 32px;color:#4a5565;font-size:14px;line-height:1.5;font-family:${fontFamily};${colorStyle}">${styleBrodtekstParagraphs(block.content ?? "")}</td></tr>`;
     }
 
-    case "billede": {
+    // "billede" er den eneste type, ny kode fra nu af producerer; "img" og
+    // "galleri" er kun stadig anerkendte type-strenge, så allerede gemte
+    // nyhedsbrev-udkast/skabeloner fra FØR Billede og Galleri blev
+    // konsolideret til én blok-type stadig eksporteres korrekt. Selve
+    // layout-valget (enkelt billede vs. galleri) afgøres udelukkende af
+    // block.galleryColumns, ikke af hvilken af de tre typer det er.
+    case "billede":
+    case "img":
+    case "galleri": {
+      if (isGalleryLayout(block.galleryColumns)) {
+        const columns = block.galleryColumns as GalleryColumns;
+        const galleryProducts = (block.galleryProductIds ?? [])
+          .map((id) => products.find((product) => product.id === id))
+          .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl));
+        if (galleryProducts.length === 0) return "";
+        // Outlooks Word-baserede rendering-motor understøtter ikke CSS
+        // flexbox/grid pålideligt – billederne sættes derfor side om side via
+        // <table>'er (samme teknik som CTA-knappen), med en fast bredde pr.
+        // billede afhængig af layoutet, i stedet for CSS-layout. "6
+        // billeder"-layoutet brydes bevidst op i TO EFTERFØLGENDE 3-kolonne-
+        // tabeller (én pr. række) i stedet for én stor 6-cellers tabel, så
+        // strukturen forbliver simpel og forudsigelig i kopieret HTML.
+        const imageWidth = GALLERY_IMAGE_WIDTH_PX[columns];
+        const rowSize = GALLERY_ROW_SIZE[columns];
+        const rows: ShopifyProduct[][] = [];
+        for (let i = 0; i < galleryProducts.length; i += rowSize) {
+          rows.push(galleryProducts.slice(i, i + rowSize));
+        }
+        const tables = rows
+          .map((rowProducts, rowIndex) => {
+            const cells = rowProducts
+              .map((product, index) => {
+                const isLast = index === rowProducts.length - 1;
+                return `<td style="width:${imageWidth}px;${isLast ? "" : "padding-right:8px;"}" valign="top">
+                <img src="${escapeAttr(product.imageUrl)}" alt="${escapeAttr(product.title)}" width="${imageWidth}" style="width:${imageWidth}px;max-width:100%;border-radius:8px;display:block;" />
+              </td>`;
+              })
+              .join("");
+            const marginTop = rowIndex === 0 ? "0" : "8px";
+            return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:${marginTop} auto 0;">
+            <tr>${cells}</tr>
+          </table>`;
+          })
+          .join("");
+        return `<tr><td style="padding:12px 32px;">
+        ${tables}
+      </td></tr>`;
+      }
+
       if (block.imageUrl) {
         const align = IMAGE_ALIGN_CSS[block.alignment ?? "center"];
         const width = IMAGE_SIZE_PX[block.size ?? "fuld"];
@@ -127,82 +178,70 @@ function renderBlockHtml(
     }
 
     case "produktvisning": {
-      const rows = products
+      // undefined betyder "vis alle tilgængelige produkter" – den
+      // oprindelige, uændrede opførsel, før dette valg fandtes (se
+      // NewsletterBlock.productDisplayIds i newsletterBlocks.ts).
+      const displayProducts = block.productDisplayIds
+        ? products.filter((product) => block.productDisplayIds!.includes(product.id))
+        : products;
+      const borderRadius = CTA_BORDER_RADIUS_PX[block.productBorderRadius ?? "afrundet"];
+      const rowPaddingY = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
+      // 16px – samme værdi som Preview-rækkens px-4 (Tailwind), den
+      // vandrette afstand fra selve den YDRE border til teksten. Sat kun på
+      // den side, der reelt vender ud mod borderen (venstre for titel-
+      // cellen, højre for pris-cellen) – siden mellem de to celler skal
+      // fortsat sidde tæt, som i Preview's flex-række.
+      const rowSidePaddingPx = 16;
+      // Mail-klienter (og den hardcodede Arial/Helvetica-skrifttype herunder)
+      // understøtter typisk KUN to reelle skrift-vægte (normal/bold) – en
+      // mellemliggende værdi som 500/600 (Preview's font-medium/
+      // font-semibold, som kun rigtige browsere med en variabel webfont kan
+      // gengive nuanceret) rundes upålideligt op/ned af mail-klienter, hvilket
+      // gav et langt federe/mere markant spring mellem titel og pris i mail,
+      // end i Preview. "normal"/"bold" er de eneste to værdier, alle
+      // mail-klienter reelt kan gengive konsekvent.
+      const rows = displayProducts
         .map(
-          (product) => `
+          (product, index) => `
         <tr>
-          <td style="padding:10px 0;border-top:1px solid #1a1a1a;font-family:${DEFAULT_FONT_FAMILY};">
-            <div style="font-weight:600;color:#1a1a1a;font-size:13px;">${escapeHtml(product.title)}</div>
+          <td style="padding:${rowPaddingY}px 0 ${rowPaddingY}px ${rowSidePaddingPx}px;${index > 0 ? "border-top:1px solid #1a1a1a;" : ""}font-family:${DEFAULT_FONT_FAMILY};">
+            <div style="font-weight:normal;color:#1a1a1a;font-size:13px;">${escapeHtml(product.title)}</div>
           </td>
-          <td style="padding:10px 0;border-top:1px solid #1a1a1a;text-align:right;font-weight:600;color:#1a1a1a;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
+          <td style="padding:${rowPaddingY}px ${rowSidePaddingPx}px ${rowPaddingY}px 0;${index > 0 ? "border-top:1px solid #1a1a1a;" : ""}text-align:right;font-weight:bold;color:#1a1a1a;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
             ${escapeHtml(formatPriceForCustomer(product.price, customerType))}
           </td>
         </tr>`,
         )
         .join("");
+      // To indlejrede tabeller (i stedet for border-radius direkte på tabellen
+      // med border-collapse:collapse) – den kombination gengives upålideligt
+      // af flere mail-klienter. Outlook ignorerer border-radius og falder
+      // pænt tilbage til skarpe hjørner, samme accepterede teknik som
+      // CTA-knappen allerede bruger.
+      //
+      // Den inderste tabel har BEVIDST ingen border-collapse:collapse –
+      // Outlook (Words rendering-motor) er kendt for at ignorere/kollapse
+      // cellernes egen padding, når det kombineres med border-collapse,
+      // selvom paddingen er korrekt sat inline på hver <td> (se rows
+      // ovenfor). cellpadding="0" cellspacing="0" på selve table-elementet
+      // er den mail-sikre erstatning – nulstiller browserens/mail-klientens
+      // standard-cellepadding uden at bruge border-collapse.
       return `<tr><td style="padding:12px 32px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">${rows}</table>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #1a1a1a;border-radius:${borderRadius}px;">
+          <tr><td style="padding:0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table>
+          </td></tr>
+        </table>
       </td></tr>`;
     }
 
     case "skillelinje":
       return `<tr><td style="padding:12px 32px;"><hr style="border:none;border-top:1px solid #d2ddd1;margin:0;" /></td></tr>`;
 
-    case "galleri": {
-      const columns = block.galleryColumns ?? 2;
-      const galleryProducts = (block.galleryProductIds ?? [])
-        .map((id) => products.find((product) => product.id === id))
-        .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl));
-      if (galleryProducts.length === 0) return "";
-      // Outlooks Word-baserede rendering-motor understøtter ikke CSS
-      // flexbox/grid pålideligt – billederne sættes derfor side om side via
-      // <table>'er (samme teknik som CTA-knappen), med en fast bredde pr.
-      // billede afhængig af layoutet, i stedet for CSS-layout. "6
-      // billeder"-layoutet brydes bevidst op i TO EFTERFØLGENDE 3-kolonne-
-      // tabeller (én pr. række) i stedet for én stor 6-cellers tabel, så
-      // strukturen forbliver simpel og forudsigelig i kopieret HTML.
-      const imageWidth = GALLERY_IMAGE_WIDTH_PX[columns];
-      const rowSize = GALLERY_ROW_SIZE[columns];
-      const rows: ShopifyProduct[][] = [];
-      for (let i = 0; i < galleryProducts.length; i += rowSize) {
-        rows.push(galleryProducts.slice(i, i + rowSize));
-      }
-      const tables = rows
-        .map((rowProducts, rowIndex) => {
-          const cells = rowProducts
-            .map((product, index) => {
-              const isLast = index === rowProducts.length - 1;
-              return `<td style="width:${imageWidth}px;${isLast ? "" : "padding-right:8px;"}" valign="top">
-                <img src="${escapeAttr(product.imageUrl)}" alt="${escapeAttr(product.title)}" width="${imageWidth}" style="width:${imageWidth}px;max-width:100%;border-radius:8px;display:block;" />
-              </td>`;
-            })
-            .join("");
-          const marginTop = rowIndex === 0 ? "0" : "8px";
-          return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:${marginTop} auto 0;">
-            <tr>${cells}</tr>
-          </table>`;
-        })
-        .join("");
-      return `<tr><td style="padding:12px 32px;">
-        ${tables}
-      </td></tr>`;
-    }
-
     case "tekst": {
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
       const colorStyle = block.textColor ? `color:${block.textColor};` : "";
       return `<tr><td style="padding:12px 32px;"><div style="color:#4a5565;font-size:14px;line-height:1.6;font-family:${fontFamily};${colorStyle}">${block.content ?? ""}</div></td></tr>`;
-    }
-
-    case "img": {
-      if (block.imageUrl) {
-        const align = IMAGE_ALIGN_CSS[block.alignment ?? "center"];
-        const width = IMAGE_SIZE_PX[block.size ?? "fuld"];
-        return `<tr><td style="padding:12px 32px;text-align:${align};">
-          <img src="${escapeAttr(block.imageUrl)}" alt="${escapeAttr(block.altText ?? "")}" style="width:${width};max-width:100%;border-radius:8px;" />
-        </td></tr>`;
-      }
-      return `<tr><td style="padding:12px 32px;text-align:center;color:#87a084;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">[Billede]</td></tr>`;
     }
 
     case "produkt": {
@@ -308,7 +347,17 @@ function renderBlockText(
       return stripHtml(block.content ?? "");
 
     case "billede":
-      return `[Billede: ${block.altText || image.altText}]`;
+    case "img":
+    case "galleri": {
+      if (isGalleryLayout(block.galleryColumns)) {
+        return (block.galleryProductIds ?? [])
+          .map((id) => products.find((product) => product.id === id))
+          .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl))
+          .map((product) => `[Billede: ${product.title}]`)
+          .join("  ");
+      }
+      return block.imageUrl ? `[Billede: ${block.altText || image.altText}]` : `[Billede: ${image.altText}]`;
+    }
 
     case "produktvisning":
       return products
@@ -321,18 +370,8 @@ function renderBlockText(
     case "skillelinje":
       return "—————————";
 
-    case "galleri":
-      return (block.galleryProductIds ?? [])
-        .map((id) => products.find((product) => product.id === id))
-        .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl))
-        .map((product) => `[Billede: ${product.title}]`)
-        .join("  ");
-
     case "tekst":
       return stripHtml(block.content ?? "");
-
-    case "img":
-      return block.imageUrl ? `[Billede: ${block.altText || "uden beskrivelse"}]` : "[Billede]";
 
     case "produkt": {
       const product = products.find((item) => item.id === block.productId);
