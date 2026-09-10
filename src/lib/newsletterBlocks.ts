@@ -175,14 +175,6 @@ function greetingFor(customerType: CustomerType): string {
   return customerType === "erhverv" ? "Kære erhvervskunde," : "Kære privatkunde,";
 }
 
-// Fast afsluttende linje, der altid vises efter selve AI-brødteksten. Den er
-// ikke en del af Geminis svar (bodyText er kun ÉT felt), men skal stadig være
-// synlig OG redigerbar i Edit-mode – ikke kun i Preview – så den flettes ind i
-// "brodtekst"-blokkens content som endnu et afsnit, i stedet for at blive
-// tilføjet separat (og usynligt for Edit-mode) i selve render-laget.
-const CLOSING_TEXT =
-  "Ønsker du at se planterne på stedet eller modtage et uforpligtende tilbud? Kontakt os direkte – vi rådgiver gerne om valg og placering.";
-
 // Bruges kun til at PRIORITERE blandt de allerede valgte produkter, når
 // galleriet forudfyldes automatisk (se pickGalleryProducts) – ShopifyProduct
 // har intet dedikeret isBestSeller-felt, så det nærmeste tilsvarende er et
@@ -249,7 +241,7 @@ export function createDefaultBlocks(
     }
     if (type === "overskrift") block.content = result.heading;
     if (type === "brodtekst") {
-      block.content = [greetingFor(customerType), result.bodyText, CLOSING_TEXT]
+      block.content = [greetingFor(customerType), result.bodyText]
         .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
         .join("");
     }
@@ -380,7 +372,7 @@ export function createBlocksFromTemplate(
 
     if (block.type === "overskrift") block.content = result.heading;
     if (block.type === "brodtekst") {
-      block.content = [greetingFor(customerType), result.bodyText, CLOSING_TEXT]
+      block.content = [greetingFor(customerType), result.bodyText]
         .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
         .join("");
     }
