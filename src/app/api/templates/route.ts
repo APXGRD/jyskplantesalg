@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
+import { getTemplateSummaries } from "@/lib/templates";
 
 interface SaveTemplateBody {
   name?: string;
@@ -21,16 +22,7 @@ interface SaveTemplateBody {
 
 export async function GET() {
   try {
-    const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from("templates")
-      .select("id, name, description")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
+    const data = await getTemplateSummaries();
     return NextResponse.json(data);
   } catch (err) {
     console.error("Kunne ikke hente skabeloner fra Supabase:", err);
