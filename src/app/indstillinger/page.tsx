@@ -141,6 +141,11 @@ export default function IndstillingerPage() {
     reader.readAsDataURL(file);
   }
 
+  function removeLogo() {
+    setLogoError(null);
+    updateField("logo_data", null);
+  }
+
   async function handleSave() {
     if (!form || isSaving) return;
 
@@ -220,6 +225,17 @@ export default function IndstillingerPage() {
                     {form.logo_data ? "Udskift logo" : "Upload logo"}
                     <input type="file" accept={LOGO_FILE_ACCEPT} onChange={handleLogoFileChange} className="sr-only" />
                   </label>
+                  {form.logo_data && (
+                    <button
+                      type="button"
+                      onClick={removeLogo}
+                      aria-label="Slet logo"
+                      title="Slet logo"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-ink-faintest hover:bg-surface-active hover:text-red-600"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
                 {logoError && <p className="text-[12px] text-red-600">{logoError}</p>}
               </div>

@@ -26,6 +26,15 @@ function resolveFontFamily(primaryFont: string): string {
   return FONT_FAMILIES.find((font) => font.label === primaryFont)?.value ?? FONT_FAMILIES[0].value;
 }
 
+// "img" og "galleri" er BEVIDST stadig anerkendte typer her – IKKE fordi nye
+// blokke af disse typer kan opstå længere (se ADDABLE_BLOCK_KINDS/
+// createNewBlock/createDefaultBlocks/createBlocksFromTemplate, som alle nu
+// udelukkende producerer "billede"), men så allerede GEMTE nyhedsbrev-udkast
+// og skabeloner (localStorage/Supabase) fra FØR konsolideringen til én
+// samlet Billede-/Galleri-blok stadig indlæses og vises korrekt. Selve
+// render-/kontrol-logikken (NewsletterCard.tsx, newsletterExport.ts,
+// EditorBlockList.tsx) behandler alle tre typer identisk ud fra block.
+// galleryColumns (se MediaLayout herunder) – ikke ud fra selve type-strengen.
 export type BlockType =
   | "header"
   | "overskrift"
@@ -78,16 +87,55 @@ export const CTA_BORDER_RADIUS_PX: Record<CtaBorderRadius, number> = {
   pille: 999,
 };
 
+// Produktvisnings-blokkens "Tæthed"-valg – styrer den lodrette afstand
+// mellem hvert produkt i listen (både Preview og den kopierede HTML bruger
+// samme PRODUCT_ROW_PADDING_PX, så de altid matcher). Bevidst kun to valg
+// (ikke tre som CTA-paddingen), jf. opgavebeskrivelsen.
+export type ProductListDensity = "kompakt" | "normal";
+
+export const PRODUCT_ROW_PADDING_PX: Record<ProductListDensity, number> = {
+  kompakt: 6,
+  normal: 12,
+};
+
 // "udfyldt" (standard) = baggrundsfarve fra bgColor. "kontur" = ingen
 // baggrund, kun en 2px kant og tekst i bgColor's farve – samme farvefelt
 // genbruges bare med en anden visuel betydning afhængig af stilen.
 export type CtaStyle = "udfyldt" | "kontur";
 
-// "Billedgalleri"-blokkens tre kuraterede layout-valg – bevidst ingen fri
-// indtastning af antal, jf. opgavebeskrivelsen. "6" er IKKE 6 kolonner i én
+// Den samlede Billede-/Galleri-blok har FIRE kuraterede layout-valg – bevidst
+// ingen fri indtastning af antal, jf. opgavebeskrivelsen. "1" er det
+// oprindelige enkelt-billede-layout (upload ELLER søgbart produktvalg,
+// justering, størrelse); "2"/"3"/"6" er det oprindelige galleri-layout (kun
+// søgbart produktvalg, fast kolonnebredde). "6" er IKKE 6 kolonner i én
 // række, men "6 billeder" – 2 rækker × 3 kolonner (se GALLERY_ROW_SIZE_PX
-// og rendering i NewsletterCard.tsx/newsletterExport.ts).
+// og rendering i NewsletterCard.tsx/newsletterExport.ts). GalleryColumns
+// holdes som en selvstændig type (i stedet for at inline'e 2|3|6 igen), fordi
+// GALLERY_IMAGE_WIDTH_PX/GALLERY_ROW_SIZE nedenfor KUN giver mening for
+// flerbilled-layoutet – layout "1" render'es i stedet via IMAGE_SIZE_PX/
+// alignment, samme som den oprindelige Billede-blok altid har gjort.
 export type GalleryColumns = 2 | 3 | 6;
+
+// Blokkens fulde layout-valg: "1" (enkelt billede) eller et af de tre
+// galleri-antal. Feltnavnet på selve blokken (galleryColumns, se
+// NewsletterBlock herunder) er BEVIDST ikke omdøbt til "mediaLayout", selvom
+// det nu også dækker layout "1" – det minimerer risikoen for allerede gemte
+// nyhedsbrev-udkast/skabeloner (localStorage/Supabase), der refererer feltet
+// ved dette navn.
+export type MediaLayout = 1 | GalleryColumns;
+
+// De fire layout-valg i den rækkefølge, de skal vises i Edit-mode.
+export const MEDIA_LAYOUT_OPTIONS: MediaLayout[] = [1, 2, 3, 6];
+
+// "1" (eller slet ingen værdi, dvs. et gammelt gemt "billede"/"img"-udkast
+// fra FØR konsolideringen) betyder enkelt-billede-layout; 2/3/6 betyder
+// galleri-layout. Bruges i NewsletterCard.tsx/newsletterExport.ts/
+// EditorBlockList.tsx til at afgøre, hvilket af de to render-/kontrol-spor en
+// given blok skal bruge, UDEN at skulle skelne på selve type-strengen
+// ("billede" vs. det legacy "img"/"galleri").
+export function isGalleryLayout(columns: MediaLayout | undefined): columns is GalleryColumns {
+  return (columns ?? 1) > 1;
+}
 
 // Fast billedbredde pr. layout-valg i den kopierede, tabel-baserede HTML
 // (samme Outlook-kompatible teknik som CTA-knappen bruger – CSS
@@ -122,10 +170,13 @@ export interface NewsletterBlock {
   ctaUrl?: string;
   // Kun relevant for "produkt"-blokken (enkelt-produkt-visning).
   productId?: string;
-  // Kun relevant for billede-blokke ("billede"/"img"). imageUrl er pt. en
-  // base64 data-URI (client-side preview via FileReader) – se
-  // ImageBlockControls.tsx. Uden imageUrl falder blokken tilbage til sin
-  // eksisterende pladsholder-visning.
+  // Kun relevant for den samlede Billede-/Galleri-blok ("billede", og de
+  // legacy-typer "img"/"galleri") ved layout "1" (se galleryColumns
+  // herunder) – enten en base64 data-URI fra "Udskift billede"-upload
+  // (client-side preview via FileReader, se ImageBlockControls.tsx) ELLER
+  // sat automatisk, når brugeren i stedet vælger ét produkt via den
+  // søgbare produktvælger (se galleryProductIds). Uden imageUrl falder
+  // blokken tilbage til sin eksisterende pladsholder-visning.
   imageUrl?: string;
   altText?: string;
   alignment?: ImageAlignment;
@@ -152,14 +203,32 @@ export interface NewsletterBlock {
   ctaPadding?: CtaPadding;
   ctaBorderRadius?: CtaBorderRadius;
   ctaStyle?: CtaStyle;
-  // Kun relevant for "galleri"-blokken – de udvalgte produkters id'er (blandt
-  // de produkter, der allerede er valgt på "Vælg produkter"-siden, samme
-  // liste som resten af nyhedsbrevet bruger) og antal kolonner i layoutet.
+  // Kun relevant for den samlede Billede-/Galleri-blok. galleryColumns er nu
+  // blokkens FULDE layout-valg (se MediaLayout ovenfor) – "1" (eller
+  // undefined, for gamle "billede"/"img"-udkast fra før konsolideringen)
+  // betyder enkelt-billede-layout (imageUrl/altText/alignment/size, se
+  // ovenfor); 2/3/6 betyder galleri-layout. galleryProductIds er, ved BEGGE
+  // layout-typer, de(t) valgte produkts/produkters id'er via den søgbare
+  // produktvælger (blandt de produkter, der allerede er valgt på "Vælg
+  // produkter"-siden) – ved layout "1" højst ét id (sat sammen med
+  // imageUrl/altText, se SearchableProductChecklist-brugen i
+  // EditorBlockList.tsx); ved layout 2/3/6 op til `galleryColumns` id'er.
   // Antallet af id'er holdes altid inden for galleryColumns af
   // GalleryBlockControls, så rendering aldrig skal håndtere flere billeder,
   // end layoutet reelt har plads til.
   galleryProductIds?: string[];
-  galleryColumns?: GalleryColumns;
+  galleryColumns?: MediaLayout;
+  // Kun relevant for "produktvisning"-blokken. productDisplayIds er
+  // brugerens egen, frie multi-select blandt de tilgængelige produkter
+  // (INGEN øvre grænse, til forskel fra galleryProductIds) – undefined
+  // betyder "vis alle tilgængelige produkter" (den oprindelige, uændrede
+  // opførsel, før dette valg fandtes). productBorderRadius/productDensity er
+  // rene stilvalg (farven forbliver bevidst fast sort, se
+  // NewsletterCard.tsx/newsletterExport.ts) – samme CtaBorderRadius-type som
+  // CTA-knappen allerede bruger, genbrugt her i stedet for en ny type.
+  productDisplayIds?: string[];
+  productBorderRadius?: CtaBorderRadius;
+  productDensity?: ProductListDensity;
 }
 
 // De blok-typer, hvis indhold redigeres som fri tekst via TextBlockEditor
@@ -181,7 +250,11 @@ function greetingFor(customerType: CustomerType): string {
 // tag, der nævner "bestseller" (fx sat manuelt i Shopify-admin). Findes et
 // sådant tag ikke på nok produkter, falder forudfyldningen roligt tilbage
 // til de først valgte produkter i stedet for at fejle eller vise intet.
-function isBestSeller(product: ShopifyProduct): boolean {
+// Eksporteret, så generate-newsletter/route.ts kan genbruge PRÆCIS samme
+// bestseller-detektion til at vælge ét repræsentativt produkt ved
+// emne-søgning (se resolveTopicRepresentativeProduct), i stedet for at
+// duplikere logikken.
+export function isBestSeller(product: ShopifyProduct): boolean {
   return product.tags.some((tag) => /best[\s-]?seller/i.test(tag));
 }
 
@@ -191,7 +264,9 @@ function isBestSeller(product: ShopifyProduct): boolean {
 // starttilstand aldrig kan give et tomt src-attribut). Er mindst `count`
 // produkter tagget som bestseller, bruges de (i den rækkefølge, de blev
 // valgt); ellers bruges simpelthen de først valgte `count` produkter.
-function pickGalleryProducts(products: ShopifyProduct[], count: number): ShopifyProduct[] {
+// Eksporteret, så EditorBlockList.tsx kan genbruge samme kuraterings-logik,
+// når en billede-blok fra en emne-søgning manuelt konverteres til et galleri.
+export function pickGalleryProducts(products: ShopifyProduct[], count: number): ShopifyProduct[] {
   const withImages = products.filter((product) => product.hasImage && product.imageUrl);
   const bestSellers = withImages.filter(isBestSeller);
   if (bestSellers.length >= count) {
@@ -210,18 +285,19 @@ export function createDefaultBlocks(
   selectedProducts: ShopifyProduct[],
   brandDefaults: BrandDefaults,
 ): NewsletterBlock[] {
-  // Præcis ét valgt produkt: almindelig Billede-blok, som hidtil. Mere end
-  // ét: en Galleri-blok på samme plads i stedet – galleriet er ikke beregnet
-  // til at vise ALLE valgte produkter på én gang (ligesom Produktvisnings-
-  // blokken heller ikke er begrænset, men et repræsentativt udsnit på 2-3),
-  // kun et kurateret udsnit. Dette er kun den automatiske starttilstand;
-  // brugeren kan altid erstatte den manuelt i Edit-mode bagefter.
-  const imageBlockType: "billede" | "galleri" = selectedProducts.length > 1 ? "galleri" : "billede";
+  // Én samlet Billede-/Galleri-blok, uanset antal valgte produkter – kun
+  // dens layout-valg (galleryColumns, se herunder) afgør, om den starter som
+  // enkelt-billede (præcis ét valgt produkt) eller galleri (mere end ét).
+  // Galleriet er ikke beregnet til at vise ALLE valgte produkter på én gang
+  // (ligesom Produktvisnings-blokken heller ikke er begrænset, men et
+  // repræsentativt udsnit på 2-3), kun et kurateret udsnit. Dette er kun den
+  // automatiske starttilstand; brugeren kan altid ændre layoutet manuelt i
+  // Edit-mode bagefter.
   const blockTypes: BlockType[] = [
     "header",
     "overskrift",
     "brodtekst",
-    imageBlockType,
+    "billede",
     "produktvisning",
     "skillelinje",
     "cta",
@@ -246,27 +322,29 @@ export function createDefaultBlocks(
         .join("");
     }
     if (type === "billede") {
-      // Slå produktet op blandt de faktisk valgte produkter ud fra det
-      // productId, AI'en pegede på – vi stoler ikke på, at Gemini har
-      // kopieret imageUrl'en korrekt videre, kun på at productId
-      // identificerer det rigtige produkt. Findes det ikke (fx tomt/forkert
-      // productId), falder vi tilbage til det først valgte produkt, så
-      // blokken stadig starter med et rigtigt billede.
-      const matchedProduct =
-        selectedProducts.find((product) => product.id === result.image.productId) ?? selectedProducts[0];
-      if (matchedProduct) {
-        block.imageUrl = matchedProduct.imageUrl;
-        block.altText = matchedProduct.title;
+      if (selectedProducts.length > 1) {
+        // 2 valgte produkter i alt: begge med i et 2-kolonne galleri. 3
+        // eller flere: kun et udsnit af 3 i et 3-kolonne galleri (se
+        // pickGalleryProducts).
+        const columns: GalleryColumns = selectedProducts.length === 2 ? 2 : 3;
+        const galleryProducts = pickGalleryProducts(selectedProducts, columns);
+        block.galleryProductIds = galleryProducts.map((product) => product.id);
+        block.galleryColumns = columns;
+      } else {
+        // Slå produktet op blandt de faktisk valgte produkter ud fra det
+        // productId, AI'en pegede på – vi stoler ikke på, at Gemini har
+        // kopieret imageUrl'en korrekt videre, kun på at productId
+        // identificerer det rigtige produkt. Findes det ikke (fx tomt/
+        // forkert productId), falder vi tilbage til det først valgte
+        // produkt, så blokken stadig starter med et rigtigt billede.
+        const matchedProduct =
+          selectedProducts.find((product) => product.id === result.image.productId) ?? selectedProducts[0];
+        if (matchedProduct) {
+          block.imageUrl = matchedProduct.imageUrl;
+          block.altText = matchedProduct.title;
+        }
+        block.galleryColumns = 1;
       }
-    }
-    if (type === "galleri") {
-      // 2 valgte produkter i alt: begge med i et 2-kolonne galleri. 3 eller
-      // flere: kun et udsnit af 3 i et 3-kolonne galleri (se
-      // pickGalleryProducts).
-      const columns: GalleryColumns = selectedProducts.length === 2 ? 2 : 3;
-      const galleryProducts = pickGalleryProducts(selectedProducts, columns);
-      block.galleryProductIds = galleryProducts.map((product) => product.id);
-      block.galleryColumns = columns;
     }
     if (type === "cta") {
       block.content = result.cta.text;
@@ -288,8 +366,10 @@ export function duplicateBlock(block: NewsletterBlock): NewsletterBlock {
 // stylingvalg, der gælder UANSET hvilket konkret nyhedsbrev/produkter en
 // senere bruger af skabelonen vælger. Bevidst ingen id (skabelonen er ikke
 // bundet til de originale blok-instansers id'er) og ingen content/ctaUrl/
-// productId/imageUrl/altText/galleryProductIds (alt sammen enten AI-tekst,
-// et konkret link, eller et konkret produkt-/billedvalg).
+// productId/imageUrl/altText/galleryProductIds/productDisplayIds (alt sammen
+// enten AI-tekst, et konkret link, eller et konkret produkt-/billedvalg).
+// productBorderRadius/productDensity ER med – rene stilvalg, samme princip
+// som ctaBorderRadius/ctaPadding/galleryColumns.
 export type TemplateBlock = Pick<
   NewsletterBlock,
   | "type"
@@ -303,6 +383,8 @@ export type TemplateBlock = Pick<
   | "ctaBorderRadius"
   | "ctaStyle"
   | "galleryColumns"
+  | "productBorderRadius"
+  | "productDensity"
 >;
 
 // Bygger den JSON-struktur, "Gem som skabelon" gemmer i Supabase, ud fra det
@@ -326,6 +408,8 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     ctaBorderRadius: block.ctaBorderRadius,
     ctaStyle: block.ctaStyle,
     galleryColumns: block.galleryColumns,
+    productBorderRadius: block.productBorderRadius,
+    productDensity: block.productDensity,
   }));
 }
 
@@ -346,13 +430,23 @@ export function createBlocksFromTemplate(
   const defaultFontFamily = resolveFontFamily(brandDefaults.primaryFont);
 
   return templateBlocks.map((templateBlock) => {
+    // Ældre skabeloner (gemt før Billede/Galleri blev konsolideret til én
+    // blok-type) kan stadig have type "img" eller "galleri" gemt – de
+    // normaliseres her til "billede", ligesom ALT nyt indhold fra nu af kun
+    // producerer "billede" (se ADDABLE_BLOCK_KINDS/createNewBlock
+    // nedenfor). Selve layout-valget (enkelt billede vs. galleri) afgøres
+    // udelukkende af templateBlock.galleryColumns herunder, ikke af denne
+    // oprindelige type-streng.
+    const normalizedType: BlockType =
+      templateBlock.type === "img" || templateBlock.type === "galleri" ? "billede" : templateBlock.type;
+
     // Skabelonens EGEN gemte fontFamily/textColor vinder altid, hvis den er
     // sat – brand-defaults fylder kun hullet ud, hvis skabelonen aldrig fik
     // sat en eksplicit værdi for netop den blok (fx en skabelon gemt før
     // nogen rørte den globale farve/skrifttype-vælger).
     const block: NewsletterBlock = {
-      id: `${templateBlock.type}-${crypto.randomUUID()}`,
-      type: templateBlock.type,
+      id: `${normalizedType}-${crypto.randomUUID()}`,
+      type: normalizedType,
       hidden: templateBlock.hidden,
       fontFamily: templateBlock.fontFamily,
       // Produktvisning har ingen farve-vælger – ignorér evt. gammel gemt
@@ -364,6 +458,8 @@ export function createBlocksFromTemplate(
       ctaPadding: templateBlock.ctaPadding,
       ctaBorderRadius: templateBlock.ctaBorderRadius,
       ctaStyle: templateBlock.ctaStyle,
+      productBorderRadius: templateBlock.productBorderRadius,
+      productDensity: templateBlock.productDensity,
     };
     if (RICH_TEXT_BLOCK_TYPES.includes(block.type)) {
       block.fontFamily = block.fontFamily ?? defaultFontFamily;
@@ -376,25 +472,30 @@ export function createBlocksFromTemplate(
         .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
         .join("");
     }
-    // "billede" og "img" er samme visning/kontroller (se BlockContent i
-    // EditorBlockList.tsx) – en skabelon kan i princippet indeholde begge,
-    // hvis brugeren tilføjede en ekstra billedblok manuelt før den blev gemt.
-    if (block.type === "billede" || block.type === "img") {
-      const matchedProduct =
-        selectedProducts.find((product) => product.id === result.image.productId) ?? selectedProducts[0];
-      if (matchedProduct) {
-        block.imageUrl = matchedProduct.imageUrl;
-        block.altText = matchedProduct.title;
+    // Den samlede Billede-/Galleri-blok (se normalizedType ovenfor) – samme
+    // layout-regel som createDefaultBlocks: galleryColumns > 1 betyder
+    // galleri-layout (kurateret produktudsnit), ellers enkelt-billede-layout
+    // (samme matchedProduct-fallback som hidtil). Ældre skabeloner uden
+    // gemt galleryColumns (fra dengang "billede"/"img" aldrig havde feltet)
+    // falder korrekt tilbage til layout "1".
+    if (normalizedType === "billede") {
+      const columns: MediaLayout = templateBlock.galleryColumns ?? 1;
+      if (isGalleryLayout(columns)) {
+        const galleryProducts = pickGalleryProducts(selectedProducts, columns);
+        block.galleryProductIds = galleryProducts.map((product) => product.id);
+        block.galleryColumns = columns;
+      } else {
+        const matchedProduct =
+          selectedProducts.find((product) => product.id === result.image.productId) ?? selectedProducts[0];
+        if (matchedProduct) {
+          block.imageUrl = matchedProduct.imageUrl;
+          block.altText = matchedProduct.title;
+        }
+        block.galleryColumns = 1;
       }
     }
     if (block.type === "produkt") {
       block.productId = selectedProducts[0]?.id;
-    }
-    if (block.type === "galleri") {
-      const columns = templateBlock.galleryColumns ?? 2;
-      const galleryProducts = pickGalleryProducts(selectedProducts, columns);
-      block.galleryProductIds = galleryProducts.map((product) => product.id);
-      block.galleryColumns = columns;
     }
     if (block.type === "cta") {
       block.content = result.cta.text;
@@ -412,17 +513,13 @@ export function createBlocksFromTemplate(
   });
 }
 
-// De typer, der kan tilføjes via "+ Tilføj blok"-menuen.
-export type AddableBlockKind = "tekst" | "billede" | "produkt" | "knap" | "skillelinje" | "galleri";
+// De typer, der kan tilføjes via "+ Tilføj blok"-menuen. "billede" og
+// "galleri" er BEVIDST slået sammen til ét "billede"-valg ("Billede/
+// Galleri") – layout-valget (1/2/3/6, se MediaLayout) vælges bagefter inde i
+// selve blokken, ikke i denne menu.
+export type AddableBlockKind = "tekst" | "billede" | "produkt" | "knap" | "skillelinje";
 
-export const ADDABLE_BLOCK_KINDS: AddableBlockKind[] = [
-  "tekst",
-  "billede",
-  "produkt",
-  "knap",
-  "skillelinje",
-  "galleri",
-];
+export const ADDABLE_BLOCK_KINDS: AddableBlockKind[] = ["tekst", "billede", "produkt", "knap", "skillelinje"];
 
 export function createNewBlock(kind: AddableBlockKind, defaultProductId?: string): NewsletterBlock {
   const id = `${kind}-${crypto.randomUUID()}`;
@@ -431,17 +528,16 @@ export function createNewBlock(kind: AddableBlockKind, defaultProductId?: string
     case "tekst":
       return { id, type: "tekst", hidden: false, content: "Ny tekstblok – redigér indholdet her" };
     case "billede":
-      return { id, type: "img", hidden: false };
+      // Default til layout "1 billede", tomt – brugeren vælger selv upload
+      // eller søgbart produktvalg (ImageBlockControls), jf.
+      // opgavebeskrivelsen ("default til INGEN valgt", ligesom det øvrige
+      // billede-flow ikke gætter for brugeren).
+      return { id, type: "billede", hidden: false, galleryColumns: 1 };
     case "produkt":
       return { id, type: "produkt", hidden: false, productId: defaultProductId };
     case "knap":
       return { id, type: "cta", hidden: false, content: "Se sortimentet", ctaUrl: "" };
     case "skillelinje":
       return { id, type: "skillelinje", hidden: false };
-    case "galleri":
-      // Tom som udgangspunkt – brugeren vælger selv 2-3 produkter i
-      // GalleryBlockControls, jf. opgavebeskrivelsen ("default til INGEN
-      // valgt", ligesom det øvrige billede-flow ikke gætter for brugeren).
-      return { id, type: "galleri", hidden: false, galleryProductIds: [], galleryColumns: 2 };
   }
 }

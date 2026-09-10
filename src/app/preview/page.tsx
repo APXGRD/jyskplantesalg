@@ -29,7 +29,7 @@ type SaveTemplateState = "idle" | "saved";
 
 export default function PreviewPage() {
   const router = useRouter();
-  const { result, customerType, selectedProductIds, blocks, setBlocks } = useNewsletter();
+  const { result, customerType, selectedProductIds, topicMatchedProductIds, blocks, setBlocks } = useNewsletter();
   const brand = useBrandSettings();
 
   const [activeView, setActiveView] = useState<View>("preview");
@@ -81,9 +81,17 @@ export default function PreviewPage() {
     setRetryToken((token) => token + 1);
   }
 
+  // Er nyhedsbrevet genereret via emne-søgning (topicMatchedProductIds sat,
+  // se NewsletterContext.setResult), bruges HELE det matchede produkt-sæt
+  // her i stedet for selectedProductIds – de to er aldrig begge aktive for
+  // samme resultat. Dette er dét, der gør hele det matchede "ahorn"-udvalg
+  // tilgængeligt for både Produktvisnings-blokken og Edit-mode's billede-/
+  // galleri-blok-vælger (se EditorBlockList.tsx), ikke kun det ene produkt,
+  // billede-blokken oprindeligt viste.
+  const effectiveProductIds = topicMatchedProductIds ?? selectedProductIds;
   const selectedProducts = useMemo(
-    () => allProducts.filter((product) => selectedProductIds.includes(product.id)),
-    [allProducts, selectedProductIds],
+    () => allProducts.filter((product) => effectiveProductIds.includes(product.id)),
+    [allProducts, effectiveProductIds],
   );
 
   const customerTypeLabel =
@@ -241,7 +249,7 @@ export default function PreviewPage() {
                 blocks={blocks}
                 onBlocksChange={setBlocks}
                 products={selectedProducts}
-                customerType={customerType}
+                topicMatchedProductIds={topicMatchedProductIds}
               />
             </div>
           )}

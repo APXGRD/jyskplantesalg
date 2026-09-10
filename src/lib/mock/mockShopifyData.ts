@@ -20,20 +20,17 @@ export interface ShopifyProduct {
   productType: string; // matcher deres kategori-struktur (Multistammet, Tagklippet osv.)
   tags: string[];
   hasImage: boolean;
+  // Produktets PRIMÆRE Shopify-collection (den første, collections(first: 1)
+  // returnerer for produktet, se fetchShopifyProducts) – null, hvis produktet
+  // ikke er medlem af nogen collection. Bruges af resolveCtaLink (ctaLink.ts)
+  // til at afgøre, om flere valgte produkter deler samme "rigtige"
+  // kategori-side, i stedet for det tidligere fiktive productType-baserede
+  // opslag (collectionUrls, nu fjernet – matchede aldrig det rigtige katalog).
+  collectionHandle: string | null;
+  // Den fulde, klikbare URL til samme collection (bygget ud fra handle'et
+  // ovenfor, se fetchProducts.ts) – null i takt med collectionHandle.
+  collectionUrl: string | null;
 }
-
-// Kategori-/collection-URL'er — bruges som CTA-mål, når flere produkter af SAMME type er
-// valgt på én gang (fx "vælg hele Multistammet-kategorien"). Peger på Jysk Plantesalgs
-// rigtige kategori-sider, i modsætning til produkternes individuelle "url"-felt.
-export const collectionUrls: Record<string, string> = {
-  Multistammet: "https://jyskplantesalg.dk/collections/multistammet",
-  "Svævende hæk": "https://jyskplantesalg.dk/collections/svaevende-haek",
-  Tagklippet: "https://jyskplantesalg.dk/collections/tagklippet",
-  Busk: "https://jyskplantesalg.dk/collections/buske",
-  Kugleformet: "https://jyskplantesalg.dk/collections/kugleformet",
-  Søjleformet: "https://jyskplantesalg.dk/collections/sojleformet",
-  Solitær: "https://jyskplantesalg.dk/collections/solitaer",
-};
 
 export const mockShopData = {
   storeName: brand.name,

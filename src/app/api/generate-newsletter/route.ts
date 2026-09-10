@@ -1,20 +1,31 @@
 // src/app/api/generate-newsletter/route.ts
 //
-// Modtager de valgte produkt-id'er + målgruppe + evt. instrukser fra Opsætnings-siden,
-// slår produkterne op i den lokale Supabase-cache (getCachedProducts – samme cache som
+// Modtager ENTEN de valgte produkt-id'er (manuelt valgt på "Vælg produkter"-siden)
+// ELLER et fritekst-emne (det nye "Emne"-felt på Opsætnings-siden – se
+// searchCachedProductsByTopic) + målgruppe + evt. instrukser, slår produkterne op i den
+// lokale Supabase-cache (getCachedProducts/searchCachedProductsByTopic – samme cache som
 // "Vælg produkter"-siden og NewsletterContext.setResult allerede bruger, IKKE det
 // direkte, fuldt paginerede fetchShopifyProducts, som tidligere gjorde netop dette kald
-// til den suverænt største flaskehals i hele generérings-flowet, ~21 sek. af ~23 sek.
-// total), bygger AI-prompten og beder Gemini om at generere nyhedsbrevets fire felter
-// (heading/bodyText/image/cta) som struktureret JSON.
+// til den suverænt største flaskehals i hele generérings-flowet), bygger AI-prompten og
+// beder Gemini om at generere nyhedsbrevets fire felter (heading/bodyText/image/cta) som
+// struktureret JSON.
+//
+// Er "Emne" udfyldt, VINDER det altid over productIds (se isTopicSearch herunder) – de
+// to er alternative, sideordnede måder at vælge produkter på, aldrig kombineret.
 
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { collectionUrls, type ShopifyProduct } from "@/lib/mock/mockShopifyData";
-import { getCachedProducts } from "@/lib/cachedProducts";
+import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import { resolveCtaLink } from "@/lib/ctaLink";
+import { getCachedProducts, searchCachedProductsByTopic } from "@/lib/cachedProducts";
 import { getBrandSettings } from "@/lib/brandSettings";
 import { getSupabaseClient } from "@/lib/supabase";
-import { createBlocksFromTemplate, type NewsletterBlock, type TemplateBlock } from "@/lib/newsletterBlocks";
+import {
+  createBlocksFromTemplate,
+  isBestSeller,
+  type NewsletterBlock,
+  type TemplateBlock,
+} from "@/lib/newsletterBlocks";
 import { buildNewsletterUserPrompt } from "@/lib/prompts/newsletterPrompt";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 
@@ -25,6 +36,13 @@ interface GenerateNewsletterBody {
   // Skabelonens id fra "Skabelon"-dropdownen på Opsætnings-siden – undefined/
   // null betyder "Standard layout" (nuværende, faste blok-struktur).
   templateId?: string | null;
+  // Fritekst-emne fra det nye "Emne (valgfrit)"-felt på Opsætnings-siden –
+  // udfyldt betyder "find produkter via tekstsøgning" i stedet for at bruge
+  // productIds, se isTopicSearch herunder.
+  topic?: string;
+  // "Kun med billede"-kontakten ved siden af Emne-feltet – kun relevant,
+  // når topic er udfyldt, se searchCachedProductsByTopic.
+  topicOnlyWithImage?: boolean;
 }
 
 // Henter skabelonens gemte block_structure fra Supabase. Kastes der en fejl
@@ -53,29 +71,6 @@ function isCustomerType(value: unknown): value is CustomerType {
   return value === "privat" || value === "erhverv";
 }
 
-// CTA-linket bestemmes deterministisk i kode ud fra de faktisk valgte
-// produkter – ikke af AI'en – så det altid er forudsigeligt og korrekt:
-// - Er ALLE valgte produkter af samme productType (fx "vælg hele
-//   Multistammet-kategorien"), peger CTA'en på selve kategori-siden
-//   (collectionUrls) i stedet for ét enkelt produkt deri.
-// - Ellers (blandet/håndplukket valg, eller en kategori uden en kendt
-//   collection-URL endnu) peges der på det primære/første valgte produkts
-//   egen url, som hidtil.
-function resolveCtaUrl(selectedProducts: ShopifyProduct[]): string {
-  const primaryUrl = selectedProducts[0].url;
-  // .every() er trivielt sandt for et enkelt element, så "kategori-scenarie"
-  // kræver EKSPLICIT også mere end ét valgt produkt – ellers ville et enkelt
-  // valgt produkt fejlagtigt pege på hele kategori-siden i stedet for sin
-  // egen produktside.
-  const isCategoryScenario =
-    selectedProducts.length > 1 &&
-    selectedProducts.every((product) => product.productType === selectedProducts[0].productType);
-  if (isCategoryScenario) {
-    return collectionUrls[selectedProducts[0].productType] ?? primaryUrl;
-  }
-  return primaryUrl;
-}
-
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -92,11 +87,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ugyldig JSON i request body" }, { status: 400 });
   }
 
-  const { productIds, customerType, instructions, templateId } = body;
+  const { productIds, customerType, instructions, templateId, topic, topicOnlyWithImage } = body;
+  const trimmedTopic = typeof topic === "string" ? topic.trim() : "";
+  const isTopicSearch = trimmedTopic.length > 0;
 
-  if (!Array.isArray(productIds) || productIds.length === 0) {
+  if (!isTopicSearch && (!Array.isArray(productIds) || productIds.length === 0)) {
     return NextResponse.json(
-      { error: "Mindst ét produkt skal vælges (productIds)" },
+      { error: "Mindst ét produkt skal vælges (productIds), eller angiv et emne" },
       { status: 400 },
     );
   }
@@ -108,23 +105,36 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let allProducts: ShopifyProduct[];
-  try {
-    allProducts = (await getCachedProducts()).products;
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Kunne ikke hente produkter." },
-      { status: 502 },
-    );
-  }
-
-  const selectedProducts = allProducts.filter((product) => productIds.includes(product.id));
-
-  if (selectedProducts.length === 0) {
-    return NextResponse.json(
-      { error: "Ingen af de valgte produkt-id'er blev fundet" },
-      { status: 400 },
-    );
+  let selectedProducts: ShopifyProduct[];
+  if (isTopicSearch) {
+    try {
+      selectedProducts = await searchCachedProductsByTopic(trimmedTopic, topicOnlyWithImage === true);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Kunne ikke søge efter produkter." },
+        { status: 502 },
+      );
+    }
+    if (selectedProducts.length === 0) {
+      return NextResponse.json({ error: `Ingen produkter matcher '${trimmedTopic}'` }, { status: 400 });
+    }
+  } else {
+    let allProducts: ShopifyProduct[];
+    try {
+      allProducts = (await getCachedProducts()).products;
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Kunne ikke hente produkter." },
+        { status: 502 },
+      );
+    }
+    selectedProducts = allProducts.filter((product) => (productIds ?? []).includes(product.id));
+    if (selectedProducts.length === 0) {
+      return NextResponse.json(
+        { error: "Ingen af de valgte produkt-id'er blev fundet" },
+        { status: 400 },
+      );
+    }
   }
 
   const productsForPrompt = selectedProducts.map((product) => ({
@@ -144,7 +154,7 @@ export async function POST(req: NextRequest) {
       brandTone: brandSettings.brand_tone,
       products: productsForPrompt,
     },
-    { customerType, instructions },
+    { customerType, instructions, topicSearchTerm: isTopicSearch ? trimmedTopic : undefined },
   );
 
   try {
@@ -166,7 +176,33 @@ export async function POST(req: NextRequest) {
     const newsletter = JSON.parse(text);
     // Overskriver AI'ens eget cta.url-valg med den deterministiske logik
     // herover – AI'en må stadig selv formulere cta.text.
-    newsletter.cta = { ...newsletter.cta, url: resolveCtaUrl(selectedProducts) };
+    newsletter.cta = { ...newsletter.cta, url: resolveCtaLink(selectedProducts) };
+
+    // Emne-søgning: ÉT repræsentativt produkt (bestseller, ellers det først
+    // fundne) til den initiale billede-blok – IKKE automatisk et galleri,
+    // selvom flere produkter matchede emnet (afviger bevidst fra den
+    // almindelige "flere valgte produkter = automatisk galleri"-regel, kun
+    // her). Overskriver samtidig AI'ens eget image-valg, af samme grund som
+    // cta.url ovenfor: det skal være deterministisk, ikke AI'ens gæt.
+    // blockSeedProducts er DERFOR kun det ene produkt, når emne-søgning er
+    // brugt – createDefaultBlocks/createBlocksFromTemplate vælger selv
+    // layout "1 billede" frem for et galleri-layout, når der kun er ét
+    // produkt at bygge ud fra (se MediaLayout i newsletterBlocks.ts).
+    // matchedProductIds er derimod HELE det matchede sæt, sendt med i svaret
+    // til NewsletterContext (se setResult), så Edit-mode's billede-/
+    // galleri-blok-vælger kan tilbyde alle emne-matches, ikke kun det ene viste.
+    let blockSeedProducts = selectedProducts;
+    let matchedProductIds: string[] | undefined;
+    if (isTopicSearch) {
+      const representative = selectedProducts.find(isBestSeller) ?? selectedProducts[0];
+      newsletter.image = {
+        productId: representative.id,
+        imageUrl: representative.imageUrl,
+        altText: representative.title,
+      };
+      blockSeedProducts = [representative];
+      matchedProductIds = selectedProducts.map((product) => product.id);
+    }
 
     // Er en skabelon valgt (frem for "Standard layout"), bygges hele
     // blocks-arrayet HER server-side ud fra dens gemte struktur/styling – se
@@ -179,7 +215,7 @@ export async function POST(req: NextRequest) {
     if (typeof templateId === "string" && templateId) {
       try {
         const templateBlockStructure = await fetchTemplateBlockStructure(templateId);
-        blocks = createBlocksFromTemplate(templateBlockStructure, newsletter, customerType, selectedProducts, {
+        blocks = createBlocksFromTemplate(templateBlockStructure, newsletter, customerType, blockSeedProducts, {
           primaryColor: brandSettings.brand_colors[0],
           primaryFont: brandSettings.primary_font,
         });
@@ -188,7 +224,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json(blocks ? { ...newsletter, blocks } : newsletter);
+    return NextResponse.json({ ...newsletter, blocks, matchedProductIds });
   } catch (err) {
     console.error("generate-newsletter fejlede:", err);
     return NextResponse.json(

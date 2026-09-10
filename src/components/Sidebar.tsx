@@ -51,17 +51,15 @@ export function Sidebar({ active }: SidebarProps) {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
       <div className="flex items-center gap-3 border-b border-border p-5">
-        {settings.logoData ? (
+        {settings.logoData && (
           // Intet farvet cirkel-badge her – et rigtigt, uploadet logo har
           // typisk sin egen baggrund/form og skal vises rent, uden en
-          // ekstra ring/baggrund uden om. Badge-baggrunden (bg-primary,
-          // rounded-full) er bevidst KUN for fallback-ikonet nedenfor.
+          // ekstra ring/baggrund uden om. Uden et uploadet logo vises INTET
+          // ikon her (kun firmanavnet) – samme princip som nyhedsbrevets
+          // egen header (NewsletterCard.tsx), i stedet for det tidligere
+          // faste leaf-ikon som fallback.
           // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
           <img src={settings.logoData} alt="" className="h-8 w-8 shrink-0 object-contain" />
-        ) : (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white">
-            <Logo className="h-4 w-4" />
-          </div>
         )}
         <span className="truncate text-xs font-semibold tracking-wide text-ink uppercase" title={settings.name}>
           {settings.name}

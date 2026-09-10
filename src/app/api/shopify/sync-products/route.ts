@@ -31,6 +31,8 @@ export async function POST() {
       product_type: product.productType,
       tags: product.tags,
       has_image: product.hasImage,
+      collection_handle: product.collectionHandle,
+      collection_url: product.collectionUrl,
       synced_at: syncedAt,
     }));
 
