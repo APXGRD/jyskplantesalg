@@ -61,18 +61,28 @@ interface NewsletterContextValue {
   // galleri-blok-kontroller (EditorBlockList.tsx) til at tilbyde hele
   // emne-udvalget som vælgbare produkter, ikke kun det oprindeligt viste.
   topicMatchedProductIds: string[] | null;
+  // Det oprindelige emne-ord (fra Opsætnings-siden), der producerede det
+  // NUVÆRENDE resultat – null ved almindeligt manuelt produktvalg. ADSKILT
+  // fra `topic` ovenfor (som er selve Emne-FELTETS løbende, redigerbare
+  // værdi) – topicSearchTerm ændrer sig KUN ved en ny generering, så den
+  // forbliver korrekt knyttet til det aktuelle resultat, selv hvis brugeren
+  // bagefter navigerer til Opsætning og redigerer Emne-feltet uden at
+  // generere igen. Bruges af EditorBlockList.tsx til at genberegne
+  // resolveCtaLink()'s søgeside-fallback client-side (se ctaLink.ts).
+  topicSearchTerm: string | null;
   // `presetBlocks`, hvis givet, bruges DIREKTE som blocks-listen i stedet for
   // at blive bygget her via createDefaultBlocks – det er sådan
   // skabelon-baseret generering fungerer, da generate-newsletter/route.ts i
   // så fald allerede har bygget den fulde blocks-liste server-side (se
-  // opsaetning/page.tsx). `matchedProductIds`, hvis givet, er HELE
-  // emne-søgningens træfliste (se generate-newsletter/route.ts) – sættes som
-  // topicMatchedProductIds; udelades den, nulstilles topicMatchedProductIds
-  // (almindeligt manuelt produktvalg).
+  // opsaetning/page.tsx). `matchedProductIds`/`topicSearchTerm`, hvis givet,
+  // stammer fra samme emne-søgning (se generate-newsletter/route.ts) –
+  // sættes som topicMatchedProductIds/topicSearchTerm; udelades de,
+  // nulstilles begge (almindeligt manuelt produktvalg).
   setResult: (
     result: GeneratedNewsletter | null,
     presetBlocks?: NewsletterBlock[],
     matchedProductIds?: string[],
+    topicSearchTerm?: string,
   ) => void;
   // Blok-listen for Preview/Edit-mode – ligger her (i stedet for som lokal
   // state i preview/page.tsx), så den overlever navigation væk fra og tilbage
@@ -96,6 +106,7 @@ interface PersistedState {
   selectedTemplateId: string | null;
   result: GeneratedNewsletter | null;
   topicMatchedProductIds: string[] | null;
+  topicSearchTerm: string | null;
   blocks: NewsletterBlock[];
 }
 
@@ -108,6 +119,7 @@ const DEFAULT_PERSISTED_STATE: PersistedState = {
   selectedTemplateId: null,
   result: null,
   topicMatchedProductIds: null,
+  topicSearchTerm: null,
   blocks: [],
 };
 
@@ -136,6 +148,7 @@ function loadPersistedState(): PersistedState {
       selectedTemplateId: typeof parsed.selectedTemplateId === "string" ? parsed.selectedTemplateId : null,
       result: parsed.result ?? null,
       topicMatchedProductIds: Array.isArray(parsed.topicMatchedProductIds) ? parsed.topicMatchedProductIds : null,
+      topicSearchTerm: typeof parsed.topicSearchTerm === "string" ? parsed.topicSearchTerm : null,
       blocks: Array.isArray(parsed.blocks) ? parsed.blocks : [],
     };
   } catch {
@@ -170,6 +183,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   const [topicMatchedProductIds, setTopicMatchedProductIds] = useState<string[] | null>(
     () => loadPersistedState().topicMatchedProductIds,
   );
+  const [topicSearchTerm, setTopicSearchTerm] = useState<string | null>(
+    () => loadPersistedState().topicSearchTerm,
+  );
   const [blocks, setBlocks] = useState<NewsletterBlock[]>(() => loadPersistedState().blocks);
 
   function toggleProduct(id: string) {
@@ -198,6 +214,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       newResult: GeneratedNewsletter | null,
       presetBlocks?: NewsletterBlock[],
       matchedProductIds?: string[],
+      newTopicSearchTerm?: string,
     ) => {
       setResultState(newResult);
       // Sat af generate-newsletter/route.ts, kun ved emne-søgning – HELE det
@@ -206,6 +223,10 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       // tilbyde hele udvalget). Nulstilles ved almindeligt manuelt
       // produktvalg (matchedProductIds er da undefined).
       setTopicMatchedProductIds(matchedProductIds ?? null);
+      // Samme mønster som topicMatchedProductIds ovenfor, men selve
+      // emne-ordet – bruges af resolveCtaLink()'s søgeside-fallback (se
+      // ctaLink.ts), uafhængigt af Emne-feltets egen, løbende værdi (`topic`).
+      setTopicSearchTerm(newTopicSearchTerm ?? null);
       if (!newResult) {
         setBlocks([]);
         return;
@@ -266,6 +287,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         selectedTemplateId,
         result,
         topicMatchedProductIds,
+        topicSearchTerm,
         blocks,
       };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -281,6 +303,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
     selectedTemplateId,
     result,
     topicMatchedProductIds,
+    topicSearchTerm,
     blocks,
   ]);
 
@@ -301,6 +324,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       setSelectedTemplateId,
       result,
       topicMatchedProductIds,
+      topicSearchTerm,
       setResult,
       blocks,
       setBlocks,
@@ -314,6 +338,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       selectedTemplateId,
       result,
       topicMatchedProductIds,
+      topicSearchTerm,
       blocks,
       setResult,
     ],
