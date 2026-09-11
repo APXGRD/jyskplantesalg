@@ -56,6 +56,9 @@ const PRODUCTS_QUERY = `
               }
             }
           }
+          metafield(namespace: "custom", key: "planteform") {
+            value
+          }
         }
       }
       pageInfo {
@@ -81,6 +84,13 @@ interface ShopifyProductNode {
   // fangst-alt-collection som "Alle Planter", se undersøgelsen forud for denne
   // ændring). Tom liste, hvis produktet ikke er medlem af nogen collection.
   collections: { edges: { node: { handle: string; title: string } }[] };
+  // Planteformen (Multistammet, Søjleformet, Tagklippet osv.) – bekræftet
+  // ved en forudgående undersøgelse til IKKE at findes i productType/tags,
+  // men i dette strukturerede metafelt (namespace "custom", key
+  // "planteform"), sat konsekvent af Jysk Plantesalg selv og formentlig det
+  // samme felt, der driver deres eget "Planteform"-filter på
+  // jyskplantesalg.dk. null, hvis metafeltet ikke er sat på produktet.
+  metafield: { value: string } | null;
 }
 
 interface ProductsQueryResponse {
@@ -128,6 +138,13 @@ function mapProductNode(node: ShopifyProductNode, shop: string): ShopifyProduct 
   const collectionHandle = primaryCollection?.handle ?? null;
   const collectionUrl = collectionHandle ? `https://${shop}/collections/${collectionHandle}` : null;
 
+  // Håndteres pænt, hvis metafeltet mangler (null) eller er sat til en tom
+  // streng – begge tælles som "ingen planteform sat", selvom en tidligere
+  // stikprøve viste 100% dækning; det er IKKE bekræftet for samtlige
+  // produkter i det fulde katalog.
+  const rawPlantForm = node.metafield?.value?.trim();
+  const plantForm = rawPlantForm && rawPlantForm.length > 0 ? rawPlantForm : null;
+
   return {
     id: node.id,
     title: node.title,
@@ -139,6 +156,7 @@ function mapProductNode(node: ShopifyProductNode, shop: string): ShopifyProduct 
     hasImage: imageUrl.length > 0,
     collectionHandle,
     collectionUrl,
+    plantForm,
   };
 }
 

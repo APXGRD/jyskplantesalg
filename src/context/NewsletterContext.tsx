@@ -52,6 +52,27 @@ interface NewsletterContextValue {
   // generate-newsletter/route.ts og searchCachedProductsByTopic.
   topicOnlyWithImage: boolean;
   setTopicOnlyWithImage: (value: boolean) => void;
+  // Valgfrit prisinterval-filter ("Min. pris"/"Maks. pris") ved siden af
+  // "Kun med billede"-kontakten – gemt som RÅ, redigerbar tekst (samme
+  // mønster som instructions ovenfor), ikke som tal, så et tomt felt/en
+  // ufuldstændig indtastning ikke kræver særskilt håndtering her. Tom streng
+  // betyder "intet filter på den grænse" – parses til et tal først lige før
+  // afsendelse (se OpsaetningClient.tsx og generate-newsletter/route.ts).
+  // Begge er uafhængige af hinanden: kun min ELLER kun maks udfyldt filtrerer
+  // kun på den ene grænse.
+  topicMinPrice: string;
+  setTopicMinPrice: (value: string) => void;
+  topicMaxPrice: string;
+  setTopicMaxPrice: (value: string) => void;
+  // Valgfrit planteform-filter ("Planteform"-dropdownen) ved siden af "Kun
+  // med billede"-kontakten – tom streng betyder "Alle planteformer" (intet
+  // filter). Værdien er produktets EGEN custom.planteform-metafeltværdi (fra
+  // getCachedPlantForms), ikke en fast, hardcodet liste. Et tidligere,
+  // separat product_type-baseret "Plantesort"-filter er fjernet igen –
+  // product_type indgår fortsat i selve fritekstsøgningen, blot ikke som
+  // struktureret dropdown-filter.
+  topicPlantForm: string;
+  setTopicPlantForm: (value: string) => void;
   // Den valgte skabelon på Opsætnings-siden – null betyder "Standard layout"
   // (nuværende, faste blok-struktur). Selve skabelonens indhold hentes ikke
   // her, kun id'et, som sendes med til generate-newsletter/route.ts.
@@ -105,6 +126,9 @@ interface PersistedState {
   customerType: CustomerType;
   instructions: string;
   topicOnlyWithImage: boolean;
+  topicMinPrice: string;
+  topicMaxPrice: string;
+  topicPlantForm: string;
   selectedTemplateId: string | null;
   result: GeneratedNewsletter | null;
   topicMatchedProductIds: string[] | null;
@@ -117,6 +141,9 @@ const DEFAULT_PERSISTED_STATE: PersistedState = {
   customerType: "privat",
   instructions: "",
   topicOnlyWithImage: false,
+  topicMinPrice: "",
+  topicMaxPrice: "",
+  topicPlantForm: "",
   selectedTemplateId: null,
   result: null,
   topicMatchedProductIds: null,
@@ -145,6 +172,9 @@ function loadPersistedState(): PersistedState {
       customerType: parsed.customerType === "erhverv" ? "erhverv" : "privat",
       instructions: typeof parsed.instructions === "string" ? parsed.instructions : "",
       topicOnlyWithImage: typeof parsed.topicOnlyWithImage === "boolean" ? parsed.topicOnlyWithImage : false,
+      topicMinPrice: typeof parsed.topicMinPrice === "string" ? parsed.topicMinPrice : "",
+      topicMaxPrice: typeof parsed.topicMaxPrice === "string" ? parsed.topicMaxPrice : "",
+      topicPlantForm: typeof parsed.topicPlantForm === "string" ? parsed.topicPlantForm : "",
       selectedTemplateId: typeof parsed.selectedTemplateId === "string" ? parsed.selectedTemplateId : null,
       result: parsed.result ?? null,
       topicMatchedProductIds: Array.isArray(parsed.topicMatchedProductIds) ? parsed.topicMatchedProductIds : null,
@@ -175,6 +205,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   const [topicOnlyWithImage, setTopicOnlyWithImage] = useState(
     () => loadPersistedState().topicOnlyWithImage,
   );
+  const [topicMinPrice, setTopicMinPrice] = useState(() => loadPersistedState().topicMinPrice);
+  const [topicMaxPrice, setTopicMaxPrice] = useState(() => loadPersistedState().topicMaxPrice);
+  const [topicPlantForm, setTopicPlantForm] = useState(() => loadPersistedState().topicPlantForm);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     () => loadPersistedState().selectedTemplateId,
   );
@@ -278,6 +311,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         customerType,
         instructions,
         topicOnlyWithImage,
+        topicMinPrice,
+        topicMaxPrice,
+        topicPlantForm,
         selectedTemplateId,
         result,
         topicMatchedProductIds,
@@ -293,6 +329,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
     customerType,
     instructions,
     topicOnlyWithImage,
+    topicMinPrice,
+    topicMaxPrice,
+    topicPlantForm,
     selectedTemplateId,
     result,
     topicMatchedProductIds,
@@ -311,6 +350,12 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       setInstructions,
       topicOnlyWithImage,
       setTopicOnlyWithImage,
+      topicMinPrice,
+      setTopicMinPrice,
+      topicMaxPrice,
+      setTopicMaxPrice,
+      topicPlantForm,
+      setTopicPlantForm,
       selectedTemplateId,
       setSelectedTemplateId,
       result,
@@ -325,6 +370,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       customerType,
       instructions,
       topicOnlyWithImage,
+      topicMinPrice,
+      topicMaxPrice,
+      topicPlantForm,
       selectedTemplateId,
       result,
       topicMatchedProductIds,
