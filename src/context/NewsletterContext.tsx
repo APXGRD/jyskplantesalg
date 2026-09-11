@@ -31,20 +31,21 @@ interface NewsletterContextValue {
   toggleProduct: (id: string) => void;
   customerType: CustomerType;
   setCustomerType: (type: CustomerType) => void;
+  // Opsætnings-sidens ENE samlede tekstfelt ("Beskriv dit nyhedsbrev") –
+  // bruges ALTID som AI'ens tone-instruks, og DESUDEN som fritekst-
+  // søgeord for at finde produkter automatisk, men KUN når intet produkt er
+  // manuelt valgt på "Vælg produkter"-siden (selectedProductIds er da tom) –
+  // se den kontekstafhængige logik i generate-newsletter/route.ts. Hed
+  // tidligere to adskilte felter ("Emne" og "Yderligere instrukser"),
+  // konsolideret til ét.
   instructions: string;
   setInstructions: (text: string) => void;
-  // Fritekst-emne fra det nye "Emne (valgfrit)"-felt på Opsætnings-siden –
-  // ADSKILT fra "instructions". Udfyldt betyder "find produkter automatisk
-  // via tekstsøgning" i stedet for de manuelt valgte produkter på "Vælg
-  // produkter"-siden (selectedProductIds ovenfor RØRES bevidst ikke af
-  // dette – de to flows er sideordnede, ikke sammenblandede).
-  topic: string;
-  setTopic: (text: string) => void;
-  // "Kun med billede"-kontakten ved siden af Emne-feltet – samme
+  // "Kun med billede"-kontakten ved siden af det samlede felt – samme
   // komponent/stil som "Vælg produkter"-sidens tilsvarende filter (se
   // OnlyWithImageCheckbox.tsx). Default false, så eksisterende opførsel
   // (alle matchende produkter, uanset billede) forbliver uændret, medmindre
-  // brugeren aktivt slår den til. Gemt sammen med topic, se
+  // brugeren aktivt slår den til. Kun relevant, når feltet reelt bruges til
+  // søgning (se instructions ovenfor) – gemt sammen med den, se
   // generate-newsletter/route.ts og searchCachedProductsByTopic.
   topicOnlyWithImage: boolean;
   setTopicOnlyWithImage: (value: boolean) => void;
@@ -61,14 +62,15 @@ interface NewsletterContextValue {
   // galleri-blok-kontroller (EditorBlockList.tsx) til at tilbyde hele
   // emne-udvalget som vælgbare produkter, ikke kun det oprindeligt viste.
   topicMatchedProductIds: string[] | null;
-  // Det oprindelige emne-ord (fra Opsætnings-siden), der producerede det
-  // NUVÆRENDE resultat – null ved almindeligt manuelt produktvalg. ADSKILT
-  // fra `topic` ovenfor (som er selve Emne-FELTETS løbende, redigerbare
-  // værdi) – topicSearchTerm ændrer sig KUN ved en ny generering, så den
-  // forbliver korrekt knyttet til det aktuelle resultat, selv hvis brugeren
-  // bagefter navigerer til Opsætning og redigerer Emne-feltet uden at
-  // generere igen. Bruges af EditorBlockList.tsx til at genberegne
-  // resolveCtaLink()'s søgeside-fallback client-side (se ctaLink.ts).
+  // Den oprindelige feltværdi (fra Opsætnings-siden), der producerede det
+  // NUVÆRENDE resultat SOM søgeord – null, hvis resultatet i stedet stammer
+  // fra manuelt produktvalg. ADSKILT fra `instructions` ovenfor (som er
+  // selve feltets løbende, redigerbare værdi) – topicSearchTerm ændrer sig
+  // KUN ved en ny generering, så den forbliver korrekt knyttet til det
+  // aktuelle resultat, selv hvis brugeren bagefter navigerer til Opsætning
+  // og redigerer feltet uden at generere igen. Bruges af EditorBlockList.tsx
+  // til at genberegne resolveCtaLink()'s søgeside-fallback client-side (se
+  // ctaLink.ts).
   topicSearchTerm: string | null;
   // `presetBlocks`, hvis givet, bruges DIREKTE som blocks-listen i stedet for
   // at blive bygget her via createDefaultBlocks – det er sådan
@@ -101,7 +103,6 @@ interface PersistedState {
   selectedProductIds: string[];
   customerType: CustomerType;
   instructions: string;
-  topic: string;
   topicOnlyWithImage: boolean;
   selectedTemplateId: string | null;
   result: GeneratedNewsletter | null;
@@ -114,7 +115,6 @@ const DEFAULT_PERSISTED_STATE: PersistedState = {
   selectedProductIds: [],
   customerType: "privat",
   instructions: "",
-  topic: "",
   topicOnlyWithImage: false,
   selectedTemplateId: null,
   result: null,
@@ -143,7 +143,6 @@ function loadPersistedState(): PersistedState {
       selectedProductIds: Array.isArray(parsed.selectedProductIds) ? parsed.selectedProductIds : [],
       customerType: parsed.customerType === "erhverv" ? "erhverv" : "privat",
       instructions: typeof parsed.instructions === "string" ? parsed.instructions : "",
-      topic: typeof parsed.topic === "string" ? parsed.topic : "",
       topicOnlyWithImage: typeof parsed.topicOnlyWithImage === "boolean" ? parsed.topicOnlyWithImage : false,
       selectedTemplateId: typeof parsed.selectedTemplateId === "string" ? parsed.selectedTemplateId : null,
       result: parsed.result ?? null,
@@ -172,7 +171,6 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   );
   const [customerType, setCustomerType] = useState<CustomerType>(() => loadPersistedState().customerType);
   const [instructions, setInstructions] = useState(() => loadPersistedState().instructions);
-  const [topic, setTopic] = useState(() => loadPersistedState().topic);
   const [topicOnlyWithImage, setTopicOnlyWithImage] = useState(
     () => loadPersistedState().topicOnlyWithImage,
   );
@@ -224,8 +222,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       // produktvalg (matchedProductIds er da undefined).
       setTopicMatchedProductIds(matchedProductIds ?? null);
       // Samme mønster som topicMatchedProductIds ovenfor, men selve
-      // emne-ordet – bruges af resolveCtaLink()'s søgeside-fallback (se
-      // ctaLink.ts), uafhængigt af Emne-feltets egen, løbende værdi (`topic`).
+      // søgeordet – bruges af resolveCtaLink()'s søgeside-fallback (se
+      // ctaLink.ts), uafhængigt af det samlede felts egen, løbende værdi
+      // (`instructions`).
       setTopicSearchTerm(newTopicSearchTerm ?? null);
       if (!newResult) {
         setBlocks([]);
@@ -282,7 +281,6 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         selectedProductIds,
         customerType,
         instructions,
-        topic,
         topicOnlyWithImage,
         selectedTemplateId,
         result,
@@ -298,7 +296,6 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
     selectedProductIds,
     customerType,
     instructions,
-    topic,
     topicOnlyWithImage,
     selectedTemplateId,
     result,
@@ -316,8 +313,6 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       setCustomerType,
       instructions,
       setInstructions,
-      topic,
-      setTopic,
       topicOnlyWithImage,
       setTopicOnlyWithImage,
       selectedTemplateId,
@@ -334,7 +329,6 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       customerType,
       instructions,
       topicOnlyWithImage,
-      topic,
       selectedTemplateId,
       result,
       topicMatchedProductIds,

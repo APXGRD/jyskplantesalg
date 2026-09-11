@@ -9,6 +9,7 @@
 
 import { getSupabaseClient } from "@/lib/supabase";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import { extractSearchWordCandidates, normalizeWord } from "@/lib/searchWords";
 
 // PostgREST begrænser som standard ét enkelt select-svar til 1000 rækker
 // (db-max-rows), uanset det faktiske antal rækker i tabellen – uden denne
@@ -92,63 +93,82 @@ export async function getCachedProducts(): Promise<CachedProductsResult> {
   return { products, syncedAt };
 }
 
-// Danske "fyld-ord" – relevante for sætningsstrukturen ("lav en nyhedsbrev
-// omkring ahorn"), ikke for selve søgningen. Fjernes fra emne-teksten, FØR
-// den splittes op og bruges til matchning i searchCachedProductsByTopic
-// herunder, så en hel, naturlig sætning giver samme resultat som en ren
-// søgning på blot det/de meningsfulde ord ("ahorn").
-const DANISH_STOP_WORDS = new Set([
-  "lav",
-  "en",
-  "et",
-  "om",
-  "omkring",
-  "vores",
-  "nyhedsbrev",
-  "til",
-  "for",
-  "med",
-  "og",
-  "på",
-  "i",
-  "den",
-  "det",
-  "de",
-  "skriv",
-  "generer",
-]);
-
 // Simpel, DETERMINISTISK tekstsøgning (ingen AI involveret) – bruges af
-// generate-newsletter/route.ts, når "Emne"-feltet på Opsætnings-siden er
-// udfyldt, i stedet for at slå manuelt valgte produkt-id'er op. Understøtter
+// generate-newsletter/route.ts, når Opsætnings-sidens samlede felt
+// ("Beskriv dit nyhedsbrev") er udfyldt OG intet produkt er manuelt valgt,
+// i stedet for at slå manuelt valgte produkt-id'er op. Understøtter
 // en hel, naturlig sætning: splitter emne-teksten op i enkeltord, fjerner
 // danske fyld-ord (DANISH_STOP_WORDS), og matcher et produkt, hvis dets
 // title, productType ELLER tags indeholder MINDST ÉT af de resterende,
-// meningsfulde ord som delstreng – case-insensitivt. Ingen grænse på antal
-// matches; læser fra den samme cache som al anden produkt-hentning (ingen
-// Shopify-kald).
+// meningsfulde ord (efter samme bøjnings-normalisering, se normalizeWord)
+// som delstreng – case-insensitivt. Ingen grænse på antal matches; læser fra
+// den samme cache som al anden produkt-hentning (ingen Shopify-kald).
 //
 // onlyWithImage (default false, samme "Kun med billede"-kontakt som på
 // Opsætnings-siden) lægger et EKSTRA filter OVENPÅ ord-matchningen – ikke i
 // stedet for den – så kun produkter med hasImage === true medtages, når
 // slået til.
+
+// Splitter en fritekst op i enkeltord (samme regel som selve søgeteksten
+// splittes med) og normaliserer hvert ord for sig (normalizeWord, se
+// searchWords.ts) – bruges til at bryde title/productType/tags op i
+// sammenlignelige enkeltord, i stedet for at sammenligne mod HELE strengen
+// som ét stykke (en endelse midt i en flerords-titel, fx "Ahorn" i "Japansk
+// Ahorn", kan ellers ikke normaliseres korrekt for sig selv).
+function tokenizeAndNormalize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length > 0)
+    .map(normalizeWord);
+}
+
+export interface TopicSearchResult {
+  products: ShopifyProduct[];
+  // De ORIGINALE (u-normaliserede) søgeord, der rent faktisk gav mindst ét
+  // matchende produkt – IKKE blot alle ord, der overlevede stopords-
+  // filtreringen uden selv at blive bekræftet. Fx "ahorns" (skrevet sådan i
+  // feltet) rapporteres som "ahorns" her, ikke den normaliserede "ahorn",
+  // som selve matchningen internt sammenlignede med. Bruges af
+  // generate-newsletter/route.ts til at bygge CTA-knappens søgeside-
+  // fallback-link (se resolveCtaLink i ctaLink.ts) ud fra kun de ord, der
+  // faktisk gav resultat – et ord som "pæn", der overlevede stopords-
+  // filtreringen men ikke matchede noget produkt, skal IKKE ende i linket.
+  matchedWords: string[];
+}
+
 export async function searchCachedProductsByTopic(
   topic: string,
   onlyWithImage = false,
-): Promise<ShopifyProduct[]> {
-  const words = topic
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((word) => word.length > 0 && !DANISH_STOP_WORDS.has(word));
+): Promise<TopicSearchResult> {
+  const candidates = extractSearchWordCandidates(topic);
 
-  if (words.length === 0) return [];
+  if (candidates.length === 0) return { products: [], matchedWords: [] };
 
   const { products } = await getCachedProducts();
-  return products.filter((product) => {
-    if (onlyWithImage && !product.hasImage) return false;
-    const title = product.title.toLowerCase();
-    const productType = product.productType.toLowerCase();
-    const tags = product.tags.map((tag) => tag.toLowerCase());
-    return words.some((word) => title.includes(word) || productType.includes(word) || tags.some((tag) => tag.includes(word)));
-  });
+  const matchedProducts: ShopifyProduct[] = [];
+  const matchedWords = new Set<string>();
+
+  for (const product of products) {
+    if (onlyWithImage && !product.hasImage) continue;
+    const titleWords = tokenizeAndNormalize(product.title);
+    const productTypeWords = tokenizeAndNormalize(product.productType);
+    const tagWords = product.tags.flatMap(tokenizeAndNormalize);
+    const haystack = [...titleWords, ...productTypeWords, ...tagWords];
+
+    // Afprøver ALLE kandidat-ord mod dette produkt (ikke kun det første, der
+    // matcher) – et andet produkt kunne ellers være den ENESTE bekræftelse
+    // for et senere kandidat-ord, som aldrig ville blive tjekket, hvis
+    // løkken stoppede ved produktets første træf.
+    let productMatched = false;
+    for (const candidate of candidates) {
+      if (haystack.some((haystackWord) => haystackWord.includes(candidate.normalized))) {
+        productMatched = true;
+        matchedWords.add(candidate.original);
+      }
+    }
+    if (productMatched) matchedProducts.push(product);
+  }
+
+  return { products: matchedProducts, matchedWords: [...matchedWords] };
 }

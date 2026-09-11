@@ -23,8 +23,6 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
     setCustomerType,
     instructions,
     setInstructions,
-    topic,
-    setTopic,
     topicOnlyWithImage,
     setTopicOnlyWithImage,
     selectedTemplateId,
@@ -39,10 +37,12 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
   const [templates] = useState<TemplateSummary[]>(initialTemplates);
 
   const hasSelectedProducts = selectedProductIds.length > 0;
-  const hasTopic = topic.trim().length > 0;
-  // Emne-søgning er et ALTERNATIVT, sideordnet flow til manuelt produktvalg
-  // (se generate-newsletter/route.ts) – enten er nok til at kunne generere.
-  const canGenerate = hasSelectedProducts || hasTopic;
+  const hasInstructions = instructions.trim().length > 0;
+  // Fritekst-søgning (feltet bruges da BÅDE til at finde produkter OG som
+  // AI'ens tone-instruks, se generate-newsletter/route.ts) er et
+  // ALTERNATIVT, sideordnet flow til manuelt produktvalg – enten er nok til
+  // at kunne generere.
+  const canGenerate = hasSelectedProducts || hasInstructions;
 
   async function handleGenerate() {
     if (!canGenerate || isGenerating) {
@@ -61,7 +61,6 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
           customerType,
           instructions: instructions.trim() || undefined,
           templateId: selectedTemplateId,
-          topic: topic.trim() || undefined,
           topicOnlyWithImage,
         }),
       });
@@ -148,37 +147,21 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
             </section>
 
             <section className="pt-8">
-              <p className="text-xs font-semibold tracking-wide text-ink uppercase">Emne (valgfrit)</p>
+              <p className="text-xs font-semibold tracking-wide text-ink uppercase">Beskriv dit nyhedsbrev</p>
               <p className="pt-1.5 pb-3 text-xs text-ink-faint">
-                Alternativ til manuelt produktvalg – find automatisk alle matchende produkter ud fra en
-                fritekst-søgning, i stedet for de valgte produkter på forrige side
+                Bruges altid til at tilpasse AI-tekstens tone, fokus og indhold. Er der ikke valgt nogen
+                produkter på forrige side, bruges teksten OGSÅ til automatisk at finde matchende produkter
               </p>
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={topic}
-                  onChange={(event) => setTopic(event.target.value)}
-                  placeholder="F.eks. 'ahorn' – find automatisk alle matchende produkter"
-                  className="flex-1 rounded-xl border border-border bg-white px-4 py-3 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
+              <div className="flex items-start gap-3">
+                <textarea
+                  value={instructions}
+                  onChange={(event) => setInstructions(event.target.value)}
+                  placeholder="F.eks. 'Lav et nyhedsbrev i en professionel tone til vores erhvervskunder om vores blommetræer'"
+                  rows={5}
+                  className="flex-1 resize-none rounded-xl border border-border bg-white px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
                 />
                 <OnlyWithImageCheckbox checked={topicOnlyWithImage} onChange={setTopicOnlyWithImage} />
               </div>
-            </section>
-
-            <section className="pt-8">
-              <p className="text-xs font-semibold tracking-wide text-ink uppercase">
-                Yderligere instrukser
-              </p>
-              <p className="pt-1.5 pb-3 text-xs text-ink-faint">
-                Valgfrit – tilpas AI-tekstens tone, fokus og indhold
-              </p>
-              <textarea
-                value={instructions}
-                onChange={(event) => setInstructions(event.target.value)}
-                placeholder="F.eks. 'Skriv i en vidende, professionel tone – og fremhæv gerne plantens robusthed og kvalitet'"
-                rows={5}
-                className="w-full resize-none rounded-xl border border-border bg-white px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
-              />
             </section>
 
             {error && <p className="pt-4 text-sm text-red-600">{error}</p>}
@@ -199,8 +182,8 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
               </button>
               {!canGenerate && (
                 <p className="pt-2 text-xs text-ink-faint">
-                  Vælg mindst ét produkt på forrige side, eller angiv et emne ovenfor, før du kan generere
-                  nyhedsbrevet.
+                  Vælg mindst ét produkt på forrige side, eller beskriv dit nyhedsbrev ovenfor, før du kan
+                  generere nyhedsbrevet.
                 </p>
               )}
             </div>
