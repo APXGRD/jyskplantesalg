@@ -167,7 +167,7 @@ export function ProduktvaelgerClient({
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar active="products" />
+      <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface">
         <PageHeader

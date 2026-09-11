@@ -26,18 +26,21 @@ export interface GeneratedNewsletter {
 }
 
 interface NewsletterContextValue {
+  // Bruges IKKE længere til at generere et nyhedsbrev (se generate-
+  // newsletter/route.ts, som udelukkende bruger instructions/fritekst-søgning
+  // nu) – kun af den nu nav-løse, men stadig eksisterende /produkter-side
+  // (ProduktvaelgerClient.tsx), som en helt separat, uafhængig
+  // katalog-browsing-/synkroniserings-funktion.
   selectedProductIds: string[];
   setSelectedProductIds: Dispatch<SetStateAction<string[]>>;
   toggleProduct: (id: string) => void;
   customerType: CustomerType;
   setCustomerType: (type: CustomerType) => void;
-  // Opsætnings-sidens ENE samlede tekstfelt ("Beskriv dit nyhedsbrev") –
-  // bruges ALTID som AI'ens tone-instruks, og DESUDEN som fritekst-
-  // søgeord for at finde produkter automatisk, men KUN når intet produkt er
-  // manuelt valgt på "Vælg produkter"-siden (selectedProductIds er da tom) –
-  // se den kontekstafhængige logik i generate-newsletter/route.ts. Hed
-  // tidligere to adskilte felter ("Emne" og "Yderligere instrukser"),
-  // konsolideret til ét.
+  // Opsætnings-sidens ENE samlede tekstfelt ("Beskriv dit nyhedsbrev") – den
+  // ENESTE vej til at generere et nyhedsbrev. Bruges ALTID BÅDE som AI'ens
+  // tone-instruks OG som fritekst-søgeord for automatisk at finde produkter
+  // (se generate-newsletter/route.ts). Hed tidligere to adskilte felter
+  // ("Emne" og "Yderligere instrukser"), konsolideret til ét.
   instructions: string;
   setInstructions: (text: string) => void;
   // "Kun med billede"-kontakten ved siden af det samlede felt – samme
@@ -55,31 +58,29 @@ interface NewsletterContextValue {
   selectedTemplateId: string | null;
   setSelectedTemplateId: Dispatch<SetStateAction<string | null>>;
   result: GeneratedNewsletter | null;
-  // HELE det matchede produkt-sæt fra den SENESTE emne-søgnings-baserede
-  // generering (ikke kun det ene produkt, billede-blokken endte med at
-  // vise) – null, hvis det aktuelle resultat/blocks i stedet stammer fra
-  // almindeligt manuelt produktvalg. Bruges af Edit-mode's billede-/
+  // HELE det matchede produkt-sæt fra den seneste generering (ikke kun det
+  // ene produkt, billede-blokken endte med at vise) – null, hvis intet
+  // nyhedsbrev er genereret endnu. Bruges af Edit-mode's billede-/
   // galleri-blok-kontroller (EditorBlockList.tsx) til at tilbyde hele
-  // emne-udvalget som vælgbare produkter, ikke kun det oprindeligt viste.
+  // søgnings-udvalget som vælgbare produkter, ikke kun det oprindeligt viste.
   topicMatchedProductIds: string[] | null;
-  // Den oprindelige feltværdi (fra Opsætnings-siden), der producerede det
-  // NUVÆRENDE resultat SOM søgeord – null, hvis resultatet i stedet stammer
-  // fra manuelt produktvalg. ADSKILT fra `instructions` ovenfor (som er
-  // selve feltets løbende, redigerbare værdi) – topicSearchTerm ændrer sig
-  // KUN ved en ny generering, så den forbliver korrekt knyttet til det
-  // aktuelle resultat, selv hvis brugeren bagefter navigerer til Opsætning
-  // og redigerer feltet uden at generere igen. Bruges af EditorBlockList.tsx
-  // til at genberegne resolveCtaLink()'s søgeside-fallback client-side (se
+  // De(t) bekræftet-matchende søgeord (fra Opsætnings-sidens samlede felt),
+  // der producerede det NUVÆRENDE resultat – null, hvis intet nyhedsbrev er
+  // genereret endnu. ADSKILT fra `instructions` ovenfor (som er selve
+  // feltets løbende, redigerbare værdi) – topicSearchTerm ændrer sig KUN ved
+  // en ny generering, så den forbliver korrekt knyttet til det aktuelle
+  // resultat, selv hvis brugeren bagefter navigerer til Opsætning og
+  // redigerer feltet uden at generere igen. Bruges af EditorBlockList.tsx til
+  // at genberegne resolveCtaLink()'s søgeside-fallback client-side (se
   // ctaLink.ts).
   topicSearchTerm: string | null;
   // `presetBlocks`, hvis givet, bruges DIREKTE som blocks-listen i stedet for
   // at blive bygget her via createDefaultBlocks – det er sådan
   // skabelon-baseret generering fungerer, da generate-newsletter/route.ts i
   // så fald allerede har bygget den fulde blocks-liste server-side (se
-  // opsaetning/page.tsx). `matchedProductIds`/`topicSearchTerm`, hvis givet,
-  // stammer fra samme emne-søgning (se generate-newsletter/route.ts) –
-  // sættes som topicMatchedProductIds/topicSearchTerm; udelades de,
-  // nulstilles begge (almindeligt manuelt produktvalg).
+  // opsaetning/page.tsx). `matchedProductIds`/`topicSearchTerm` stammer fra
+  // samme søgning (se generate-newsletter/route.ts) og sættes som
+  // topicMatchedProductIds/topicSearchTerm.
   setResult: (
     result: GeneratedNewsletter | null,
     presetBlocks?: NewsletterBlock[],
@@ -215,16 +216,16 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       newTopicSearchTerm?: string,
     ) => {
       setResultState(newResult);
-      // Sat af generate-newsletter/route.ts, kun ved emne-søgning – HELE det
-      // matchede sæt, ikke kun det ene produkt, billede-blokken viser (se
-      // Edit-mode's billede-/galleri-blok-kontroller, som bruger denne til at
-      // tilbyde hele udvalget). Nulstilles ved almindeligt manuelt
-      // produktvalg (matchedProductIds er da undefined).
+      // Sat af generate-newsletter/route.ts – enhver generering er nu en
+      // fritekst-søgning, så matchedProductIds er altid HELE det matchede
+      // sæt, ikke kun det ene produkt, billede-blokken viser (se Edit-mode's
+      // billede-/galleri-blok-kontroller, som bruger denne til at tilbyde
+      // hele udvalget).
       setTopicMatchedProductIds(matchedProductIds ?? null);
-      // Samme mønster som topicMatchedProductIds ovenfor, men selve
-      // søgeordet – bruges af resolveCtaLink()'s søgeside-fallback (se
-      // ctaLink.ts), uafhængigt af det samlede felts egen, løbende værdi
-      // (`instructions`).
+      // Samme mønster som topicMatchedProductIds ovenfor, men de(t)
+      // bekræftet-matchende søgeord – bruges af resolveCtaLink()'s
+      // søgeside-fallback (se ctaLink.ts), uafhængigt af det samlede felts
+      // egen, løbende værdi (`instructions`).
       setTopicSearchTerm(newTopicSearchTerm ?? null);
       if (!newResult) {
         setBlocks([]);
@@ -236,29 +237,24 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       }
       let selectedProducts: ShopifyProduct[] = [];
       try {
-        // Læser fra den lokale Supabase-cache (samme som "Vælg produkter"-
-        // siden), IKKE det direkte, fuldt paginerede /api/shopify/products –
-        // det sidste kan tage 20-30+ sekunder ved 900+ produkter, og blev
-        // desuden allerede kaldt/vist på "Vælg produkter"-siden. At kalde det
-        // IGEN her (og en tredje gang på selve Preview-siden) var den
-        // væsentligste kilde til en langsomt opfattet app.
+        // Læser fra den lokale Supabase-cache, IKKE det direkte, fuldt
+        // paginerede /api/shopify/products – det sidste kan tage 20-30+
+        // sekunder ved 900+ produkter. At kalde det igen her (og en tredje
+        // gang på selve Preview-siden) var den væsentligste kilde til en
+        // langsomt opfattet app.
         const response = await fetch("/api/products/cached");
         const data = await response.json();
         const allProducts: ShopifyProduct[] = response.ok ? data.products : [];
-        if (matchedProductIds) {
-          // Emne-søgning: ÉT repræsentativt produkt til billede-blokken –
-          // generate-newsletter/route.ts har allerede sat
-          // newResult.image.productId til dette produkt, så
-          // createDefaultBlocks's egen opslagslogik finder det korrekt her.
-          // IKKE automatisk et galleri, selvom mange produkter matchede
-          // emnet – kun ÉT element i selectedProducts sikrer det.
-          const matchedProducts = allProducts.filter((product) => matchedProductIds.includes(product.id));
-          const representative =
-            matchedProducts.find((product) => product.id === newResult.image.productId) ?? matchedProducts[0];
-          selectedProducts = representative ? [representative] : [];
-        } else {
-          selectedProducts = allProducts.filter((product) => selectedProductIds.includes(product.id));
-        }
+        // ÉT repræsentativt produkt til billede-blokken – generate-
+        // newsletter/route.ts har allerede sat newResult.image.productId
+        // til dette produkt, så createDefaultBlocks's egen opslagslogik
+        // finder det korrekt her. IKKE automatisk et galleri, selvom mange
+        // produkter matchede søgningen – kun ÉT element i selectedProducts
+        // sikrer det.
+        const matchedProducts = allProducts.filter((product) => (matchedProductIds ?? []).includes(product.id));
+        const representative =
+          matchedProducts.find((product) => product.id === newResult.image.productId) ?? matchedProducts[0];
+        selectedProducts = representative ? [representative] : [];
       } catch {
         // Ignoreres bevidst – se kommentaren ovenfor.
       }
@@ -269,7 +265,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         }),
       );
     },
-    [selectedProductIds, customerType, brand.colors, brand.primaryFont],
+    [customerType, brand.colors, brand.primaryFont],
   );
 
   // Gemmer HELE udkastet til localStorage, hver gang noget i det ændrer sig.
