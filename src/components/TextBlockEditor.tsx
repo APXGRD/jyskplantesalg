@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FocusEvent } from "react";
+import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
@@ -97,6 +97,26 @@ export function TextBlockEditor({
     },
     [],
   );
+
+  // `useEditor`'s `content` (ovenfor) sættes KUN ved selve mount – Tiptap
+  // synkroniserer IKKE efterfølgende prop-ændringer af sig selv. Uden denne
+  // effekt ville en ekstern content-opdatering (fx "Regenerér tekst" i
+  // EditorBlockList.tsx, som opdaterer block.content for et ALLEREDE
+  // monteret blok-id) aldrig blive synlig i selve editoren, selvom
+  // block.content i state rent faktisk er korrekt. `content !== editor.
+  // getHTML()`-tjekket sikrer, at almindelig tastatur-indtastning (som
+  // allerede ruller content tilbage til editorens EGEN getHTML() via
+  // onChange ovenfor) IKKE selv trigger et unødvendigt setContent-kald, der
+  // ville nulstille markørens position midt i skrivning – kun en RIGTIG
+  // ekstern ændring (content ≠ editorens nuværende HTML) synkroniseres.
+  // emitUpdate: false forhindrer dette setContent-kald i selv at udløse
+  // onUpdate (og dermed et cirkulært onChange-kald tilbage).
+  useEffect(() => {
+    if (!editor) return;
+    if (content !== editor.getHTML()) {
+      editor.commands.setContent(content, { emitUpdate: false });
+    }
+  }, [content, editor]);
 
   function applyCommand(run: (chain: ReturnType<NonNullable<typeof editor>["chain"]>) => void) {
     if (!editor) return;
