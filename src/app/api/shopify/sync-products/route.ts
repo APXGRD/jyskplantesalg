@@ -33,6 +33,7 @@ export async function POST() {
       has_image: product.hasImage,
       collection_handle: product.collectionHandle,
       collection_url: product.collectionUrl,
+      plant_form: product.plantForm,
       synced_at: syncedAt,
     }));
 

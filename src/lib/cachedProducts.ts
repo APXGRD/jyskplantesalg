@@ -29,6 +29,7 @@ interface CachedProductRow {
   has_image: boolean;
   collection_handle: string | null;
   collection_url: string | null;
+  plant_form: string | null;
   synced_at: string | null;
 }
 
@@ -41,7 +42,7 @@ async function fetchAllCachedRows(): Promise<CachedProductRow[]> {
     const { data, error } = await supabase
       .from("cached_products")
       .select(
-        "id, title, price, image_url, url, product_type, tags, has_image, collection_handle, collection_url, synced_at",
+        "id, title, price, image_url, url, product_type, tags, has_image, collection_handle, collection_url, plant_form, synced_at",
       )
       .order("title", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
@@ -79,6 +80,7 @@ export async function getCachedProducts(): Promise<CachedProductsResult> {
     hasImage: row.has_image,
     collectionHandle: row.collection_handle,
     collectionUrl: row.collection_url,
+    plantForm: row.plant_form,
   }));
 
   // Alle rækker fra samme synkronisering deler samme synced_at (sat af
@@ -93,6 +95,25 @@ export async function getCachedProducts(): Promise<CachedProductsResult> {
   return { products, syncedAt };
 }
 
+// Alle unikke, ikke-tomme plantForm-værdier (vækstform – Multistammet,
+// Søjleformet, Tagklippet osv., fra Shopifys custom.planteform-metafelt, se
+// fetchProducts.ts) i cachen, alfabetisk sorteret (dansk sortering) – bruges
+// til Opsætnings-sidens "Planteform"-dropdown (se OpsaetningClient.tsx), det
+// ENESTE strukturerede filter på siden (product_type-baserede "Plantesort"-
+// filteret er fjernet igen – product_type indgår fortsat i selve
+// fritekstsøgningen nedenfor, blot ikke længere som separat dropdown).
+// Genbruger getCachedProducts direkte (samme fuldt paginerede cache, ingen
+// separat Supabase-forespørgsel/pagineringslogik at holde synkron med den).
+export async function getCachedPlantForms(): Promise<string[]> {
+  const { products } = await getCachedProducts();
+  const forms = new Set<string>();
+  for (const product of products) {
+    const trimmed = product.plantForm?.trim();
+    if (trimmed) forms.add(trimmed);
+  }
+  return [...forms].sort((a, b) => a.localeCompare(b, "da"));
+}
+
 // Simpel, DETERMINISTISK tekstsøgning (ingen AI involveret) – bruges af
 // generate-newsletter/route.ts, når Opsætnings-sidens samlede felt
 // ("Beskriv dit nyhedsbrev") er udfyldt OG intet produkt er manuelt valgt,
@@ -105,9 +126,10 @@ export async function getCachedProducts(): Promise<CachedProductsResult> {
 // den samme cache som al anden produkt-hentning (ingen Shopify-kald).
 //
 // onlyWithImage (default false, samme "Kun med billede"-kontakt som på
-// Opsætnings-siden) lægger et EKSTRA filter OVENPÅ ord-matchningen – ikke i
-// stedet for den – så kun produkter med hasImage === true medtages, når
-// slået til.
+// Opsætnings-siden) OG minPrice/maxPrice (samme "Min./Maks. pris"-felter)
+// lægger EKSTRA AND-filtre OVENPÅ ord-matchningen – ikke i stedet for den –
+// så kun produkter, der BÅDE matcher mindst ét søgeord OG opfylder disse
+// filtre, medtages.
 
 // Splitter en fritekst op i enkeltord (samme regel som selve søgeteksten
 // splittes med) og normaliserer hvert ord for sig (normalizeWord, se
@@ -137,10 +159,28 @@ export interface TopicSearchResult {
   matchedWords: string[];
 }
 
+// Valgfrit prisinterval (begge grænser inklusive), fra Opsætnings-sidens
+// "Min. pris"/"Maks. pris"-felter ved siden af "Kun med billede"-kontakten –
+// tomt/undefined betyder "intet filter på den grænse". Er kun ÉN af de to
+// udfyldt, filtreres der kun på den ene grænse, som hidtil beskrevet.
+// plantForm (fra "Planteform"-dropdownen) er et EKSAKT match mod
+// product.plantForm, ikke endnu en ord-matchning – undefined/tom streng
+// betyder "intet filter". product_type indgår fortsat i selve
+// ord-matchningen herunder (se tokenizeAndNormalize-brugen), men er IKKE
+// længere et separat, strukturelt AND-filter for sig (det tidligere
+// "Plantesort"-filter er fjernet).
+export interface TopicSearchOptions {
+  onlyWithImage?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
+  plantForm?: string;
+}
+
 export async function searchCachedProductsByTopic(
   topic: string,
-  onlyWithImage = false,
+  options: TopicSearchOptions = {},
 ): Promise<TopicSearchResult> {
+  const { onlyWithImage = false, minPrice, maxPrice, plantForm } = options;
   const candidates = extractSearchWordCandidates(topic);
 
   if (candidates.length === 0) return { products: [], matchedWords: [] };
@@ -151,6 +191,9 @@ export async function searchCachedProductsByTopic(
 
   for (const product of products) {
     if (onlyWithImage && !product.hasImage) continue;
+    if (typeof minPrice === "number" && product.price < minPrice) continue;
+    if (typeof maxPrice === "number" && product.price > maxPrice) continue;
+    if (plantForm && product.plantForm !== plantForm) continue;
     const titleWords = tokenizeAndNormalize(product.title);
     const productTypeWords = tokenizeAndNormalize(product.productType);
     const tagWords = product.tags.flatMap(tokenizeAndNormalize);

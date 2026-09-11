@@ -17,7 +17,13 @@ export interface ShopifyProduct {
   price: number; // kr., inkl. moms
   imageUrl: string;
   url: string;
-  productType: string; // matcher deres kategori-struktur (Multistammet, Tagklippet osv.)
+  // Plante-ARTEN/sorten (fx "Kugleahorn", "Japansk ahorn, rød bladet") – IKKE
+  // vækstformen (se plantForm herunder). Bekræftet ved en undersøgelse af de
+  // rigtige Shopify-data. Indgår i selve fritekstsøgningen (se
+  // tokenizeAndNormalize/searchCachedProductsByTopic i cachedProducts.ts),
+  // men er IKKE længere et separat, struktureret dropdown-filter på
+  // Opsætnings-siden (det tidligere "Plantesort"-filter er fjernet igen).
+  productType: string;
   tags: string[];
   hasImage: boolean;
   // Produktets PRIMÆRE Shopify-collection (den første, collections(first: 1)
@@ -30,6 +36,12 @@ export interface ShopifyProduct {
   // Den fulde, klikbare URL til samme collection (bygget ud fra handle'et
   // ovenfor, se fetchProducts.ts) – null i takt med collectionHandle.
   collectionUrl: string | null;
+  // Vækstformen (Multistammet, Søjleformet, Tagklippet, Opstammet
+  // kugleformet osv.) – IKKE en del af productType/tags, men af Shopifys
+  // strukturerede metafelt custom.planteform (bekræftet ved en forudgående
+  // undersøgelse, se fetchProducts.ts). null, hvis metafeltet ikke er sat.
+  // "Planteform"-filteret på Opsætnings-siden bygger på dette felt.
+  plantForm: string | null;
 }
 
 export const mockShopData = {

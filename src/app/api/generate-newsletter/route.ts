@@ -43,6 +43,22 @@ interface GenerateNewsletterBody {
   // "Kun med billede"-kontakten ved siden af det samlede felt, se
   // searchCachedProductsByTopic.
   topicOnlyWithImage?: boolean;
+  // Valgfrit prisinterval-filter, fra "Min. pris"/"Maks. pris"-felterne ved
+  // siden af "Kun med billede"-kontakten – undefined/manglende betyder
+  // "intet filter på den grænse", se searchCachedProductsByTopic.
+  topicMinPrice?: number;
+  topicMaxPrice?: number;
+  // Valgfrit "Planteform"-filter (vækstform – Multistammet, Søjleformet
+  // osv., fra Shopifys custom.planteform-metafelt) – undefined/tom streng
+  // betyder "Alle" (intet filter), se searchCachedProductsByTopic.
+  topicPlantForm?: string;
+}
+
+// Et tal, hvis værdien reelt ER et brugbart, ikke-negativt tal – ellers
+// undefined, så et ugyldigt/tomt prisfelt roligt behandles som "intet
+// filter på den grænse" i stedet for at fejle hele genereringen.
+function parseOptionalPrice(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
 // Henter skabelonens gemte block_structure fra Supabase. Kastes der en fejl
@@ -87,8 +103,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ugyldig JSON i request body" }, { status: 400 });
   }
 
-  const { customerType, instructions, templateId, topicOnlyWithImage } = body;
+  const {
+    customerType,
+    instructions,
+    templateId,
+    topicOnlyWithImage,
+    topicMinPrice,
+    topicMaxPrice,
+    topicPlantForm,
+  } = body;
   const trimmedInstructions = typeof instructions === "string" ? instructions.trim() : "";
+  const minPrice = parseOptionalPrice(topicMinPrice);
+  const maxPrice = parseOptionalPrice(topicMaxPrice);
+  const trimmedPlantForm = typeof topicPlantForm === "string" ? topicPlantForm.trim() : "";
 
   if (trimmedInstructions.length === 0) {
     return NextResponse.json(
@@ -113,7 +140,12 @@ export async function POST(req: NextRequest) {
   let selectedProducts: ShopifyProduct[];
   let matchedSearchWords: string[];
   try {
-    const searchResult = await searchCachedProductsByTopic(trimmedInstructions, topicOnlyWithImage === true);
+    const searchResult = await searchCachedProductsByTopic(trimmedInstructions, {
+      onlyWithImage: topicOnlyWithImage === true,
+      minPrice,
+      maxPrice,
+      plantForm: trimmedPlantForm || undefined,
+    });
     selectedProducts = searchResult.products;
     matchedSearchWords = searchResult.matchedWords;
   } catch (err) {
@@ -123,7 +155,18 @@ export async function POST(req: NextRequest) {
     );
   }
   if (selectedProducts.length === 0) {
-    return NextResponse.json({ error: `Ingen produkter matcher '${trimmedInstructions}'` }, { status: 400 });
+    // Samme fejlbesked-mønster som hidtil – blot udvidet til også at nævne
+    // ethvert AKTIVT ekstra filter (prisinterval og/eller planteform), når det
+    // (og ikke kun selve teksten) er årsagen til, at kombinationen ikke
+    // giver nogen resultater.
+    const filterNotes: string[] = [];
+    if (minPrice !== undefined || maxPrice !== undefined) filterNotes.push("det angivne prisinterval");
+    if (trimmedPlantForm) filterNotes.push(`planteformen "${trimmedPlantForm}"`);
+    const message =
+      filterNotes.length > 0
+        ? `Ingen produkter matcher '${trimmedInstructions}' inden for ${filterNotes.join(" og ")}`
+        : `Ingen produkter matcher '${trimmedInstructions}'`;
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   const productsForPrompt = selectedProducts.map((product) => ({
