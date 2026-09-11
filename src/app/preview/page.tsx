@@ -27,10 +27,15 @@ type Viewport = "desktop" | "mobil";
 type CopyState = "idle" | "copied" | "error";
 type SaveTemplateState = "idle" | "saved";
 
+// Stabil, delt tom-array-reference for effectiveProductIds' fallback
+// herunder – et nyt `[]`-literal ved hvert render ville ellers usynligt
+// ugyldiggøre selectedProducts' useMemo hver gang, selvom intet reelt ændrer
+// sig (react-hooks/exhaustive-deps).
+const EMPTY_PRODUCT_IDS: string[] = [];
+
 export default function PreviewPage() {
   const router = useRouter();
-  const { result, customerType, selectedProductIds, topicMatchedProductIds, topicSearchTerm, blocks, setBlocks } =
-    useNewsletter();
+  const { result, customerType, topicMatchedProductIds, topicSearchTerm, blocks, setBlocks } = useNewsletter();
   const brand = useBrandSettings();
 
   const [activeView, setActiveView] = useState<View>("preview");
@@ -82,14 +87,15 @@ export default function PreviewPage() {
     setRetryToken((token) => token + 1);
   }
 
-  // Er nyhedsbrevet genereret via emne-søgning (topicMatchedProductIds sat,
-  // se NewsletterContext.setResult), bruges HELE det matchede produkt-sæt
-  // her i stedet for selectedProductIds – de to er aldrig begge aktive for
-  // samme resultat. Dette er dét, der gør hele det matchede "ahorn"-udvalg
-  // tilgængeligt for både Produktvisnings-blokken og Edit-mode's billede-/
-  // galleri-blok-vælger (se EditorBlockList.tsx), ikke kun det ene produkt,
-  // billede-blokken oprindeligt viste.
-  const effectiveProductIds = topicMatchedProductIds ?? selectedProductIds;
+  // Enhver generering er nu en fritekst-søgning (se generate-newsletter/
+  // route.ts) – topicMatchedProductIds (sat af NewsletterContext.setResult)
+  // er derfor altid HELE det matchede produkt-sæt for det aktuelle
+  // resultat, ikke kun det ene produkt, billede-blokken oprindeligt viste.
+  // Dette er dét, der gør hele udvalget tilgængeligt for både
+  // Produktvisnings-blokken og Edit-mode's billede-/galleri-blok-vælger (se
+  // EditorBlockList.tsx). Falder tilbage til en tom liste, hvis intet
+  // resultat er genereret endnu.
+  const effectiveProductIds = topicMatchedProductIds ?? EMPTY_PRODUCT_IDS;
   const selectedProducts = useMemo(
     () => allProducts.filter((product) => effectiveProductIds.includes(product.id)),
     [allProducts, effectiveProductIds],

@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { DocumentIcon, GearIcon, PaletteIcon, UsersIcon } from "./icons";
-import { Logo } from "./Logo";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
 
-export type SidebarPage = "products" | "settings" | "preview" | "customers" | "brand-settings";
+// "products" (den tidligere "Vælg produkter"-side) er BEVIDST ikke længere
+// en mulig værdi her – siden er fjernet fra navigationen/det normale flow
+// (nyhedsbreve genereres nu udelukkende via Opsætnings-sidens samlede
+// beskrivelsesfelt), men selve /produkter-routen og dens indhold
+// (søgning/filtrering/synkroniser-knappen) eksisterer stadig uændret, kun
+// uden et link hertil i denne sidemenu.
+export type SidebarPage = "settings" | "preview" | "customers" | "brand-settings";
 
 interface NavItem {
   id: SidebarPage;
@@ -15,7 +20,6 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "products", label: "Vælg produkter", href: "/produkter", icon: Logo },
   { id: "settings", label: "Opsætning", href: "/opsaetning", icon: GearIcon },
   { id: "preview", label: "Preview / Rediger", href: "/preview", icon: DocumentIcon },
   { id: "customers", label: "Kunder", href: "/kunder", icon: UsersIcon },
@@ -36,7 +40,10 @@ function formatDraftSavedAt(date: Date) {
 }
 
 interface SidebarProps {
-  active: SidebarPage;
+  // Valgfri – den nu nav-løse /produkter-side (se SidebarPage ovenfor)
+  // rendrer Sidebar UDEN denne prop, så intet punkt fejlagtigt vises som
+  // aktivt for en side, der ikke længere har et tilsvarende menupunkt.
+  active?: SidebarPage;
 }
 
 export function Sidebar({ active }: SidebarProps) {

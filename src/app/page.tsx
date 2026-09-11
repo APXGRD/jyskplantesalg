@@ -39,7 +39,7 @@ export default function HomePage() {
       </div>
 
       <Link
-        href="/produkter"
+        href="/opsaetning"
         className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
       >
         Kom i gang

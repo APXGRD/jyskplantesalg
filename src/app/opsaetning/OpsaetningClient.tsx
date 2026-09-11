@@ -18,7 +18,6 @@ interface OpsaetningClientProps {
 export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
   const router = useRouter();
   const {
-    selectedProductIds,
     customerType,
     setCustomerType,
     instructions,
@@ -36,13 +35,10 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
   // klientside mount-fetch for skabelon-dropdownen.
   const [templates] = useState<TemplateSummary[]>(initialTemplates);
 
-  const hasSelectedProducts = selectedProductIds.length > 0;
-  const hasInstructions = instructions.trim().length > 0;
-  // Fritekst-søgning (feltet bruges da BÅDE til at finde produkter OG som
-  // AI'ens tone-instruks, se generate-newsletter/route.ts) er et
-  // ALTERNATIVT, sideordnet flow til manuelt produktvalg – enten er nok til
-  // at kunne generere.
-  const canGenerate = hasSelectedProducts || hasInstructions;
+  // Det samlede beskrivelsesfelt er den ENESTE vej til at generere et
+  // nyhedsbrev – manuelt produktvalg findes ikke længere som et alternativ
+  // (se generate-newsletter/route.ts).
+  const canGenerate = instructions.trim().length > 0;
 
   async function handleGenerate() {
     if (!canGenerate || isGenerating) {
@@ -57,7 +53,6 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productIds: selectedProductIds,
           customerType,
           instructions: instructions.trim() || undefined,
           templateId: selectedTemplateId,
@@ -73,8 +68,9 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
       // `blocks` er kun med i svaret, når en skabelon blev anvendt server-side
       // (se generate-newsletter/route.ts) – ellers bygger setResult selv
       // blocks-listen via createDefaultBlocks, som hidtil. `matchedProductIds`/
-      // `topicSearchTerm` er kun med ved emne-søgning – HELE det matchede
-      // produkt-sæt hhv. selve emne-ordet, se NewsletterContext.setResult.
+      // `topicSearchTerm` er altid med (enhver generering er nu en
+      // fritekst-søgning) – HELE det matchede produkt-sæt hhv. de
+      // bekræftet-matchende søgeord, se NewsletterContext.setResult.
       const {
         blocks,
         matchedProductIds,
@@ -149,8 +145,8 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
             <section className="pt-8">
               <p className="text-xs font-semibold tracking-wide text-ink uppercase">Beskriv dit nyhedsbrev</p>
               <p className="pt-1.5 pb-3 text-xs text-ink-faint">
-                Bruges altid til at tilpasse AI-tekstens tone, fokus og indhold. Er der ikke valgt nogen
-                produkter på forrige side, bruges teksten OGSÅ til automatisk at finde matchende produkter
+                Bruges til automatisk at finde matchende produkter, og til at tilpasse AI-tekstens tone, fokus
+                og indhold
               </p>
               <div className="flex items-start gap-3">
                 <textarea
@@ -182,8 +178,7 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
               </button>
               {!canGenerate && (
                 <p className="pt-2 text-xs text-ink-faint">
-                  Vælg mindst ét produkt på forrige side, eller beskriv dit nyhedsbrev ovenfor, før du kan
-                  generere nyhedsbrevet.
+                  Beskriv dit nyhedsbrev ovenfor, før du kan generere det.
                 </p>
               )}
             </div>
