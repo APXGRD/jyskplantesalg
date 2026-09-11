@@ -1,17 +1,18 @@
 // src/app/api/generate-newsletter/route.ts
 //
-// Modtager ENTEN de valgte produkt-id'er (manuelt valgt på "Vælg produkter"-siden)
-// ELLER et fritekst-emne (det nye "Emne"-felt på Opsætnings-siden – se
-// searchCachedProductsByTopic) + målgruppe + evt. instrukser, slår produkterne op i den
-// lokale Supabase-cache (getCachedProducts/searchCachedProductsByTopic – samme cache som
-// "Vælg produkter"-siden og NewsletterContext.setResult allerede bruger, IKKE det
-// direkte, fuldt paginerede fetchShopifyProducts, som tidligere gjorde netop dette kald
-// til den suverænt største flaskehals i hele generérings-flowet), bygger AI-prompten og
-// beder Gemini om at generere nyhedsbrevets fire felter (heading/bodyText/image/cta) som
+// Modtager de valgte produkt-id'er (manuelt valgt på "Vælg produkter"-siden) OG/ELLER
+// Opsætnings-sidens ene samlede tekstfelt ("Beskriv dit nyhedsbrev") + målgruppe, slår
+// produkterne op i den lokale Supabase-cache (getCachedProducts/searchCachedProductsByTopic
+// – samme cache som "Vælg produkter"-siden og NewsletterContext.setResult allerede bruger,
+// IKKE det direkte, fuldt paginerede fetchShopifyProducts, som tidligere gjorde netop dette
+// kald til den suverænt største flaskehals i hele generérings-flowet), bygger AI-prompten
+// og beder Gemini om at generere nyhedsbrevets fire felter (heading/bodyText/image/cta) som
 // struktureret JSON.
 //
-// Er "Emne" udfyldt, VINDER det altid over productIds (se isTopicSearch herunder) – de
-// to er alternative, sideordnede måder at vælge produkter på, aldrig kombineret.
+// Er der INGEN manuelt valgte produkter, bruges tekstfeltet SOM fritekst-søgeord til at
+// finde produkter (se isTopicSearch herunder) – er der derimod valgt produkter, bruges
+// tekstfeltet UDELUKKENDE som AI'ens tone-instruks. De to bruges aldrig samtidig til at
+// vælge produkter.
 
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
@@ -32,16 +33,20 @@ import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 interface GenerateNewsletterBody {
   productIds?: string[];
   customerType?: CustomerType;
+  // Opsætnings-sidens ENE samlede tekstfelt ("Beskriv dit nyhedsbrev" –
+  // tidligere to adskilte felter, "Emne" og "Yderligere instrukser").
+  // Sendes ALTID til AI'en som tone-/fokus-instruks. Er productIds tom
+  // (intet manuelt produktvalg på "Vælg produkter"-siden), bruges DEN SAMME
+  // tekst DESUDEN som fritekst-søgeord for automatisk at finde produkter
+  // (se isTopicSearch herunder) – er der derimod manuelt valgte produkter,
+  // køres ingen søgning, siden produkterne allerede er givet.
   instructions?: string;
   // Skabelonens id fra "Skabelon"-dropdownen på Opsætnings-siden – undefined/
   // null betyder "Standard layout" (nuværende, faste blok-struktur).
   templateId?: string | null;
-  // Fritekst-emne fra det nye "Emne (valgfrit)"-felt på Opsætnings-siden –
-  // udfyldt betyder "find produkter via tekstsøgning" i stedet for at bruge
-  // productIds, se isTopicSearch herunder.
-  topic?: string;
-  // "Kun med billede"-kontakten ved siden af Emne-feltet – kun relevant,
-  // når topic er udfyldt, se searchCachedProductsByTopic.
+  // "Kun med billede"-kontakten ved siden af det samlede felt – kun
+  // relevant, når feltet reelt bruges til søgning (isTopicSearch), se
+  // searchCachedProductsByTopic.
   topicOnlyWithImage?: boolean;
 }
 
@@ -87,13 +92,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ugyldig JSON i request body" }, { status: 400 });
   }
 
-  const { productIds, customerType, instructions, templateId, topic, topicOnlyWithImage } = body;
-  const trimmedTopic = typeof topic === "string" ? topic.trim() : "";
-  const isTopicSearch = trimmedTopic.length > 0;
+  const { productIds, customerType, instructions, templateId, topicOnlyWithImage } = body;
+  const trimmedInstructions = typeof instructions === "string" ? instructions.trim() : "";
+  const hasManualProducts = Array.isArray(productIds) && productIds.length > 0;
+  // Fritekst-søgning køres KUN, når INGEN produkter er manuelt valgt – er
+  // der valgt produkter, bruges instructions UDELUKKENDE som tone-instruks
+  // til AI'en (se buildNewsletterUserPrompt-kaldet herunder), som hidtil.
+  const isTopicSearch = !hasManualProducts && trimmedInstructions.length > 0;
 
-  if (!isTopicSearch && (!Array.isArray(productIds) || productIds.length === 0)) {
+  if (!hasManualProducts && trimmedInstructions.length === 0) {
     return NextResponse.json(
-      { error: "Mindst ét produkt skal vælges (productIds), eller angiv et emne" },
+      { error: "Mindst ét produkt skal vælges (productIds), eller angiv en beskrivelse" },
       { status: 400 },
     );
   }
@@ -106,9 +115,18 @@ export async function POST(req: NextRequest) {
   }
 
   let selectedProducts: ShopifyProduct[];
+  // De ORIGINALE (u-normaliserede) søgeord, der rent faktisk gav mindst ét
+  // matchende produkt (se searchCachedProductsByTopic/matchedWords,
+  // cachedProducts.ts) – IKKE alle "ikke-stopord" fra feltet. Bruges
+  // UDELUKKENDE til CTA-knappens søgeside-fallback-link (se resolveCtaLink
+  // herunder) – AI-promptens egen topicSearchTerm (buildNewsletterUserPrompt)
+  // bruger fortsat den FULDE trimmedInstructions, uændret.
+  let matchedSearchWords: string[] = [];
   if (isTopicSearch) {
     try {
-      selectedProducts = await searchCachedProductsByTopic(trimmedTopic, topicOnlyWithImage === true);
+      const searchResult = await searchCachedProductsByTopic(trimmedInstructions, topicOnlyWithImage === true);
+      selectedProducts = searchResult.products;
+      matchedSearchWords = searchResult.matchedWords;
     } catch (err) {
       return NextResponse.json(
         { error: err instanceof Error ? err.message : "Kunne ikke søge efter produkter." },
@@ -116,7 +134,7 @@ export async function POST(req: NextRequest) {
       );
     }
     if (selectedProducts.length === 0) {
-      return NextResponse.json({ error: `Ingen produkter matcher '${trimmedTopic}'` }, { status: 400 });
+      return NextResponse.json({ error: `Ingen produkter matcher '${trimmedInstructions}'` }, { status: 400 });
     }
   } else {
     let allProducts: ShopifyProduct[];
@@ -154,7 +172,7 @@ export async function POST(req: NextRequest) {
       brandTone: brandSettings.brand_tone,
       products: productsForPrompt,
     },
-    { customerType, instructions, topicSearchTerm: isTopicSearch ? trimmedTopic : undefined },
+    { customerType, instructions: trimmedInstructions || undefined, topicSearchTerm: isTopicSearch ? trimmedInstructions : undefined },
   );
 
   try {
@@ -175,9 +193,14 @@ export async function POST(req: NextRequest) {
 
     const newsletter = JSON.parse(text);
     // Overskriver AI'ens eget cta.url-valg med den deterministiske logik
-    // herover – AI'en må stadig selv formulere cta.text. topic gives kun med
-    // ved emne-søgning (se resolveCtaLink's søgeside-fallback i ctaLink.ts).
-    newsletter.cta = { ...newsletter.cta, url: resolveCtaLink(selectedProducts, isTopicSearch ? trimmedTopic : undefined) };
+    // herover – AI'en må stadig selv formulere cta.text. De bekræftet-
+    // matchende søgeord (matchedSearchWords, IKKE den fulde feltværdi) gives
+    // kun med ved fritekst-søgning (se resolveCtaLink's søgeside-fallback i
+    // ctaLink.ts).
+    newsletter.cta = {
+      ...newsletter.cta,
+      url: resolveCtaLink(selectedProducts, isTopicSearch ? matchedSearchWords.join(" ") : undefined),
+    };
 
     // Emne-søgning: ÉT repræsentativt produkt (bestseller, ellers det først
     // fundne) til den initiale billede-blok – IKKE automatisk et galleri,
@@ -226,15 +249,19 @@ export async function POST(req: NextRequest) {
     }
 
     // topicSearchTerm sendes med (parallelt med matchedProductIds) ved
-    // emne-søgning, så NewsletterContext kan gemme det oprindelige emne-ord
-    // sammen med resultatet – EditorBlockList.tsx bruger det til at
-    // genberegne resolveCtaLink()'s søgeside-fallback client-side, uanset
-    // hvilken blok der senest blev ændret (se applyCtaLinkUpdate).
+    // fritekst-søgning, så NewsletterContext kan gemme de bekræftet-
+    // matchende søgeord sammen med resultatet – EditorBlockList.tsx bruger
+    // det til at genberegne resolveCtaLink()'s søgeside-fallback client-side,
+    // uanset hvilken blok der senest blev ændret (se applyCtaLinkUpdate).
+    // BEMÆRK: dette er matchedSearchWords (kun de ord, der faktisk gav
+    // resultat), IKKE den fulde, rå feltværdi – til forskel fra
+    // buildNewsletterUserPrompt-kaldet ovenfor, som fortsat bruger HELE
+    // trimmedInstructions til selve AI-tekstens tone/kategori-note.
     return NextResponse.json({
       ...newsletter,
       blocks,
       matchedProductIds,
-      topicSearchTerm: isTopicSearch ? trimmedTopic : undefined,
+      topicSearchTerm: isTopicSearch ? matchedSearchWords.join(" ") : undefined,
     });
   } catch (err) {
     console.error("generate-newsletter fejlede:", err);

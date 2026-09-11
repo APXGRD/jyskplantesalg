@@ -168,6 +168,15 @@ export interface NewsletterBlock {
   content?: string;
   // Kun relevant for "cta"-blokken.
   ctaUrl?: string;
+  // AI'ens OPRINDELIGT genererede knap-tekst, uændret – adskilt fra content
+  // ovenfor (som er den FAKTISK viste tekst, og som applyCtaLinkUpdate i
+  // EditorBlockList.tsx kan overskrive med en fast ental-tekst, når CTA-
+  // unionen er indsnævret til ét produkt). Bruges til at gendanne den
+  // naturlige, varierede flertalsformulering, når unionen igen omfatter mere
+  // end ét produkt, i stedet for at skulle bede AI'en generere den påny.
+  // Undefined for manuelt tilføjede knap-blokke (se createNewBlock) – der er
+  // ingen AI-tekst at vende tilbage til for dem.
+  originalCtaText?: string;
   // Kun relevant for "produkt"-blokken (enkelt-produkt-visning).
   productId?: string;
   // Kun relevant for den samlede Billede-/Galleri-blok ("billede", og de
@@ -348,6 +357,7 @@ export function createDefaultBlocks(
     }
     if (type === "cta") {
       block.content = result.cta.text;
+      block.originalCtaText = result.cta.text;
       block.ctaUrl = result.cta.url;
     }
     return block;
@@ -366,8 +376,9 @@ export function duplicateBlock(block: NewsletterBlock): NewsletterBlock {
 // stylingvalg, der gælder UANSET hvilket konkret nyhedsbrev/produkter en
 // senere bruger af skabelonen vælger. Bevidst ingen id (skabelonen er ikke
 // bundet til de originale blok-instansers id'er) og ingen content/ctaUrl/
-// productId/imageUrl/altText/galleryProductIds/productDisplayIds (alt sammen
-// enten AI-tekst, et konkret link, eller et konkret produkt-/billedvalg).
+// originalCtaText/productId/imageUrl/altText/galleryProductIds/
+// productDisplayIds (alt sammen enten AI-tekst, et konkret link, eller et
+// konkret produkt-/billedvalg).
 // productBorderRadius/productDensity ER med – rene stilvalg, samme princip
 // som ctaBorderRadius/ctaPadding/galleryColumns.
 export type TemplateBlock = Pick<
@@ -499,6 +510,7 @@ export function createBlocksFromTemplate(
     }
     if (block.type === "cta") {
       block.content = result.cta.text;
+      block.originalCtaText = result.cta.text;
       block.ctaUrl = result.cta.url;
     }
     // "tekst" er frit indtastet af brugeren og derfor ikke AI-genereret – der

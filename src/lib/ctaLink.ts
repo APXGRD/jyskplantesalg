@@ -9,17 +9,28 @@
 
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 
-// Bygger butikkens egen søgeresultat-side for emne-søgeordet – domænet
-// udledes af et af de faktisk viste produkters egen URL (samme rigtige,
-// kunde-vendte domæne, produktets/collection'ens link allerede bruger,
-// se fetchShopifyProducts/mapProductNode), i stedet for at kræve endnu en
-// separat kilde til shop-domænet. Returnerer null, hvis intet produkt har en
-// brugbar URL at udlede domænet fra (bør reelt aldrig ske – url er aldrig
-// tom for et rigtigt Shopify-produkt), så kalderen kan falde videre tilbage.
-function buildTopicSearchUrl(topic: string, products: ShopifyProduct[]): string | null {
+// Bygger butikkens egen søgeresultat-side for de BEKRÆFTET-matchende
+// søgeord – domænet udledes af et af de faktisk viste produkters egen URL
+// (samme rigtige, kunde-vendte domæne, produktets/collection'ens link
+// allerede bruger, se fetchShopifyProducts/mapProductNode), i stedet for at
+// kræve endnu en separat kilde til shop-domænet. Returnerer null, hvis intet
+// produkt har en brugbar URL at udlede domænet fra (bør reelt aldrig ske –
+// url er aldrig tom for et rigtigt Shopify-produkt), så kalderen kan falde
+// videre tilbage.
+//
+// `matchedSearchWords` er IKKE den rå feltværdi og IKKE alle "ikke-stopord"
+// fra sætningen – det er PRÆCIS de(t) ord, der rent faktisk gav mindst ét
+// matchende produkt i selve søgningen (searchCachedProductsByTopic,
+// cachedProducts.ts – se dens matchedWords), i deres OPRINDELIGE,
+// u-normaliserede stavemåde (fx "ahorns", ikke den afkortede "ahorn", selve
+// matchningen internt sammenlignede med). Renses/normaliseres IKKE yderligere
+// her – det er allerede gjort, netop for at finde disse ord; at gøre det
+// igen ville risikere at inkludere ord, der blot ikke blev filtreret fra,
+// men aldrig selv gav noget resultat (fx "pæn").
+function buildTopicSearchUrl(matchedSearchWords: string, products: ShopifyProduct[]): string | null {
   try {
     const origin = new URL(products[0].url).origin;
-    return `${origin}/search?q=${encodeURIComponent(topic)}&type=product`;
+    return `${origin}/search?q=${encodeURIComponent(matchedSearchWords)}&type=product`;
   } catch {
     return null;
   }
@@ -36,16 +47,28 @@ function buildTopicSearchUrl(topic: string, products: ShopifyProduct[]): string 
 //   katalogs productType-værdier – erstattet af produkternes egen, rigtige
 //   collection-tilhørsforhold.
 // - Flere produkter UDEN en fælles collection, MEN nyhedsbrevet stammer fra
-//   en emne-søgning (topic er udfyldt, se generate-newsletter/route.ts og
-//   NewsletterContext's topicSearchTerm): butikkens egen søgeside for
-//   emne-ordet – dækker hele det viste udvalg, selvom det spænder over flere
-//   collections, i stedet for at pege snævert på ét enkelt af dem.
+//   en emne-søgning (matchedSearchWords er udfyldt – se
+//   generate-newsletter/route.ts og NewsletterContext's topicSearchTerm,
+//   begge sat ud fra searchCachedProductsByTopic's matchedWords, IKKE den rå
+//   feltværdi): butikkens egen søgeside for de bekræftet-matchende ord –
+//   dækker hele det viste udvalg, selvom det spænder over flere collections,
+//   i stedet for at pege snævert på ét enkelt af dem.
 // - Ingen af ovenstående (fx et almindeligt, manuelt "Vælg produkter"-flow
-//   uden noget emne-ord at falde tilbage på): fald tilbage til det først
+//   uden noget søgeord at falde tilbage på): fald tilbage til det først
 //   valgte produkts egen URL – IKKE et kategori- eller søge-link, der ikke
 //   reelt afspejler et bevidst, samlet valg.
-export function resolveCtaLink(products: ShopifyProduct[], topic?: string | null): string {
+export function resolveCtaLink(products: ShopifyProduct[], matchedSearchWords?: string | null): string {
   const primaryUrl = products[0].url;
+  // PRÆCIS 1 produkt har ALTID topprioritet: dets egen URL, uanset om
+  // nyhedsbrevet oprindeligt blev genereret via emne-søgning eller ej. Uden
+  // dette eksplicitte tjek FØRST kunne søge-fallback'et herunder
+  // (matchedSearchWords) fejlagtigt "vinde" – matchedSearchWords forbliver
+  // sat fra selve genereringen, selvom brugeren siden har indsnævret
+  // Edit-mode-valget ned til ét specifikt produkt, og var tidligere IKKE
+  // beskyttet af noget længde-tjek (kun kategori-scenariet var).
+  if (products.length === 1) {
+    return primaryUrl;
+  }
   const primaryCollectionHandle = products[0].collectionHandle;
   // .every() er trivielt sandt for et enkelt element, så "kategori-scenarie"
   // kræver EKSPLICIT også mere end ét produkt – ellers ville et enkelt
@@ -59,8 +82,8 @@ export function resolveCtaLink(products: ShopifyProduct[], topic?: string | null
   if (isCategoryScenario) {
     return products[0].collectionUrl ?? primaryUrl;
   }
-  if (topic) {
-    const searchUrl = buildTopicSearchUrl(topic, products);
+  if (matchedSearchWords) {
+    const searchUrl = buildTopicSearchUrl(matchedSearchWords, products);
     if (searchUrl) return searchUrl;
   }
   return primaryUrl;

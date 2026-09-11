@@ -727,17 +727,33 @@ function collectCtaRelevantProducts(blocks: NewsletterBlock[], products: Shopify
   return products.filter((product) => relevantIds.has(product.id));
 }
 
-// CTA-linket genberegnes LØBENDE (ikke kun ved selve genereringen), hver
-// gang produktvalget i Produktvisnings- eller billede-/galleri-blokken
-// ændres i Edit-mode – samme centrale resolveCtaLink()-funktion som
-// generate-newsletter/route.ts selv bruger ved den initiale generering (se
-// src/lib/ctaLink.ts), men nu udregnet ud fra UNIONEN af alle relevante
-// blokkes produktvalg (se collectCtaRelevantProducts ovenfor), ikke kun den
-// blok, der udløste selve ændringen. Opdaterer ALLE cta-blokke i
-// nyhedsbrevet (typisk kun én). Er unionen tom (fx brugeren har fravalgt alt
-// i Produktvisning OG billede/galleri), er der intet meningsfuldt at pege på
-// – CTA-linket røres da slet ikke, i stedet for at pege på et tomt/ugyldigt
-// produkt.
+// Fast, simpel ental-tekst, når CTA-unionen er indsnævret til ét enkelt
+// produkt (se applyCtaLinkUpdate herunder) – IKKE en ny AI-generering, blot
+// en statisk, altid-korrekt formulering, der matcher at linket nu peger på
+// ÉT produkts egen side.
+const SINGLE_PRODUCT_CTA_TEXT = "Se produktet her";
+
+// CTA-linket OG -teksten genberegnes LØBENDE (ikke kun ved selve
+// genereringen), hver gang produktvalget i Produktvisnings- eller billede-/
+// galleri-blokken ændres i Edit-mode – samme centrale resolveCtaLink()-
+// funktion som generate-newsletter/route.ts selv bruger ved den initiale
+// generering (se src/lib/ctaLink.ts), men nu udregnet ud fra UNIONEN af alle
+// relevante blokkes produktvalg (se collectCtaRelevantProducts ovenfor),
+// ikke kun den blok, der udløste selve ændringen. Opdaterer ALLE cta-blokke
+// i nyhedsbrevet (typisk kun én). Er unionen tom (fx brugeren har fravalgt
+// alt i Produktvisning OG billede/galleri), er der intet meningsfuldt at
+// pege på – CTA-blokken røres da slet ikke, i stedet for at pege på/omtale
+// et tomt/ugyldigt produkt.
+//
+// Teksten (content) følger samme "1 vs. flere"-skel som linket: ved PRÆCIS
+// ét produkt i unionen bruges SINGLE_PRODUCT_CTA_TEXT (entalsformulering,
+// matcher at linket nu peger på ét produkts egen side); ved flere end ét
+// genindsættes blokkens EGET, gemte originalCtaText (AI'ens oprindelige,
+// varierede flertalsformulering fra selve genereringen – se
+// newsletterBlocks.ts), i stedet for at bede AI'en generere en ny tekst.
+// Mangler originalCtaText (fx en CTA-blok tilføjet manuelt via "+ Tilføj
+// blok", som aldrig havde AI-tekst), bevares blokkens nuværende content
+// uændret, i stedet for at rydde den.
 function applyCtaLinkUpdate(
   currentBlocks: NewsletterBlock[],
   products: ShopifyProduct[],
@@ -746,7 +762,11 @@ function applyCtaLinkUpdate(
   const effectiveProducts = collectCtaRelevantProducts(currentBlocks, products);
   if (effectiveProducts.length === 0) return currentBlocks;
   const ctaUrl = resolveCtaLink(effectiveProducts, topicSearchTerm);
-  return currentBlocks.map((block) => (block.type === "cta" ? { ...block, ctaUrl } : block));
+  return currentBlocks.map((block) => {
+    if (block.type !== "cta") return block;
+    const content = effectiveProducts.length === 1 ? SINGLE_PRODUCT_CTA_TEXT : (block.originalCtaText ?? block.content);
+    return { ...block, ctaUrl, content };
+  });
 }
 
 interface EditorBlockListProps {
