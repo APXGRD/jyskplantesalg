@@ -698,13 +698,29 @@ function collectCtaRelevantProducts(blocks: NewsletterBlock[], products: Shopify
   const relevantIds = new Set<string>();
   for (const block of blocks) {
     if (block.type === "produktvisning") {
-      const displayIds = block.productDisplayIds;
-      if (displayIds === undefined) {
-        for (const product of products) relevantIds.add(product.id);
-      } else {
-        for (const id of displayIds) relevantIds.add(id);
+      // productDisplayIds === undefined betyder "urørt, stadig på standard
+      // 'vis alle tilgængelige produkter'" (se NewsletterBlock i
+      // newsletterBlocks.ts) – IKKE det samme som brugeren AKTIVT har valgt
+      // alle produkter. En urørt Produktvisning bidrager derfor BEVIDST
+      // INTET til CTA-unionen her: ellers ville den, ved ethvert nyhedsbrev
+      // med mere end én collection i det oprindelige produktvalg, permanent
+      // "overdøve" et bevidst valg i Billede/Galleri (unionen ville altid
+      // indeholde ALLE oprindeligt valgte produkter, uanset collection, og
+      // dermed aldrig kunne opfattes som "samme collection") – præcis den
+      // opførsel, der blev observeret og bekræftet i undersøgelsen forud for
+      // denne rettelse. Kun når brugeren EKSPLICIT har indsnævret
+      // Produktvisning (en sat, om end evt. tom, liste), tæller dens
+      // produkter med.
+      if (block.productDisplayIds !== undefined) {
+        for (const id of block.productDisplayIds) relevantIds.add(id);
       }
     } else if (block.type === "billede" || block.type === "img" || block.type === "galleri") {
+      // Ingen tilsvarende "urørt = vis alle"-tilstand her – galleryProductIds
+      // betyder ALTID "præcis disse valgte produkter" i selve renderingen
+      // (NewsletterCard.tsx/newsletterExport.ts bruger konsekvent
+      // `galleryProductIds ?? []`, aldrig "alle tilgængelige"), så et urørt/
+      // tomt galleryProductIds bidrager allerede naturligt intet til
+      // unionen her – ingen særskilt undtagelse nødvendig.
       for (const id of block.galleryProductIds ?? []) relevantIds.add(id);
     }
   }
@@ -722,10 +738,14 @@ function collectCtaRelevantProducts(blocks: NewsletterBlock[], products: Shopify
 // i Produktvisning OG billede/galleri), er der intet meningsfuldt at pege på
 // – CTA-linket røres da slet ikke, i stedet for at pege på et tomt/ugyldigt
 // produkt.
-function applyCtaLinkUpdate(currentBlocks: NewsletterBlock[], products: ShopifyProduct[]): NewsletterBlock[] {
+function applyCtaLinkUpdate(
+  currentBlocks: NewsletterBlock[],
+  products: ShopifyProduct[],
+  topicSearchTerm: string | null,
+): NewsletterBlock[] {
   const effectiveProducts = collectCtaRelevantProducts(currentBlocks, products);
   if (effectiveProducts.length === 0) return currentBlocks;
-  const ctaUrl = resolveCtaLink(effectiveProducts);
+  const ctaUrl = resolveCtaLink(effectiveProducts, topicSearchTerm);
   return currentBlocks.map((block) => (block.type === "cta" ? { ...block, ctaUrl } : block));
 }
 
@@ -737,6 +757,11 @@ interface EditorBlockListProps {
   // almindeligt manuelt produktvalg, se preview/page.tsx og
   // NewsletterContext.topicMatchedProductIds.
   topicMatchedProductIds: string[] | null;
+  // Selve emne-ordet, der producerede det nuværende resultat – null ved
+  // almindeligt manuelt produktvalg, se preview/page.tsx og
+  // NewsletterContext.topicSearchTerm. Bruges KUN til at genberegne
+  // resolveCtaLink()'s søgeside-fallback (se applyCtaLinkUpdate ovenfor).
+  topicSearchTerm: string | null;
 }
 
 export function EditorBlockList({
@@ -744,6 +769,7 @@ export function EditorBlockList({
   onBlocksChange,
   products,
   topicMatchedProductIds,
+  topicSearchTerm,
 }: EditorBlockListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -834,6 +860,7 @@ export function EditorBlockList({
       applyCtaLinkUpdate(
         blocks.map((block) => (block.id === id ? { ...block, galleryProductIds } : block)),
         products,
+        topicSearchTerm,
       ),
     );
   }
@@ -873,7 +900,7 @@ export function EditorBlockList({
     // hvad blokken reelt viser ændrer sig derfor, og CTA-linket skal
     // genberegnes ud fra unionen af alle blokke, samme som ved et almindeligt
     // produktvalg (se applyCtaLinkUpdate).
-    onBlocksChange(applyCtaLinkUpdate(next, products));
+    onBlocksChange(applyCtaLinkUpdate(next, products, topicSearchTerm));
   }
 
   // Kun relevant ved layout "1 billede" – vælger (eller fravælger, ved klik
@@ -898,7 +925,7 @@ export function EditorBlockList({
         altText: product?.title,
       };
     });
-    onBlocksChange(applyCtaLinkUpdate(next, products));
+    onBlocksChange(applyCtaLinkUpdate(next, products, topicSearchTerm));
   }
 
   function handleProductDisplayIdsChange(id: string, productDisplayIds: string[]) {
@@ -906,6 +933,7 @@ export function EditorBlockList({
       applyCtaLinkUpdate(
         blocks.map((block) => (block.id === id ? { ...block, productDisplayIds } : block)),
         products,
+        topicSearchTerm,
       ),
     );
   }

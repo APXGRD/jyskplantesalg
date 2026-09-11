@@ -9,6 +9,22 @@
 
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 
+// Bygger butikkens egen søgeresultat-side for emne-søgeordet – domænet
+// udledes af et af de faktisk viste produkters egen URL (samme rigtige,
+// kunde-vendte domæne, produktets/collection'ens link allerede bruger,
+// se fetchShopifyProducts/mapProductNode), i stedet for at kræve endnu en
+// separat kilde til shop-domænet. Returnerer null, hvis intet produkt har en
+// brugbar URL at udlede domænet fra (bør reelt aldrig ske – url er aldrig
+// tom for et rigtigt Shopify-produkt), så kalderen kan falde videre tilbage.
+function buildTopicSearchUrl(topic: string, products: ShopifyProduct[]): string | null {
+  try {
+    const origin = new URL(products[0].url).origin;
+    return `${origin}/search?q=${encodeURIComponent(topic)}&type=product`;
+  } catch {
+    return null;
+  }
+}
+
 // - 1 produkt: produktets egen URL.
 // - Flere produkter, ALLE medlem af SAMME Shopify-collection (fx "vælg hele
 //   Opstammet træer-kategorien", eller en emne-søgning, hvor alle
@@ -19,11 +35,16 @@ import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 //   (collectionUrls i mockShopifyData.ts), som ALDRIG matchede det rigtige
 //   katalogs productType-værdier – erstattet af produkternes egen, rigtige
 //   collection-tilhørsforhold.
-// - Flere produkter uden en fælles collection (fx en bred emne-søgning på
-//   tværs af kategorier, eller intet af dem er medlem af nogen collection):
-//   fald tilbage til det først valgte produkts egen URL – IKKE et
-//   kategori-link, der ikke reelt dækker alt det viste.
-export function resolveCtaLink(products: ShopifyProduct[]): string {
+// - Flere produkter UDEN en fælles collection, MEN nyhedsbrevet stammer fra
+//   en emne-søgning (topic er udfyldt, se generate-newsletter/route.ts og
+//   NewsletterContext's topicSearchTerm): butikkens egen søgeside for
+//   emne-ordet – dækker hele det viste udvalg, selvom det spænder over flere
+//   collections, i stedet for at pege snævert på ét enkelt af dem.
+// - Ingen af ovenstående (fx et almindeligt, manuelt "Vælg produkter"-flow
+//   uden noget emne-ord at falde tilbage på): fald tilbage til det først
+//   valgte produkts egen URL – IKKE et kategori- eller søge-link, der ikke
+//   reelt afspejler et bevidst, samlet valg.
+export function resolveCtaLink(products: ShopifyProduct[], topic?: string | null): string {
   const primaryUrl = products[0].url;
   const primaryCollectionHandle = products[0].collectionHandle;
   // .every() er trivielt sandt for et enkelt element, så "kategori-scenarie"
@@ -37,6 +58,10 @@ export function resolveCtaLink(products: ShopifyProduct[]): string {
     products.every((product) => product.collectionHandle === primaryCollectionHandle);
   if (isCategoryScenario) {
     return products[0].collectionUrl ?? primaryUrl;
+  }
+  if (topic) {
+    const searchUrl = buildTopicSearchUrl(topic, products);
+    if (searchUrl) return searchUrl;
   }
   return primaryUrl;
 }

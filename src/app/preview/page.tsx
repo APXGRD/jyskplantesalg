@@ -29,7 +29,8 @@ type SaveTemplateState = "idle" | "saved";
 
 export default function PreviewPage() {
   const router = useRouter();
-  const { result, customerType, selectedProductIds, topicMatchedProductIds, blocks, setBlocks } = useNewsletter();
+  const { result, customerType, selectedProductIds, topicMatchedProductIds, topicSearchTerm, blocks, setBlocks } =
+    useNewsletter();
   const brand = useBrandSettings();
 
   const [activeView, setActiveView] = useState<View>("preview");
@@ -250,6 +251,7 @@ export default function PreviewPage() {
                 onBlocksChange={setBlocks}
                 products={selectedProducts}
                 topicMatchedProductIds={topicMatchedProductIds}
+                topicSearchTerm={topicSearchTerm}
               />
             </div>
           )}

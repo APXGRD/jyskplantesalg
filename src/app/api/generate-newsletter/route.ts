@@ -175,8 +175,9 @@ export async function POST(req: NextRequest) {
 
     const newsletter = JSON.parse(text);
     // Overskriver AI'ens eget cta.url-valg med den deterministiske logik
-    // herover – AI'en må stadig selv formulere cta.text.
-    newsletter.cta = { ...newsletter.cta, url: resolveCtaLink(selectedProducts) };
+    // herover – AI'en må stadig selv formulere cta.text. topic gives kun med
+    // ved emne-søgning (se resolveCtaLink's søgeside-fallback i ctaLink.ts).
+    newsletter.cta = { ...newsletter.cta, url: resolveCtaLink(selectedProducts, isTopicSearch ? trimmedTopic : undefined) };
 
     // Emne-søgning: ÉT repræsentativt produkt (bestseller, ellers det først
     // fundne) til den initiale billede-blok – IKKE automatisk et galleri,
@@ -224,7 +225,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ...newsletter, blocks, matchedProductIds });
+    // topicSearchTerm sendes med (parallelt med matchedProductIds) ved
+    // emne-søgning, så NewsletterContext kan gemme det oprindelige emne-ord
+    // sammen med resultatet – EditorBlockList.tsx bruger det til at
+    // genberegne resolveCtaLink()'s søgeside-fallback client-side, uanset
+    // hvilken blok der senest blev ændret (se applyCtaLinkUpdate).
+    return NextResponse.json({
+      ...newsletter,
+      blocks,
+      matchedProductIds,
+      topicSearchTerm: isTopicSearch ? trimmedTopic : undefined,
+    });
   } catch (err) {
     console.error("generate-newsletter fejlede:", err);
     return NextResponse.json(

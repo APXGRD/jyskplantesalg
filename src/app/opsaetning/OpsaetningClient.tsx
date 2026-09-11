@@ -73,15 +73,20 @@ export function OpsaetningClient({ initialTemplates }: OpsaetningClientProps) {
 
       // `blocks` er kun med i svaret, når en skabelon blev anvendt server-side
       // (se generate-newsletter/route.ts) – ellers bygger setResult selv
-      // blocks-listen via createDefaultBlocks, som hidtil. `matchedProductIds`
-      // er kun med ved emne-søgning – HELE det matchede produkt-sæt, se
-      // NewsletterContext.setResult.
+      // blocks-listen via createDefaultBlocks, som hidtil. `matchedProductIds`/
+      // `topicSearchTerm` er kun med ved emne-søgning – HELE det matchede
+      // produkt-sæt hhv. selve emne-ordet, se NewsletterContext.setResult.
       const {
         blocks,
         matchedProductIds,
+        topicSearchTerm,
         ...data
-      }: GeneratedNewsletter & { blocks?: NewsletterBlock[]; matchedProductIds?: string[] } = await response.json();
-      setResult(data, blocks, matchedProductIds);
+      }: GeneratedNewsletter & {
+        blocks?: NewsletterBlock[];
+        matchedProductIds?: string[];
+        topicSearchTerm?: string;
+      } = await response.json();
+      setResult(data, blocks, matchedProductIds, topicSearchTerm);
       router.push("/preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
