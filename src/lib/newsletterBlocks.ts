@@ -253,6 +253,18 @@ function greetingFor(customerType: CustomerType): string {
   return customerType === "erhverv" ? "Kære erhvervskunde," : "Kære privatkunde,";
 }
 
+// Bygger Brødtekst-blokkens FULDE HTML-indhold (hilsen + selve AI-teksten,
+// hver i sit eget <p>) – PRÆCIS samme formatering, uanset om den bruges ved
+// selve genereringen (createDefaultBlocks/createBlocksFromTemplate herunder)
+// eller ved en efterfølgende "Regenerér tekst"-handling i Edit-mode (se
+// EditorBlockList.tsx), som KUN opdaterer Overskrift-/Brødtekst-indholdet
+// uden at røre blok-struktur/styling. Eksporteret, så begge steder deler
+// nøjagtig samme funktion i stedet for at duplikere escapeHtml/greetingFor-
+// logikken.
+export function buildBodyTextHtml(customerType: CustomerType, bodyText: string): string {
+  return [greetingFor(customerType), bodyText].map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("");
+}
+
 // Bruges kun til at PRIORITERE blandt de allerede valgte produkter, når
 // galleriet forudfyldes automatisk (se pickGalleryProducts) – ShopifyProduct
 // har intet dedikeret isBestSeller-felt, så det nærmeste tilsvarende er et
@@ -332,9 +344,7 @@ export function createDefaultBlocks(
     }
     if (type === "overskrift") block.content = result.heading;
     if (type === "brodtekst") {
-      block.content = [greetingFor(customerType), result.bodyText]
-        .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
-        .join("");
+      block.content = buildBodyTextHtml(customerType, result.bodyText);
     }
     if (type === "billede") {
       if (selectedProducts.length > 1) {
@@ -498,9 +508,7 @@ export function createBlocksFromTemplate(
 
     if (block.type === "overskrift") block.content = result.heading;
     if (block.type === "brodtekst") {
-      block.content = [greetingFor(customerType), result.bodyText]
-        .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
-        .join("");
+      block.content = buildBodyTextHtml(customerType, result.bodyText);
     }
     // Den samlede Billede-/Galleri-blok (se normalizedType ovenfor) – samme
     // layout-regel som createDefaultBlocks: galleryColumns > 1 betyder

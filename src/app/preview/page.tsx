@@ -35,7 +35,8 @@ const EMPTY_PRODUCT_IDS: string[] = [];
 
 export default function PreviewPage() {
   const router = useRouter();
-  const { result, customerType, topicMatchedProductIds, topicSearchTerm, blocks, setBlocks } = useNewsletter();
+  const { result, customerType, instructions, topicMatchedProductIds, topicSearchTerm, blocks, setBlocks } =
+    useNewsletter();
   const brand = useBrandSettings();
 
   const [activeView, setActiveView] = useState<View>("preview");
@@ -258,6 +259,8 @@ export default function PreviewPage() {
                 products={selectedProducts}
                 topicMatchedProductIds={topicMatchedProductIds}
                 topicSearchTerm={topicSearchTerm}
+                customerType={customerType}
+                instructions={instructions}
               />
             </div>
           )}

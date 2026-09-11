@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import type { CustomerType } from "@/lib/format";
 import { resolveCtaLink } from "@/lib/ctaLink";
 import { TextBlockEditor } from "@/components/TextBlockEditor";
 import { ImageBlockControls } from "@/components/ImageBlockControls";
@@ -38,10 +39,13 @@ import {
   ImagePlaceholderIcon,
   PlusIcon,
   ProductIcon,
+  RefreshIcon,
+  SpinnerIcon,
   TextIcon,
   TrashIcon,
 } from "@/components/icons";
 import {
+  buildBodyTextHtml,
   createNewBlock,
   duplicateBlock,
   isGalleryLayout,
@@ -779,9 +783,22 @@ interface EditorBlockListProps {
   topicMatchedProductIds: string[] | null;
   // Selve emne-ordet, der producerede det nuværende resultat – null ved
   // almindeligt manuelt produktvalg, se preview/page.tsx og
-  // NewsletterContext.topicSearchTerm. Bruges KUN til at genberegne
-  // resolveCtaLink()'s søgeside-fallback (se applyCtaLinkUpdate ovenfor).
+  // NewsletterContext.topicSearchTerm. Bruges til at genberegne
+  // resolveCtaLink()'s søgeside-fallback (se applyCtaLinkUpdate ovenfor) OG
+  // som (valgfri) kategori-kontekst ved "Regenerér tekst" (se
+  // handleRegenerateText herunder).
   topicSearchTerm: string | null;
+  // Målgruppen, det nuværende nyhedsbrev blev genereret til – bruges KUN af
+  // "Regenerér tekst" (se handleRegenerateText herunder), til at bygge
+  // PRÆCIS samme prompt-kontekst (pris inkl./ekskl. moms, tone) som selve
+  // genereringen, og til at genopbygge Brødtekst-blokkens hilsen korrekt
+  // (se buildBodyTextHtml).
+  customerType: CustomerType;
+  // Opsætnings-sidens samlede tekstfelt, som det så ud ved selve
+  // genereringen (NewsletterContext.instructions) – bruges KUN af
+  // "Regenerér tekst" til at give AI'en samme tone-/fokus-instruks som
+  // oprindeligt, uden at det ellers påvirker noget i selve editoren.
+  instructions: string;
 }
 
 export function EditorBlockList({
@@ -790,11 +807,65 @@ export function EditorBlockList({
   products,
   topicMatchedProductIds,
   topicSearchTerm,
+  customerType,
+  instructions,
 }: EditorBlockListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  const [isRegeneratingText, setIsRegeneratingText] = useState(false);
+  const [regenerateTextError, setRegenerateTextError] = useState<string | null>(null);
+
+  // Samme union af "aktuelt viste" produkter, CTA-linket allerede
+  // genberegnes ud fra (se collectCtaRelevantProducts/applyCtaLinkUpdate
+  // ovenfor) – IKKE de oprindelige seed-produkter fra selve genereringen.
+  // Tom, hvis brugeren har fravalgt alt i både Produktvisning og Billede/
+  // Galleri – "Regenerér tekst"-knappen deaktiveres da (se JSX herunder),
+  // ligesom CTA-linket i så fald heller ikke opdateres.
+  const regenerateTextProducts = collectCtaRelevantProducts(blocks, products);
+
+  // Kalder /api/regenerate-text med UNIONEN af aktuelt viste produkter
+  // (regenerateTextProducts ovenfor) og opdaterer KUN Overskrift-/
+  // Brødtekst-blokkenes content med svaret – rører bevidst intet andet
+  // (blok-struktur, styling, billeder, CTA, som allerede er korrekt
+  // dynamisk, se applyCtaLinkUpdate). Samme prompt-opbygning som selve
+  // genereringen (buildNewsletterUserPrompt via regenerate-text/route.ts),
+  // men image/cta i AI-svaret ignoreres helt – kun heading/bodyText bruges.
+  async function handleRegenerateText() {
+    if (regenerateTextProducts.length === 0 || isRegeneratingText) return;
+    setIsRegeneratingText(true);
+    setRegenerateTextError(null);
+    try {
+      const response = await fetch("/api/regenerate-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerType,
+          instructions,
+          productIds: regenerateTextProducts.map((product) => product.id),
+          topicSearchTerm,
+        }),
+      });
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        throw new Error(errorBody?.error ?? "Kunne ikke regenerere teksten. Prøv igen.");
+      }
+      const { heading, bodyText } = await response.json();
+      onBlocksChange(
+        blocks.map((block) => {
+          if (block.type === "overskrift") return { ...block, content: heading };
+          if (block.type === "brodtekst") return { ...block, content: buildBodyTextHtml(customerType, bodyText) };
+          return block;
+        }),
+      );
+    } catch (err) {
+      setRegenerateTextError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
+    } finally {
+      setIsRegeneratingText(false);
+    }
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -1061,6 +1132,24 @@ export function EditorBlockList({
         <div aria-label="Tekstfarve for hele nyhedsbrevet">
           <ColorSwatches value={globalTextColor} onChange={handleGlobalColorChange} />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <button
+          type="button"
+          onClick={handleRegenerateText}
+          disabled={regenerateTextProducts.length === 0 || isRegeneratingText}
+          title="Genererer Overskrift og Brødtekst på ny, ud fra det/de produkter, der aktuelt er valgt i Produktvisning og Billede/Galleri herunder – rører ikke ved blok-struktur, styling, billeder eller CTA-knappen."
+          className="inline-flex h-9 w-fit items-center gap-2 self-start rounded-full border border-border bg-white px-3.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isRegeneratingText ? (
+            <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshIcon className="h-3.5 w-3.5" />
+          )}
+          {isRegeneratingText ? "Regenererer tekst..." : "Regenerér tekst ud fra det viste produkt"}
+        </button>
+        {regenerateTextError && <p className="text-[12px] text-red-600">{regenerateTextError}</p>}
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
