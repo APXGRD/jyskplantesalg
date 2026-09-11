@@ -287,21 +287,27 @@ export function pickGalleryProducts(products: ShopifyProduct[], count: number): 
 export function createDefaultBlocks(
   result: GeneratedNewsletter,
   customerType: CustomerType,
-  // De produkter, brugeren valgte på "Vælg produkter"-siden – bruges som
+  // De "seed"-produkter, genereringen skal bygges ud fra (fra
+  // generate-newsletter/route.ts: de FØRSTE N af det fulde matchede sæt,
+  // N = "Maks. antal produkter"-grænsen, se seedProducts der) – bruges som
   // fallback for billede-blokken, hvis AI-svarets productId ikke kan slås op
-  // (se nedenfor), OG afgør, om der automatisk indsættes en "Billede"- eller
-  // "Galleri"-blok (se blockTypes herunder).
+  // (se nedenfor), afgør om der automatisk indsættes en "Billede"- eller
+  // "Galleri"-blok (se blockTypes herunder), OG sætter produktvisnings-
+  // blokkens INITIALE productDisplayIds (se type==="produktvisning"
+  // herunder). Dette er en AFGRÆNSET seed-pulje, IKKE det fulde matchede
+  // sæt – Edit-mode's produktvælgere henter i stedet fra HELE puljen (se
+  // topicMatchedProductIds i NewsletterContext.tsx), uafhængigt af denne.
   selectedProducts: ShopifyProduct[],
   brandDefaults: BrandDefaults,
 ): NewsletterBlock[] {
-  // Én samlet Billede-/Galleri-blok, uanset antal valgte produkter – kun
-  // dens layout-valg (galleryColumns, se herunder) afgør, om den starter som
-  // enkelt-billede (præcis ét valgt produkt) eller galleri (mere end ét).
-  // Galleriet er ikke beregnet til at vise ALLE valgte produkter på én gang
-  // (ligesom Produktvisnings-blokken heller ikke er begrænset, men et
-  // repræsentativt udsnit på 2-3), kun et kurateret udsnit. Dette er kun den
-  // automatiske starttilstand; brugeren kan altid ændre layoutet manuelt i
-  // Edit-mode bagefter.
+  // Én samlet Billede-/Galleri-blok, uanset antal valgte (seed-)produkter –
+  // kun dens layout-valg (galleryColumns, se herunder) afgør, om den starter
+  // som enkelt-billede (præcis ét seed-produkt) eller galleri (mere end ét).
+  // Galleriet er ikke beregnet til at vise ALLE seed-produkter på én gang
+  // (kun et kurateret udsnit på 2-3, se pickGalleryProducts) – dette er kun
+  // den automatiske starttilstand; brugeren kan altid ændre layoutet
+  // manuelt i Edit-mode bagefter, med adgang til HELE det matchede sæt
+  // (ikke kun seed-puljen), se produktvisning-håndteringen herunder.
   const blockTypes: BlockType[] = [
     "header",
     "overskrift",
@@ -354,6 +360,15 @@ export function createDefaultBlocks(
         }
         block.galleryColumns = 1;
       }
+    }
+    if (type === "produktvisning") {
+      // Sættes EKSPLICIT til seed-puljen (IKKE ladt undefined/"vis alle") –
+      // ellers ville blokken automatisk vise HELE det matchede sæt (se
+      // productDisplayIds' doc-kommentar i NewsletterBlock ovenfor), som kan
+      // være langt større end "Maks. antal produkter"-grænsen tilsiger.
+      // Brugeren kan altid udvide/indsnævre valget igen i Edit-mode – det
+      // fulde sæt er fortsat tilgængeligt der (se topicMatchedProductIds).
+      block.productDisplayIds = selectedProducts.map((product) => product.id);
     }
     if (type === "cta") {
       block.content = result.cta.text;
@@ -435,6 +450,10 @@ export function createBlocksFromTemplate(
   templateBlocks: TemplateBlock[],
   result: GeneratedNewsletter,
   customerType: CustomerType,
+  // Samme "seed"-pulje-begreb som createDefaultBlocks ovenfor (de FØRSTE N
+  // af det fulde matchede sæt, se generate-newsletter/route.ts) – IKKE det
+  // fulde matchede sæt. Bruges her til billede-/galleri-layoutet OG til
+  // produktvisnings-blokkens initiale productDisplayIds, se herunder.
   selectedProducts: ShopifyProduct[],
   brandDefaults: BrandDefaults,
 ): NewsletterBlock[] {
@@ -507,6 +526,12 @@ export function createBlocksFromTemplate(
     }
     if (block.type === "produkt") {
       block.productId = selectedProducts[0]?.id;
+    }
+    if (block.type === "produktvisning") {
+      // Samme begrundelse som createDefaultBlocks: sættes EKSPLICIT til
+      // seed-puljen, i stedet for at lade den stå undefined ("vis alle"),
+      // som ellers ville ignorere "Maks. antal produkter"-grænsen helt.
+      block.productDisplayIds = selectedProducts.map((product) => product.id);
     }
     if (block.type === "cta") {
       block.content = result.cta.text;

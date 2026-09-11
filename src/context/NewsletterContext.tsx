@@ -73,6 +73,15 @@ interface NewsletterContextValue {
   // struktureret dropdown-filter.
   topicPlantForm: string;
   setTopicPlantForm: (value: string) => void;
+  // "Maks. antal produkter"-feltet, i samme filter-gruppe som ovenstående –
+  // gemt som RÅ, redigerbar tekst (samme mønster som topicMinPrice/
+  // topicMaxPrice), men ALDRIG tom i praksis: starter på "1"
+  // (DEFAULT_TOPIC_MAX_RESULTS i cachedProducts.ts – kan ikke importeres
+  // direkte her, se DEFAULT_PERSISTED_STATE herunder). Afskærer det
+  // ENDELIGE, alfabetisk sorterede søgeresultat EFTER alle øvrige filtre
+  // (se searchCachedProductsByTopic/parseMaxResults).
+  topicMaxResults: string;
+  setTopicMaxResults: (value: string) => void;
   // Den valgte skabelon på Opsætnings-siden – null betyder "Standard layout"
   // (nuværende, faste blok-struktur). Selve skabelonens indhold hentes ikke
   // her, kun id'et, som sendes med til generate-newsletter/route.ts.
@@ -101,12 +110,17 @@ interface NewsletterContextValue {
   // så fald allerede har bygget den fulde blocks-liste server-side (se
   // opsaetning/page.tsx). `matchedProductIds`/`topicSearchTerm` stammer fra
   // samme søgning (se generate-newsletter/route.ts) og sættes som
-  // topicMatchedProductIds/topicSearchTerm.
+  // topicMatchedProductIds/topicSearchTerm. `seedProductIds` er de FØRSTE N
+  // (maks.-antal-grænsen) af `matchedProductIds` – bruges KUN her, til selv
+  // at bygge blocks-listen via createDefaultBlocks ("Standard layout", uden
+  // `presetBlocks`), IKKE gemt i context'en (Edit-mode's produktvælgere
+  // bruger fortsat det fulde topicMatchedProductIds, se herunder).
   setResult: (
     result: GeneratedNewsletter | null,
     presetBlocks?: NewsletterBlock[],
     matchedProductIds?: string[],
     topicSearchTerm?: string,
+    seedProductIds?: string[],
   ) => void;
   // Blok-listen for Preview/Edit-mode – ligger her (i stedet for som lokal
   // state i preview/page.tsx), så den overlever navigation væk fra og tilbage
@@ -129,6 +143,9 @@ interface PersistedState {
   topicMinPrice: string;
   topicMaxPrice: string;
   topicPlantForm: string;
+  // Holdt i sync manuelt med DEFAULT_TOPIC_MAX_RESULTS i cachedProducts.ts
+  // (se kommentaren ved topicMaxResults i NewsletterContextValue ovenfor).
+  topicMaxResults: string;
   selectedTemplateId: string | null;
   result: GeneratedNewsletter | null;
   topicMatchedProductIds: string[] | null;
@@ -144,6 +161,7 @@ const DEFAULT_PERSISTED_STATE: PersistedState = {
   topicMinPrice: "",
   topicMaxPrice: "",
   topicPlantForm: "",
+  topicMaxResults: "1",
   selectedTemplateId: null,
   result: null,
   topicMatchedProductIds: null,
@@ -175,6 +193,7 @@ function loadPersistedState(): PersistedState {
       topicMinPrice: typeof parsed.topicMinPrice === "string" ? parsed.topicMinPrice : "",
       topicMaxPrice: typeof parsed.topicMaxPrice === "string" ? parsed.topicMaxPrice : "",
       topicPlantForm: typeof parsed.topicPlantForm === "string" ? parsed.topicPlantForm : "",
+      topicMaxResults: typeof parsed.topicMaxResults === "string" ? parsed.topicMaxResults : "1",
       selectedTemplateId: typeof parsed.selectedTemplateId === "string" ? parsed.selectedTemplateId : null,
       result: parsed.result ?? null,
       topicMatchedProductIds: Array.isArray(parsed.topicMatchedProductIds) ? parsed.topicMatchedProductIds : null,
@@ -208,6 +227,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
   const [topicMinPrice, setTopicMinPrice] = useState(() => loadPersistedState().topicMinPrice);
   const [topicMaxPrice, setTopicMaxPrice] = useState(() => loadPersistedState().topicMaxPrice);
   const [topicPlantForm, setTopicPlantForm] = useState(() => loadPersistedState().topicPlantForm);
+  const [topicMaxResults, setTopicMaxResults] = useState(() => loadPersistedState().topicMaxResults);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     () => loadPersistedState().selectedTemplateId,
   );
@@ -247,13 +267,14 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       presetBlocks?: NewsletterBlock[],
       matchedProductIds?: string[],
       newTopicSearchTerm?: string,
+      seedProductIds?: string[],
     ) => {
       setResultState(newResult);
       // Sat af generate-newsletter/route.ts – enhver generering er nu en
       // fritekst-søgning, så matchedProductIds er altid HELE det matchede
-      // sæt, ikke kun det ene produkt, billede-blokken viser (se Edit-mode's
-      // billede-/galleri-blok-kontroller, som bruger denne til at tilbyde
-      // hele udvalget).
+      // sæt, ikke kun de(t) produkt(er) billede-/produktvisnings-blokken
+      // initialt viser (se Edit-mode's billede-/galleri- og produktvisnings-
+      // blok-kontroller, som bruger denne til at tilbyde hele udvalget).
       setTopicMatchedProductIds(matchedProductIds ?? null);
       // Samme mønster som topicMatchedProductIds ovenfor, men de(t)
       // bekræftet-matchende søgeord – bruges af resolveCtaLink()'s
@@ -278,16 +299,18 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         const response = await fetch("/api/products/cached");
         const data = await response.json();
         const allProducts: ShopifyProduct[] = response.ok ? data.products : [];
-        // ÉT repræsentativt produkt til billede-blokken – generate-
-        // newsletter/route.ts har allerede sat newResult.image.productId
-        // til dette produkt, så createDefaultBlocks's egen opslagslogik
-        // finder det korrekt her. IKKE automatisk et galleri, selvom mange
-        // produkter matchede søgningen – kun ÉT element i selectedProducts
-        // sikrer det.
-        const matchedProducts = allProducts.filter((product) => (matchedProductIds ?? []).includes(product.id));
-        const representative =
-          matchedProducts.find((product) => product.id === newResult.image.productId) ?? matchedProducts[0];
-        selectedProducts = representative ? [representative] : [];
+        // Kun de(t) produkt(er), der udgør seed-puljen (de FØRSTE N af det
+        // fulde matchede sæt, N = "Maks. antal produkter"-grænsen, se
+        // seedProductIds fra generate-newsletter/route.ts) – IKKE hele
+        // matchedProducts. Rækkefølgen fra seedProductIds bevares (allerede
+        // alfabetisk fra selve søgningen), så billede-blokkens repræsentant-
+        // valg (matcher stadig newResult.image.productId, se
+        // createDefaultBlocks) og produktvisnings-blokkens initiale
+        // productDisplayIds begge kun trækker fra denne afgrænsede pulje.
+        const seedProducts = (seedProductIds ?? [])
+          .map((id) => allProducts.find((product) => product.id === id))
+          .filter((product): product is ShopifyProduct => Boolean(product));
+        selectedProducts = seedProducts;
       } catch {
         // Ignoreres bevidst – se kommentaren ovenfor.
       }
@@ -314,6 +337,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         topicMinPrice,
         topicMaxPrice,
         topicPlantForm,
+        topicMaxResults,
         selectedTemplateId,
         result,
         topicMatchedProductIds,
@@ -332,6 +356,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
     topicMinPrice,
     topicMaxPrice,
     topicPlantForm,
+    topicMaxResults,
     selectedTemplateId,
     result,
     topicMatchedProductIds,
@@ -356,6 +381,8 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       setTopicMaxPrice,
       topicPlantForm,
       setTopicPlantForm,
+      topicMaxResults,
+      setTopicMaxResults,
       selectedTemplateId,
       setSelectedTemplateId,
       result,
@@ -373,6 +400,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       topicMinPrice,
       topicMaxPrice,
       topicPlantForm,
+      topicMaxResults,
       selectedTemplateId,
       result,
       topicMatchedProductIds,
