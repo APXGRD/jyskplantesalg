@@ -146,6 +146,10 @@ function tokenizeAndNormalize(text: string): string[] {
 }
 
 export interface TopicSearchResult {
+  // Det ENDELIGE produkt-sæt – EFTER både alle øvrige filtre OG en evt.
+  // maxResults-afskæring (se options.maxResults herunder). ALTID alfabetisk
+  // sorteret efter titel (dansk sortering), uanset om der reelt blev
+  // afskåret eller ej, så rækkefølgen er forudsigelig i begge tilfælde.
   products: ShopifyProduct[];
   // De ORIGINALE (u-normaliserede) søgeord, der rent faktisk gav mindst ét
   // matchende produkt – IKKE blot alle ord, der overlevede stopords-
@@ -157,6 +161,33 @@ export interface TopicSearchResult {
   // faktisk gav resultat – et ord som "pæn", der overlevede stopords-
   // filtreringen men ikke matchede noget produkt, skal IKKE ende i linket.
   matchedWords: string[];
+  // Antal produkter, der matchede ALLE øvrige filtre (tekst, pris,
+  // planteform, billede), FØR maxResults-afskæringen blev anvendt – dvs.
+  // `products.length` når intet blev afskåret, men STØRRE end
+  // `products.length`, når maxResults reelt begrænsede resultatet. Bruges af
+  // Opsætnings-sidens "X produkter matcher, viser de første N"-note (se
+  // /api/products/topic-match-count/route.ts og OpsaetningClient.tsx).
+  totalMatchCount: number;
+}
+
+// Standardgrænsen for "Maks. antal produkter"-feltet på Opsætnings-siden –
+// ÉN kilde til sandhed for både serverens fallback (parseMaxResults
+// herunder, når feltet mangler/er ugyldigt) og klientfeltets startværdi (se
+// DEFAULT_PERSISTED_STATE i NewsletterContext.tsx, som IKKE kan importere
+// denne fil direkte, da den trækker Supabase-klienten ind i klientbundlet –
+// holdes derfor manuelt i sync med kommentar-henvisning begge steder).
+export const DEFAULT_TOPIC_MAX_RESULTS = 1;
+
+// Et brugbart, positivt heltal (min. 1) – ellers DEFAULT_TOPIC_MAX_RESULTS,
+// så et manglende/ugyldigt felt altid falder tilbage til en fornuftig,
+// automatisk grænse i stedet for enten at fejle eller (utilsigtet) fjerne
+// grænsen helt.
+export function parseMaxResults(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const rounded = Math.floor(value);
+    if (rounded >= 1) return rounded;
+  }
+  return DEFAULT_TOPIC_MAX_RESULTS;
 }
 
 // Valgfrit prisinterval (begge grænser inklusive), fra Opsætnings-sidens
@@ -169,21 +200,28 @@ export interface TopicSearchResult {
 // ord-matchningen herunder (se tokenizeAndNormalize-brugen), men er IKKE
 // længere et separat, strukturelt AND-filter for sig (det tidligere
 // "Plantesort"-filter er fjernet).
+// maxResults afskærer resultatet til de første N produkter (alfabetisk
+// sorteret efter titel) EFTER alle øvrige filtre OG ord-matchningen –
+// undefined betyder "ingen afskæring" (bruges af
+// /api/products/topic-match-count/route.ts, som netop skal kende det FULDE,
+// ufiltrerede antal). generate-newsletter/route.ts sender derimod altid en
+// værdi (se parseMaxResults ovenfor).
 export interface TopicSearchOptions {
   onlyWithImage?: boolean;
   minPrice?: number;
   maxPrice?: number;
   plantForm?: string;
+  maxResults?: number;
 }
 
 export async function searchCachedProductsByTopic(
   topic: string,
   options: TopicSearchOptions = {},
 ): Promise<TopicSearchResult> {
-  const { onlyWithImage = false, minPrice, maxPrice, plantForm } = options;
+  const { onlyWithImage = false, minPrice, maxPrice, plantForm, maxResults } = options;
   const candidates = extractSearchWordCandidates(topic);
 
-  if (candidates.length === 0) return { products: [], matchedWords: [] };
+  if (candidates.length === 0) return { products: [], matchedWords: [], totalMatchCount: 0 };
 
   const { products } = await getCachedProducts();
   const matchedProducts: ShopifyProduct[] = [];
@@ -213,5 +251,16 @@ export async function searchCachedProductsByTopic(
     if (productMatched) matchedProducts.push(product);
   }
 
-  return { products: matchedProducts, matchedWords: [...matchedWords] };
+  // Alfabetisk (dansk sortering), så resultatet er forudsigeligt og
+  // testbart – IKKE en påstået "bedste"/mest populære udvælgelse, siden der
+  // ikke findes et pålideligt popularitets-/bestseller-signal i de rigtige
+  // Shopify-data. Sorteres eksplicit her, i stedet for at stole på, at
+  // getCachedProducts allerede returnerer rækkerne i denne rækkefølge.
+  matchedProducts.sort((a, b) => a.title.localeCompare(b.title, "da"));
+
+  const totalMatchCount = matchedProducts.length;
+  const truncatedProducts =
+    typeof maxResults === "number" ? matchedProducts.slice(0, maxResults) : matchedProducts;
+
+  return { products: truncatedProducts, matchedWords: [...matchedWords], totalMatchCount };
 }

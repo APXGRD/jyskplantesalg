@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { Sidebar } from "@/components/Sidebar";
@@ -32,6 +32,8 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
     setTopicMaxPrice,
     topicPlantForm,
     setTopicPlantForm,
+    topicMaxResults,
+    setTopicMaxResults,
     selectedTemplateId,
     setSelectedTemplateId,
     setResult,
@@ -55,12 +57,79 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
   // handleDeleteTemplate.
   const [deleteTarget, setDeleteTarget] = useState<TemplateSummary | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Det FULDE (ufiltrerede af maxResults) antal produkter, der matcher de
+  // nuværende filtre – null, indtil den første optælling er kommet tilbage
+  // (eller feltet er tomt, se effekten herunder). Bruges UDELUKKENDE til
+  // "X produkter matcher, viser de første N"-noten ved siden af "Maks. antal
+  // produkter"-feltet; selve genereringen bruger IKKE denne værdi, kun sin
+  // egen friske søgning server-side (se generate-newsletter/route.ts).
+  const [topicTotalMatchCount, setTopicTotalMatchCount] = useState<number | null>(null);
 
   // Det samlede beskrivelsesfelt er den ENESTE vej til at generere et
   // nyhedsbrev – manuelt produktvalg findes ikke længere som et alternativ
   // (se generate-newsletter/route.ts).
   const canGenerate = instructions.trim().length > 0;
   const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
+
+  // Debounceret, LIVE optælling af det fulde antal matchende produkter (før
+  // "Maks. antal produkter" afskærer noget) – opdateres, mens brugeren
+  // stadig redigerer felterne, i stedet for kun at kunne ses efter en hel
+  // generering (som i forvejen navigerer væk fra siden med det samme ved
+  // succes, se handleGenerate). Kalder /api/products/topic-match-count, som
+  // kører NØJAGTIG samme søgning/filtre, blot uden AI og uden afskæring.
+  useEffect(() => {
+    const trimmedInstructions = instructions.trim();
+    if (!trimmedInstructions) {
+      return;
+    }
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/products/topic-match-count", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instructions: trimmedInstructions,
+            topicOnlyWithImage,
+            topicMinPrice: topicMinPrice.trim() ? Number(topicMinPrice) : undefined,
+            topicMaxPrice: topicMaxPrice.trim() ? Number(topicMaxPrice) : undefined,
+            topicPlantForm: topicPlantForm || undefined,
+          }),
+        });
+        if (cancelled || !response.ok) return;
+        const data = await response.json();
+        if (!cancelled && typeof data.totalMatchCount === "number") {
+          setTopicTotalMatchCount(data.totalMatchCount);
+        }
+      } catch {
+        // Ignoreres bevidst – noten er informativ, ikke kritisk for selve
+        // genereringen, som stadig kører sin egen, friske søgning.
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [instructions, topicOnlyWithImage, topicMinPrice, topicMaxPrice, topicPlantForm]);
+
+  const parsedMaxResults = topicMaxResults.trim() ? Number(topicMaxResults) : NaN;
+  const hasValidMaxResults = Number.isFinite(parsedMaxResults) && parsedMaxResults >= 1;
+  // Vises ALTID (ikke kun når grænsen reelt afskærer noget), så feltet ét
+  // sted uden filter (tomt tekstfelt) forbliver tydeligt "intet at vise" –
+  // IKKE et forvirrende "0 produkter matcher" for et filter, brugeren slet
+  // ikke er i gang med at bruge endnu. Selve teksten har tre varianter
+  // (se matchCountText herunder): "0 produkter matcher", "N produkter
+  // matcher" (inden for grænsen), og "N produkter matcher, viser de første
+  // M" (grænsen afskærer reelt noget).
+  const showMatchCountNote = canGenerate && topicTotalMatchCount !== null;
+  const matchCountText = (() => {
+    if (topicTotalMatchCount === null) return "";
+    if (topicTotalMatchCount === 0) return "0 produkter matcher";
+    if (hasValidMaxResults && topicTotalMatchCount > parsedMaxResults) {
+      return `${topicTotalMatchCount} produkter matcher, viser de første ${parsedMaxResults}`;
+    }
+    return `${topicTotalMatchCount} produkter matcher`;
+  })();
 
   function handleDeleteTemplate() {
     if (!selectedTemplate) return;
@@ -113,6 +182,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
           topicMinPrice: topicMinPrice.trim() ? Number(topicMinPrice) : undefined,
           topicMaxPrice: topicMaxPrice.trim() ? Number(topicMaxPrice) : undefined,
           topicPlantForm: topicPlantForm || undefined,
+          topicMaxResults: topicMaxResults.trim() ? Number(topicMaxResults) : undefined,
         }),
       });
 
@@ -127,17 +197,22 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
       // `topicSearchTerm` er altid med (enhver generering er nu en
       // fritekst-søgning) – HELE det matchede produkt-sæt hhv. de
       // bekræftet-matchende søgeord, se NewsletterContext.setResult.
+      // `seedProductIds` er de FØRSTE N (maks.-antal-grænsen) af
+      // matchedProductIds – bruges KUN til selve den initiale blok-
+      // opbygning (se setResult), IKKE gemt nogen steder i context'en.
       const {
         blocks,
         matchedProductIds,
         topicSearchTerm,
+        seedProductIds,
         ...data
       }: GeneratedNewsletter & {
         blocks?: NewsletterBlock[];
         matchedProductIds?: string[];
         topicSearchTerm?: string;
+        seedProductIds?: string[];
       } = await response.json();
-      setResult(data, blocks, matchedProductIds, topicSearchTerm);
+      setResult(data, blocks, matchedProductIds, topicSearchTerm, seedProductIds);
       router.push("/preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
@@ -261,6 +336,27 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                   </select>
                   <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-3 w-3 -translate-y-1/2 text-ink-muted" />
                 </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="topic-max-results" className="text-[13px] text-ink-faint whitespace-nowrap">
+                    Maks. antal produkter
+                  </label>
+                  <input
+                    id="topic-max-results"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    value={topicMaxResults}
+                    onChange={(event) => setTopicMaxResults(event.target.value)}
+                    className="w-20 rounded-lg border border-border bg-white px-2.5 py-2 text-[13px] text-ink focus:outline-none"
+                  />
+                </div>
+                {showMatchCountNote && (
+                  <p
+                    className={`w-full text-[12px] ${topicTotalMatchCount === 0 ? "text-red-600" : "text-ink-faint"}`}
+                  >
+                    {matchCountText}
+                  </p>
+                )}
               </div>
             </section>
 

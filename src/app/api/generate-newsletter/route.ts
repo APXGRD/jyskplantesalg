@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { resolveCtaLink } from "@/lib/ctaLink";
-import { searchCachedProductsByTopic } from "@/lib/cachedProducts";
+import { parseMaxResults, searchCachedProductsByTopic } from "@/lib/cachedProducts";
 import { getBrandSettings } from "@/lib/brandSettings";
 import { getSupabaseClient } from "@/lib/supabase";
 import {
@@ -52,6 +52,12 @@ interface GenerateNewsletterBody {
   // osv., fra Shopifys custom.planteform-metafelt) – undefined/tom streng
   // betyder "Alle" (intet filter), se searchCachedProductsByTopic.
   topicPlantForm?: string;
+  // "Maks. antal produkter"-feltet ved siden af de øvrige filtre – afskærer
+  // det ENDELIGE, alfabetisk sorterede resultat (EFTER alle øvrige filtre)
+  // til de N første produkter, se searchCachedProductsByTopic/
+  // parseMaxResults. Manglende/ugyldig værdi falder tilbage til
+  // DEFAULT_TOPIC_MAX_RESULTS (se parseMaxResults), aldrig "ingen grænse".
+  topicMaxResults?: number;
 }
 
 // Et tal, hvis værdien reelt ER et brugbart, ikke-negativt tal – ellers
@@ -111,11 +117,13 @@ export async function POST(req: NextRequest) {
     topicMinPrice,
     topicMaxPrice,
     topicPlantForm,
+    topicMaxResults,
   } = body;
   const trimmedInstructions = typeof instructions === "string" ? instructions.trim() : "";
   const minPrice = parseOptionalPrice(topicMinPrice);
   const maxPrice = parseOptionalPrice(topicMaxPrice);
   const trimmedPlantForm = typeof topicPlantForm === "string" ? topicPlantForm.trim() : "";
+  const maxResults = parseMaxResults(topicMaxResults);
 
   if (trimmedInstructions.length === 0) {
     return NextResponse.json(
@@ -137,7 +145,15 @@ export async function POST(req: NextRequest) {
   // UDELUKKENDE til CTA-knappens søgeside-fallback-link (se resolveCtaLink
   // herunder) – AI-promptens egen topicSearchTerm (buildNewsletterUserPrompt)
   // bruger fortsat den FULDE trimmedInstructions, uændret.
-  let selectedProducts: ShopifyProduct[];
+  //
+  // BEMÆRK: maxResults sendes IKKE med her – matchedProducts er derfor det
+  // FULDE, ufiltrerede (af maks.-antal) resultat, EFTER alle øvrige filtre
+  // (tekst, pris, planteform, billede). Dette er den pulje, der sendes til
+  // klienten som matchedProductIds herunder, og som Edit-mode's søgbare
+  // produktvælgere (Produktvisning og Billede/Galleri) vælger imellem.
+  // maxResults-grænsen anvendes udelukkende LOKALT herunder (seedProducts),
+  // til selve den INITIALE blok-opbygning – se seedProducts.
+  let matchedProducts: ShopifyProduct[];
   let matchedSearchWords: string[];
   try {
     const searchResult = await searchCachedProductsByTopic(trimmedInstructions, {
@@ -146,7 +162,7 @@ export async function POST(req: NextRequest) {
       maxPrice,
       plantForm: trimmedPlantForm || undefined,
     });
-    selectedProducts = searchResult.products;
+    matchedProducts = searchResult.products;
     matchedSearchWords = searchResult.matchedWords;
   } catch (err) {
     return NextResponse.json(
@@ -154,7 +170,7 @@ export async function POST(req: NextRequest) {
       { status: 502 },
     );
   }
-  if (selectedProducts.length === 0) {
+  if (matchedProducts.length === 0) {
     // Samme fejlbesked-mønster som hidtil – blot udvidet til også at nævne
     // ethvert AKTIVT ekstra filter (prisinterval og/eller planteform), når det
     // (og ikke kun selve teksten) er årsagen til, at kombinationen ikke
@@ -169,7 +185,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  const productsForPrompt = selectedProducts.map((product) => ({
+  // De FØRSTE N (maks.-antal-grænsen) af det fulde, alfabetisk sorterede
+  // matchedProducts – den ENESTE plads, maxResults har effekt. Bruges til
+  // AI-promptens produktliste OG selve den initiale blok-opbygning
+  // (billede-/produktvisningsblok, CTA-link) herunder. Edit-mode's
+  // produktvælgere bruger DERIMOD det fulde matchedProducts (se
+  // matchedProductIds), ikke denne afskårne liste.
+  const seedProducts = matchedProducts.slice(0, maxResults);
+
+  const productsForPrompt = seedProducts.map((product) => ({
     id: product.id,
     title: product.title,
     price: formatPriceForCustomer(product.price, customerType),
@@ -209,33 +233,39 @@ export async function POST(req: NextRequest) {
     // Overskriver AI'ens eget cta.url-valg med den deterministiske logik
     // herover – AI'en må stadig selv formulere cta.text. De bekræftet-
     // matchende søgeord (matchedSearchWords, IKKE den fulde feltværdi)
-    // bruges til resolveCtaLink's søgeside-fallback i ctaLink.ts.
+    // bruges til resolveCtaLink's søgeside-fallback i ctaLink.ts. Bruger
+    // seedProducts (IKKE det fulde matchedProducts) – CTA-linket skal
+    // afspejle det, der REELT vises i den initiale generering, samme
+    // afgrænsning som billede-/produktvisningsblokken herunder.
     newsletter.cta = {
       ...newsletter.cta,
-      url: resolveCtaLink(selectedProducts, matchedSearchWords.join(" ")),
+      url: resolveCtaLink(seedProducts, matchedSearchWords.join(" ")),
     };
 
-    // ÉT repræsentativt produkt (bestseller, ellers det først fundne) til
-    // den initiale billede-blok – IKKE automatisk et galleri, selvom flere
-    // produkter matchede søgningen (afviger bevidst fra den almindelige
-    // "flere produkter = automatisk galleri"-regel). Overskriver samtidig
-    // AI'ens eget image-valg, af samme grund som cta.url ovenfor: det skal
-    // være deterministisk, ikke AI'ens gæt. blockSeedProducts er DERFOR kun
-    // det ene produkt – createDefaultBlocks/createBlocksFromTemplate vælger
-    // selv layout "1 billede" frem for et galleri-layout, når der kun er ét
-    // produkt at bygge ud fra (se MediaLayout i newsletterBlocks.ts).
-    // matchedProductIds er derimod HELE det matchede sæt, sendt med i svaret
-    // til NewsletterContext (se setResult), så Edit-mode's billede-/
-    // galleri-blok-vælger kan tilbyde alle søgnings-matches, ikke kun det
-    // ene viste.
-    const representative = selectedProducts.find(isBestSeller) ?? selectedProducts[0];
+    // Repræsentativt produkt (bestseller, ellers det først fundne) TIL
+    // billede-blokkens enkelt-billede-layout, valgt blandt seedProducts
+    // (IKKE det fulde matchedProducts) – overskriver samtidig AI'ens eget
+    // image-valg, af samme grund som cta.url ovenfor: det skal være
+    // deterministisk, ikke AI'ens gæt.
+    const representative = seedProducts.find(isBestSeller) ?? seedProducts[0];
     newsletter.image = {
       productId: representative.id,
       imageUrl: representative.imageUrl,
       altText: representative.title,
     };
-    const blockSeedProducts = [representative];
-    const matchedProductIds = selectedProducts.map((product) => product.id);
+    // blockSeedProducts = seedProducts (op til maxResults produkter, IKKE
+    // kun ét) – createDefaultBlocks/createBlocksFromTemplate bygger selv et
+    // kurateret galleri (billede-blok) og sætter produktvisningsblokkens
+    // productDisplayIds ud fra denne pulje, se newsletterBlocks.ts. Dette er
+    // den ENESTE plads, maxResults påvirker den initiale blok-opbygning.
+    // matchedProductIds er derimod det FULDE matchedProducts (før
+    // maxResults-afskæring), sendt med i svaret til NewsletterContext (se
+    // setResult), så Edit-mode's billede-/galleri- og produktvisnings-
+    // vælgere kan tilbyde ALLE søgnings-matches, ikke kun de(t) initialt
+    // viste.
+    const blockSeedProducts = seedProducts;
+    const matchedProductIds = matchedProducts.map((product) => product.id);
+    const seedProductIds = seedProducts.map((product) => product.id);
 
     // Er en skabelon valgt (frem for "Standard layout"), bygges hele
     // blocks-arrayet HER server-side ud fra dens gemte struktur/styling – se
@@ -270,6 +300,7 @@ export async function POST(req: NextRequest) {
       ...newsletter,
       blocks,
       matchedProductIds,
+      seedProductIds,
       topicSearchTerm: matchedSearchWords.join(" "),
     });
   } catch (err) {
