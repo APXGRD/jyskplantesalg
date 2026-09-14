@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { DocumentIcon, GearIcon, PaletteIcon, UsersIcon } from "./icons";
+import { DocumentIcon, GearIcon, MenuIcon, PaletteIcon, UsersIcon, XIcon } from "./icons";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
 
 // "products" (den tidligere "Vælg produkter"-side) er BEVIDST ikke længere
@@ -54,9 +55,13 @@ export function Sidebar({ active }: SidebarProps) {
   // opgavebeskrivelsen. Navnet vises PRÆCIST som skrevet i Indstillinger,
   // ingen opsplitning/omformatering.
   const settings = useBrandSettings();
+  // Kun relevant under md-breakpointet (se den faste hamburger-knap
+  // herunder) – ved md og opefter er sidemenuen altid synlig, uændret fra
+  // før dette responsive-arbejde, og denne state bruges slet ikke.
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
+  const navBody = (
+    <>
       <div className="flex items-center gap-3 border-b border-border p-5">
         {settings.logoData && (
           // Intet farvet cirkel-badge her – et rigtigt, uploadet logo har
@@ -99,6 +104,9 @@ export function Sidebar({ active }: SidebarProps) {
                 key={item.id}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
+                // Lukker altid den mobile menu efter et sidevalg – harmløs
+                // no-op ved md+ (isMobileOpen bruges der slet ikke).
+                onClick={() => setIsMobileOpen(false)}
                 className={className}
               >
                 <Icon className="h-3.75 w-3.75" />
@@ -113,6 +121,53 @@ export function Sidebar({ active }: SidebarProps) {
         <p className="text-[11px] text-ink-faint">Udkast gemt</p>
         <p className="pt-0.5 text-[11px] font-medium text-ink-muted">{formatDraftSavedAt(new Date())}</p>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Fast hamburger-knap – KUN under md-breakpointet, hvor selve
+          sidemenuen er skjult som standard (se aside herunder). Fixed
+          positionering betyder, den er synlig oven på al sideindhold på
+          alle fem sider, uden at hver enkelt side selv skal håndtere den. */}
+      <button
+        type="button"
+        onClick={() => setIsMobileOpen(true)}
+        aria-label="Åbn menu"
+        className="fixed top-4 left-4 z-30 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-ink-muted shadow-[0_1px_3px_rgba(0,0,0,0.1)] md:hidden"
+      >
+        <MenuIcon className="h-4 w-4" />
+      </button>
+
+      {/* Desktop/tablet – uændret adfærd og udseende fra md og opefter,
+          altid synlig, ingen state involveret. */}
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-surface md:flex">
+        {navBody}
+      </aside>
+
+      {/* Mobil – off-canvas menu, kun i DOM'en når den rent faktisk er
+          åben. Samme baggrunds-luk-mønster som ConfirmDialog.tsx. */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-40 flex md:hidden">
+          <button
+            type="button"
+            aria-label="Luk menu"
+            onClick={() => setIsMobileOpen(false)}
+            className="absolute inset-0 bg-black/30"
+          />
+          <aside className="relative flex h-full w-64 max-w-[80vw] flex-col border-r border-border bg-surface shadow-[0_0_24px_rgba(0,0,0,0.15)]">
+            <button
+              type="button"
+              onClick={() => setIsMobileOpen(false)}
+              aria-label="Luk menu"
+              className="absolute top-4 right-3 flex h-7 w-7 items-center justify-center rounded-md text-ink-faintest hover:bg-surface-active hover:text-ink-muted"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+            {navBody}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

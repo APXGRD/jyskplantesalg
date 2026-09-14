@@ -190,7 +190,7 @@ export default function IndstillingerPage() {
           subtitle="Firmanavn, brandfarver og tone-of-voice – bruges overalt i appen og i genererede nyhedsbreve"
         />
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           {isLoading ? (
             <LoadingCard message="Henter indstillinger..." />
           ) : loadError ? (
@@ -211,7 +211,7 @@ export default function IndstillingerPage() {
                 <p className="pb-1 text-xs text-ink-faint">
                   PNG eller JPEG, maks. 500 KB – vises i nyhedsbrevets header (ikke i selve appens sidemenu)
                 </p>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-surface">
                     {form.logo_data ? (
                       // eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI, next/image kan ikke optimere den

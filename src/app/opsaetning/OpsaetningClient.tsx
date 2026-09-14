@@ -231,11 +231,11 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
           subtitle="Angiv målgruppe og evt. særlige instrukser til AI-genereringen"
         />
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="flex max-w-xl flex-col">
             <section>
               <p className="text-xs font-semibold tracking-wide text-ink uppercase">Målgruppe</p>
-              <div className="grid grid-cols-2 gap-4 pt-3">
+              <div className="grid grid-cols-1 gap-4 pt-3 sm:grid-cols-2">
                 <CustomerTypeCard
                   title="Privatkunder"
                   description="Priser inkl. moms · Tilgængeligt, inspirerende sprog · Fokus på udtryk og haveoplevelse"

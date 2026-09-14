@@ -233,11 +233,11 @@ export function KunderClient({ initialCustomers, initialSyncedAt, initialError }
         />
 
         {syncError && (
-          <p className="border-b border-border bg-surface px-8 py-2 text-[12px] text-red-600">{syncError}</p>
+          <p className="border-b border-border bg-surface px-4 py-2 text-[12px] text-red-600 md:px-8">{syncError}</p>
         )}
 
         {importResult && (
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-emerald-50 px-8 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-emerald-50 px-4 py-3 md:px-8">
             <p className="text-[13px] text-emerald-800">
               <span className="font-semibold">{importResult.count} kunder importeret</span> fra{" "}
               <span className="font-medium">{importResult.name}</span>
@@ -254,7 +254,7 @@ export function KunderClient({ initialCustomers, initialSyncedAt, initialError }
         )}
 
         {unsubscribeError && (
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-red-50 px-8 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-red-50 px-4 py-3 md:px-8">
             <p className="text-[13px] text-red-800">{unsubscribeError}</p>
             <button
               type="button"
@@ -273,8 +273,8 @@ export function KunderClient({ initialCustomers, initialSyncedAt, initialError }
           <ErrorCard title="Kunne ikke hente kunder" message={loadError} onRetry={retryLoadCustomers} />
         ) : (
           <>
-            <div className="flex items-center gap-3 border-b border-border bg-surface px-8 py-3.5">
-              <div className="relative min-w-[220px] max-w-sm flex-1">
+            <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-3.5 md:px-8">
+              <div className="relative min-w-40 max-w-sm flex-1 sm:min-w-55">
                 <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
                 <input
                   type="text"

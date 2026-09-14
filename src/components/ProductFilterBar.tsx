@@ -30,8 +30,8 @@ export function ProductFilterBar({
   onOnlyWithImageChange,
 }: ProductFilterBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-8 py-3.5">
-      <div className="relative min-w-[220px] flex-1">
+    <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-3.5 md:px-8">
+      <div className="relative min-w-40 flex-1 sm:min-w-55">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
         <input
           type="text"
