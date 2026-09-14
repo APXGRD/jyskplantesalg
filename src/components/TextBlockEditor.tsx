@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
+import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { FONT_FAMILIES } from "@/lib/fontFamilies";
 import { BoldIcon, ChevronDownIcon, ItalicIcon, MinusIcon, PlusIcon, UnderlineIcon } from "@/components/icons";
@@ -11,13 +11,25 @@ import { BoldIcon, ChevronDownIcon, ItalicIcon, MinusIcon, PlusIcon, UnderlineIc
 interface TextBlockEditorProps {
   content: string;
   onChange: (html: string) => void;
-  // Blokkens skrifttype- og tekstfarve-udgangspunkt sat af de globale vælgere
-  // i Edit-mode (se NewsletterBlock.fontFamily/.textColor) – vises som
-  // editorens standard, så den matcher Preview. Et enkelt tekstudsnit kan
-  // stadig afvige herfra via værktøjslinjens egne dropdown/farve-swatches
-  // herunder.
+  // Blokkens skrifttype-/størrelse-/tekstfarve-udgangspunkt (se
+  // NewsletterBlock.fontFamily/.fontSize/.textColor i newsletterBlocks.ts) –
+  // vises som editorens standard, så den matcher Preview. Skrifttype OG
+  // størrelse er BLOK-NIVEAU-egenskaber (se onFontFamilyChange/
+  // onFontSizeChange herunder) – de kræver IKKE en tekst-markering. Fed/
+  // kursiv/understreget er fortsat ord-specifikke Tiptap-mærker (så en
+  // enkelt markeret del af teksten stadig kan formateres for sig), MEN
+  // kræver heller IKKE længere en markering: uden én anvendes de på HELE
+  // blokkens indhold med det samme (se applyCommand herunder).
   fontFamily?: string;
+  fontSize?: number;
   textColor?: string;
+  // Sat af værktøjslinjens skrifttype-dropdown/størrelse-stepper herunder –
+  // opdaterer HELE blokkens fontFamily/fontSize-felt med det samme (samme
+  // mønster som textColor, se ColorSwatches-brugen ved kalderen i
+  // EditorBlockList.tsx), IKKE et Tiptap-mærke på den aktuelle markering.
+  // Kræver derfor kun, at editoren har fokus – ingen markeret tekst.
+  onFontFamilyChange: (value: string) => void;
+  onFontSizeChange: (value: number) => void;
   // Værktøjslinjens EGEN farve-swatches sætter et per-udsnit Tiptap-mærke
   // direkte i content-HTML'en – uafhængigt af blokkens textColor-felt.  For
   // CTA-knappens ét-linjes label giver det ingen mening (og gemmes IKKE i en
@@ -52,8 +64,6 @@ const EDITOR_EXTENSIONS = [
     link: false,
   }),
   TextStyle,
-  FontFamily,
-  FontSize,
   Color,
 ];
 
@@ -61,7 +71,10 @@ export function TextBlockEditor({
   content,
   onChange,
   fontFamily,
+  fontSize,
   textColor,
+  onFontFamilyChange,
+  onFontSizeChange,
   showColorPicker = true,
 }: TextBlockEditorProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -69,7 +82,9 @@ export function TextBlockEditor({
   // Klik på værktøjslinjen (knapper/dropdowns) flytter DOM-fokus væk fra selve
   // editoren, hvilket kan nulstille markeringen, før kommandoen når at køre.
   // Vi gemmer derfor den seneste markering løbende og genskaber den eksplicit,
-  // når en værktøjslinje-handling udføres.
+  // når en værktøjslinje-handling udføres. Kun relevant for fed/kursiv/
+  // understreget/farve herunder – skrifttype/størrelse er blok-niveau og har
+  // derfor ikke brug for en markering at genskabe.
   const savedSelectionRef = useRef({ from: 0, to: 0 });
 
   const editor = useEditor(
@@ -79,14 +94,15 @@ export function TextBlockEditor({
       content,
       editorProps: {
         attributes: {
-          // NB: ingen text-ink (farve) her – den skal komme fra wrapper-div'ens
-          // egen style/color herunder, så den reagerer på blokkens textColor.
-          // Sættes den her i stedet (som en class direkte på selve
-          // ProseMirror-elementet), vinder den altid over wrapperens nedarvede
-          // farve, uanset hvad textColor er sat til – uden at det giver fejl,
-          // ser det bare ud som om den globale/per-blok farve-vælger ikke gør
-          // noget i selve Edit-mode-listen.
-          class: "outline-none text-[13px] leading-relaxed",
+          // NB: ingen text-ink (farve) OG ingen fast text-[13px] (størrelse)
+          // her – begge skal komme fra wrapper-div'ens egen style/fontSize/
+          // color herunder, så selve tekstfeltet reagerer på blokkens
+          // fontSize/textColor. En class SAT DIREKTE på selve ProseMirror-
+          // elementet vinder altid over en nedarvet værdi fra wrapperen,
+          // uanset hvad fontSize/textColor er sat til – uden at det giver
+          // fejl, ser det bare ud som om den per-blok størrelse-/
+          // farve-vælger ikke gør noget i selve Edit-mode-listen.
+          class: "outline-none leading-relaxed",
         },
       },
       onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -118,25 +134,41 @@ export function TextBlockEditor({
     }
   }, [content, editor]);
 
+  // Bruges af fed/kursiv/understreget herunder – IKKE af skrifttype/
+  // størrelse, som er rene blok-niveau-felter uden nogen markering
+  // involveret (se onFontFamilyChange/onFontSizeChange). Har brugeren
+  // rent faktisk MARKERET noget (from !== to), formateres fortsat kun den
+  // markering – ord-specifik formatering virker altså stadig uændret. Er
+  // markeringen derimod tom (kun en blinkende markør, ingen markering),
+  // markeres HELE blokkens indhold først, så fed/kursiv/understreget
+  // anvendes på al teksten med det samme – samme "ingen markering krævet"-
+  // oplevelse som skrifttype/størrelse, i stedet for at knappen tilsyneladende
+  // ikke gør noget (Tiptaps egen opførsel uden en markering: slår kun fed
+  // TIL for tegn, der skrives EFTER markøren, ikke for allerede skrevet tekst).
   function applyCommand(run: (chain: ReturnType<NonNullable<typeof editor>["chain"]>) => void) {
     if (!editor) return;
-    const chain = editor.chain().focus().setTextSelection(savedSelectionRef.current);
+    const { from, to } = savedSelectionRef.current;
+    const hasSelection = from !== to;
+    const chain = editor.chain().focus();
+    if (hasSelection) {
+      chain.setTextSelection({ from, to });
+    } else {
+      chain.selectAll();
+    }
     run(chain);
     chain.run();
   }
 
   function stepFontSize(delta: number) {
-    const current = Number(activeState.fontSize) || DEFAULT_FONT_SIZE;
+    const current = fontSize ?? DEFAULT_FONT_SIZE;
     const next = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, current + delta));
-    applyCommand((chain) => chain.setFontSize(`${next}px`));
+    onFontSizeChange(next);
   }
 
   const defaultActiveState = {
     bold: false,
     italic: false,
     underline: false,
-    fontFamily: "",
-    fontSize: "",
     color: "",
   };
 
@@ -151,8 +183,6 @@ export function TextBlockEditor({
           bold: editor.isActive("bold"),
           italic: editor.isActive("italic"),
           underline: editor.isActive("underline"),
-          fontFamily: editor.getAttributes("textStyle").fontFamily ?? "",
-          fontSize: (editor.getAttributes("textStyle").fontSize ?? "").replace("px", ""),
           color: editor.getAttributes("textStyle").color ?? "",
         };
       },
@@ -180,23 +210,20 @@ export function TextBlockEditor({
       onFocus={handleFocus}
       onBlur={handleBlur}
       className="relative"
-      style={{ fontFamily, color: textColor || "var(--ink)" }}
+      // fontSize sættes ALTID til en konkret værdi (aldrig undefined) – i
+      // modsætning til fontFamily/textColor, som roligt kan arve fra en
+      // ansvarlig forfader, når de ikke er sat. Uden en eksplicit fallback
+      // her ville selve tekstfeltet (nu uden sin tidligere faste
+      // text-[13px]-class, se editorProps ovenfor) i stedet arve
+      // block-kortets egen, langt større skriftstørrelse.
+      style={{ fontFamily, fontSize: `${fontSize ?? DEFAULT_FONT_SIZE}px`, color: textColor || "var(--ink)" }}
     >
       {isFocused && (
         <div className="absolute bottom-full left-0 z-10 mb-2 flex h-11 w-fit items-center gap-0.5 rounded-full border border-border bg-surface px-2 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div className="relative flex items-center">
             <select
-              value={activeState.fontFamily}
-              onMouseDown={() => {
-                if (editor) {
-                  const { from, to } = editor.state.selection;
-                  savedSelectionRef.current = { from, to };
-                }
-              }}
-              onChange={(event) => {
-                const value = event.target.value;
-                applyCommand((chain) => chain.setFontFamily(value));
-              }}
+              value={fontFamily ?? ""}
+              onChange={(event) => onFontFamilyChange(event.target.value)}
               aria-label="Skrifttype"
               className="appearance-none rounded-full bg-transparent py-1 pr-5 pl-2 text-xs text-ink-muted hover:bg-surface-active focus:outline-none"
             >
@@ -223,7 +250,7 @@ export function TextBlockEditor({
               <MinusIcon className="h-3 w-3" />
             </button>
             <span className="w-4 text-center text-[11px] tabular-nums text-ink-muted">
-              {activeState.fontSize || DEFAULT_FONT_SIZE}
+              {fontSize ?? DEFAULT_FONT_SIZE}
             </span>
             <button
               type="button"

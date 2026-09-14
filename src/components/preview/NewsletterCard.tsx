@@ -63,7 +63,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           <div className="px-8 py-3">
             <div
               className="font-serif text-[26px] leading-[1.2] text-ink [&_p]:m-0"
-              style={{ fontFamily: block.fontFamily, color: block.textColor }}
+              style={{ fontFamily: block.fontFamily, fontSize: block.fontSize ? `${block.fontSize}px` : undefined, color: block.textColor }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -74,7 +74,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           <div className="px-8 py-3">
             <div
               className="text-[13px] leading-normal text-card-body-text [&_p]:m-0 [&_p]:mb-3.5 [&_p:last-child]:mb-0"
-              style={{ fontFamily: block.fontFamily, color: block.textColor }}
+              style={{ fontFamily: block.fontFamily, fontSize: block.fontSize ? `${block.fontSize}px` : undefined, color: block.textColor }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -155,8 +155,38 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
         const displayProducts = block.productDisplayIds
           ? products.filter((product) => block.productDisplayIds!.includes(product.id))
           : products;
-        const borderRadius = CTA_BORDER_RADIUS_PX[block.productBorderRadius ?? "afrundet"];
+        const productBorderRadius = block.productBorderRadius ?? "afrundet";
+        const borderRadius = CTA_BORDER_RADIUS_PX[productBorderRadius];
         const rowPaddingY = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
+
+        // "Fuld rund" (pille, 999px) ser kun rigtig ud på et enkelt,
+        // kort element – anvendt på ÉN delt kant omkring en høj stak af
+        // flere produkter giver et akavet resultat (kun de yderste hjørner
+        // rundes kraftigt, resten af stakken forbliver skarp). Kun for
+        // DENNE ene kant-form vises hvert produkt derfor i stedet som sin
+        // EGEN, separate pille-formede boks – "skarp"/"let afrundet"
+        // beholder uændret ét samlet, delt kort (se nedenfor).
+        if (productBorderRadius === "pille") {
+          return (
+            <div className="flex flex-col gap-2 px-8 py-3">
+              {displayProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between overflow-hidden border px-4"
+                  style={{ borderColor: "#1a1a1a", borderRadius, paddingTop: rowPaddingY, paddingBottom: rowPaddingY }}
+                >
+                  <p className="text-xs font-medium" style={{ color: "#1a1a1a" }}>
+                    {product.title}
+                  </p>
+                  <p className="text-xs font-semibold" style={{ color: "#1a1a1a" }}>
+                    {formatPriceForCustomer(product.price, customerType)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
         return (
           <div className="px-8 py-3">
             <div className="overflow-hidden border" style={{ borderColor: "#1a1a1a", borderRadius }}>
@@ -195,7 +225,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
           <div className="px-8 py-3">
             <div
               className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0"
-              style={{ fontFamily: block.fontFamily, color: block.textColor }}
+              style={{ fontFamily: block.fontFamily, fontSize: block.fontSize ? `${block.fontSize}px` : undefined, color: block.textColor }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -231,6 +261,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
         const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
         const ctaStyle: CSSProperties = {
           fontFamily: block.fontFamily,
+          fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
           borderRadius,
           paddingTop: padding.vertical,
           paddingBottom: padding.vertical,

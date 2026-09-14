@@ -97,6 +97,7 @@ function renderBlockHtml(
 
     case "overskrift": {
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      const fontSize = block.fontSize ? `${block.fontSize}px` : "24px";
       const colorStyle = block.textColor ? `color:${block.textColor};` : "";
       // block.content er rå Tiptap-HTML (fx "<p>Overskriften</p>") uden nogen
       // margin-styring – ubehandlet arver <p>'en browserens/mail-klientens
@@ -105,13 +106,14 @@ function renderBlockHtml(
       // CSS-regel (`[&_p]:m-0`), som ikke findes i det kopierede HTML-fragment
       // (ingen <style>-blok) – sat eksplicit her i stedet, så det matcher.
       const heading = (block.content ?? "").replace(/<p>/g, '<p style="margin:0">');
-      return `<tr><td style="padding:12px 32px;"><div style="color:#3a5837;font-size:24px;font-family:${fontFamily};${colorStyle}">${heading}</div></td></tr>`;
+      return `<tr><td style="padding:12px 32px;"><div style="color:#3a5837;font-size:${fontSize};font-family:${fontFamily};${colorStyle}">${heading}</div></td></tr>`;
     }
 
     case "brodtekst": {
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      const fontSize = block.fontSize ? `${block.fontSize}px` : "14px";
       const colorStyle = block.textColor ? `color:${block.textColor};` : "";
-      return `<tr><td style="padding:12px 32px;color:#4a5565;font-size:14px;line-height:1.5;font-family:${fontFamily};${colorStyle}">${styleBrodtekstParagraphs(block.content ?? "")}</td></tr>`;
+      return `<tr><td style="padding:12px 32px;color:#4a5565;font-size:${fontSize};line-height:1.5;font-family:${fontFamily};${colorStyle}">${styleBrodtekstParagraphs(block.content ?? "")}</td></tr>`;
     }
 
     // "billede" er den eneste type, ny kode fra nu af producerer; "img" og
@@ -184,7 +186,8 @@ function renderBlockHtml(
       const displayProducts = block.productDisplayIds
         ? products.filter((product) => block.productDisplayIds!.includes(product.id))
         : products;
-      const borderRadius = CTA_BORDER_RADIUS_PX[block.productBorderRadius ?? "afrundet"];
+      const productBorderRadius = block.productBorderRadius ?? "afrundet";
+      const borderRadius = CTA_BORDER_RADIUS_PX[productBorderRadius];
       const rowPaddingY = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
       // 16px – samme værdi som Preview-rækkens px-4 (Tailwind), den
       // vandrette afstand fra selve den YDRE border til teksten. Sat kun på
@@ -200,19 +203,17 @@ function renderBlockHtml(
       // gav et langt federe/mere markant spring mellem titel og pris i mail,
       // end i Preview. "normal"/"bold" er de eneste to værdier, alle
       // mail-klienter reelt kan gengive konsekvent.
-      const rows = displayProducts
-        .map(
-          (product, index) => `
+      function productRow(product: ShopifyProduct, showTopBorder: boolean): string {
+        return `
         <tr>
-          <td style="padding:${rowPaddingY}px 0 ${rowPaddingY}px ${rowSidePaddingPx}px;${index > 0 ? "border-top:1px solid #1a1a1a;" : ""}font-family:${DEFAULT_FONT_FAMILY};">
+          <td style="padding:${rowPaddingY}px 0 ${rowPaddingY}px ${rowSidePaddingPx}px;${showTopBorder ? "border-top:1px solid #1a1a1a;" : ""}font-family:${DEFAULT_FONT_FAMILY};">
             <div style="font-weight:normal;color:#1a1a1a;font-size:13px;">${escapeHtml(product.title)}</div>
           </td>
-          <td style="padding:${rowPaddingY}px ${rowSidePaddingPx}px ${rowPaddingY}px 0;${index > 0 ? "border-top:1px solid #1a1a1a;" : ""}text-align:right;font-weight:bold;color:#1a1a1a;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
+          <td style="padding:${rowPaddingY}px ${rowSidePaddingPx}px ${rowPaddingY}px 0;${showTopBorder ? "border-top:1px solid #1a1a1a;" : ""}text-align:right;font-weight:bold;color:#1a1a1a;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
             ${escapeHtml(formatPriceForCustomer(product.price, customerType))}
           </td>
-        </tr>`,
-        )
-        .join("");
+        </tr>`;
+      }
       // To indlejrede tabeller (i stedet for border-radius direkte på tabellen
       // med border-collapse:collapse) – den kombination gengives upålideligt
       // af flere mail-klienter. Outlook ignorerer border-radius og falder
@@ -226,6 +227,33 @@ function renderBlockHtml(
       // ovenfor). cellpadding="0" cellspacing="0" på selve table-elementet
       // er den mail-sikre erstatning – nulstiller browserens/mail-klientens
       // standard-cellepadding uden at bruge border-collapse.
+      //
+      // "Fuld rund" (pille, 999px) ser kun rigtig ud på et enkelt, kort
+      // element – ÉN delt kant omkring en høj stak af flere produkter giver
+      // et akavet resultat (samme begrundelse som NewsletterCard.tsx). Kun
+      // for DENNE kant-form får hvert produkt derfor sin EGEN, separate
+      // indlejrede tabel (med et lille luft-mellemrum imellem, i stedet for
+      // en top-kant) – "skarp"/"let afrundet" beholder uændret ét samlet
+      // kort med alle produkter i samme indre tabel.
+      if (productBorderRadius === "pille") {
+        const items = displayProducts
+          .map((product, index) => {
+            const topPadding = index === 0 ? 12 : 8;
+            const bottomPadding = index === displayProducts.length - 1 ? 12 : 0;
+            return `
+        <tr><td style="padding:${topPadding}px 32px ${bottomPadding}px 32px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #1a1a1a;border-radius:${borderRadius}px;">
+            <tr><td style="padding:0;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${productRow(product, false)}</table>
+            </td></tr>
+          </table>
+        </td></tr>`;
+          })
+          .join("");
+        return items;
+      }
+
+      const rows = displayProducts.map((product, index) => productRow(product, index > 0)).join("");
       return `<tr><td style="padding:12px 32px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #1a1a1a;border-radius:${borderRadius}px;">
           <tr><td style="padding:0;">
@@ -240,8 +268,9 @@ function renderBlockHtml(
 
     case "tekst": {
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      const fontSize = block.fontSize ? `${block.fontSize}px` : "14px";
       const colorStyle = block.textColor ? `color:${block.textColor};` : "";
-      return `<tr><td style="padding:12px 32px;"><div style="color:#4a5565;font-size:14px;line-height:1.6;font-family:${fontFamily};${colorStyle}">${block.content ?? ""}</div></td></tr>`;
+      return `<tr><td style="padding:12px 32px;"><div style="color:#4a5565;font-size:${fontSize};line-height:1.6;font-family:${fontFamily};${colorStyle}">${block.content ?? ""}</div></td></tr>`;
     }
 
     case "produkt": {
@@ -265,6 +294,7 @@ function renderBlockHtml(
     case "cta": {
       const bgColor = block.bgColor || "#3a5837";
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+      const fontSize = block.fontSize ? `${block.fontSize}px` : "13px";
       const padding = CTA_PADDING_PX[block.ctaPadding ?? "normal"];
       const borderRadius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "afrundet"];
       const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
@@ -309,7 +339,7 @@ function renderBlockHtml(
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
           <tr>
             <td${cellBgcolorAttr} style="${cellFillStyle}${radiusStyle}${paddingStyle}font-family:${fontFamily};" align="center">
-              <a href="${escapeAttr(block.ctaUrl || "#")}" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-weight:600;font-size:13px;line-height:19.5px;display:inline-block;">
+              <a href="${escapeAttr(block.ctaUrl || "#")}" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-weight:600;font-size:${fontSize};line-height:19.5px;display:inline-block;">
                 ${label}
               </a>
             </td>
