@@ -11,7 +11,13 @@ interface CustomerPanelProps {
   // bevares fra den eksisterende kunde i stedet for at blive gendannet).
   customer?: ShopifyCustomer;
   onClose: () => void;
-  onSave: (customer: ShopifyCustomer) => void;
+  // "Tilføj"-tilstand kalder i praksis et RIGTIGT Shopify-kald (se
+  // KunderClient.tsx's handleAddCustomer) og kan derfor fejle/tage tid –
+  // onSave kan derfor returnere en Promise, som denne komponent selv venter
+  // på og viser en tydelig loading-/fejltilstand for (samme mønster som
+  // SaveTemplateDialog.tsx). "Rediger"-tilstand er fortsat en almindelig,
+  // synkron, lokal opdatering.
+  onSave: (customer: ShopifyCustomer) => void | Promise<void>;
 }
 
 const fieldClassName =
@@ -25,20 +31,31 @@ export function CustomerPanel({ customer, onClose, onSave }: CustomerPanelProps)
   const [customerType, setCustomerType] = useState<CustomerType>(
     customer?.tags.includes("erhverv") ? "erhverv" : "privat",
   );
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    onSave({
-      id: customer?.id ?? crypto.randomUUID(),
-      firstName,
-      lastName,
-      email,
-      tags: [customerType],
-      // Nye kunder tilføjet manuelt her antages at have givet samtykke, jf.
-      // opgavebeskrivelsen. Ved redigering ændrer panelet ikke på samtykket –
-      // kundens eksisterende marketingConsentStatus bevares uændret.
-      marketingConsentStatus: customer?.marketingConsentStatus ?? "SUBSCRIBED",
-    });
+    if (isSaving) return;
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      await onSave({
+        id: customer?.id ?? crypto.randomUUID(),
+        firstName,
+        lastName,
+        email,
+        tags: [customerType],
+        // Nye kunder tilføjet manuelt her antages at have givet samtykke, jf.
+        // opgavebeskrivelsen. Ved redigering ændrer panelet ikke på samtykket –
+        // kundens eksisterende marketingConsentStatus bevares uændret.
+        marketingConsentStatus: customer?.marketingConsentStatus ?? "SUBSCRIBED",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -107,19 +124,23 @@ export function CustomerPanel({ customer, onClose, onSave }: CustomerPanelProps)
             </label>
           </div>
 
+          {error && <p className="pt-3 text-[12px] text-red-600">{error}</p>}
+
           <div className="flex items-center gap-2 pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted hover:bg-surface-active"
+              disabled={isSaving}
+              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
             >
               Annullér
             </button>
             <button
               type="submit"
-              className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-90"
+              disabled={isSaving}
+              className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isEditing ? "Gem ændringer" : "Tilføj kunde"}
+              {isSaving ? (isEditing ? "Gemmer..." : "Tilføjer...") : isEditing ? "Gem ændringer" : "Tilføj kunde"}
             </button>
           </div>
         </form>

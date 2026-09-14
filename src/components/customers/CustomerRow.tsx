@@ -25,10 +25,10 @@ function Badge({ className, children }: { className: string; children: React.Rea
 interface CustomerRowProps {
   customer: ShopifyCustomer;
   onEdit: (customer: ShopifyCustomer) => void;
-  onDelete: (customer: ShopifyCustomer) => void;
+  onUnsubscribe: (customer: ShopifyCustomer) => void;
 }
 
-export function CustomerRow({ customer, onEdit, onDelete }: CustomerRowProps) {
+export function CustomerRow({ customer, onEdit, onUnsubscribe }: CustomerRowProps) {
   const type = getCustomerType(customer);
   const active = isActiveCustomer(customer);
   const fullName = `${customer.firstName} ${customer.lastName}`;
@@ -60,10 +60,11 @@ export function CustomerRow({ customer, onEdit, onDelete }: CustomerRowProps) {
           </button>
           <button
             type="button"
-            onClick={() => onDelete(customer)}
-            aria-label={`Slet ${fullName}`}
-            title="Slet"
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faintest hover:bg-red-50 hover:text-red-600"
+            onClick={() => onUnsubscribe(customer)}
+            disabled={!active}
+            aria-label={`Afmeld ${fullName}`}
+            title={active ? "Afmeld" : "Allerede afmeldt"}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faintest hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faintest"
           >
             <TrashIcon className="h-3.5 w-3.5" />
           </button>
