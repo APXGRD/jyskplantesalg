@@ -35,3 +35,22 @@ export function stripFontFamilyStyles(html: string): string {
     return cleaned ? `style="${cleaned}"` : "";
   });
 }
+
+// Samme formål/mønster som stripFontFamilyStyles ovenfor og stripColorStyles
+// (brandColors.ts), men for font-size – skrifttype OG -størrelse er nu
+// BEGGE blok-niveau-felter (block.fontFamily/block.fontSize, se
+// newsletterBlocks.ts), sat af TextBlockEditor.tsx's egen værktøjslinje
+// direkte på blokken, ikke som et Tiptap-mærke i selve content-HTML'en.
+// Renser derfor en evt. inline font-size, der alligevel skulle snige sig ind
+// via indsat/limet HTML (samme sikkerhedsnet som for farve/skrifttype), så
+// block.fontSize forbliver den ENESTE kilde til blokkens skriftstørrelse.
+export function stripFontSizeStyles(html: string): string {
+  return html.replace(/style="([^"]*)"/g, (match, styleContent: string) => {
+    const cleaned = styleContent
+      .split(";")
+      .map((rule) => rule.trim())
+      .filter((rule) => rule && !rule.toLowerCase().startsWith("font-size"))
+      .join("; ");
+    return cleaned ? `style="${cleaned}"` : "";
+  });
+}

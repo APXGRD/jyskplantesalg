@@ -195,12 +195,19 @@ export interface NewsletterBlock {
   // Uden bgColor bruges blokkens eksisterende standardfarve.
   bgColor?: string;
   // Blokkens skrifttype-udgangspunkt – kun relevant for tekst-blokke
-  // (overskrift/brodtekst/tekst/cta), sat af den globale skrifttype-vælger i
-  // Edit-mode (se FONT_FAMILIES). Et enkelt tekstudsnit inde i selve
-  // "content"-HTML'en kan stadig afvige herfra via et Tiptap-mark fra den
-  // per-blok værktøjslinje – det inline mark vinder naturligt over denne
-  // block-brede standard i CSS-cascaden.
+  // (overskrift/brodtekst/tekst/cta), sat enten af den globale
+  // skrifttype-vælger i Edit-mode (se FONT_FAMILIES) ELLER blokkens EGEN
+  // per-blok værktøjslinje (se TextBlockEditor.tsx) – begge skriver til
+  // PRÆCIS dette felt og gælder derfor HELE blokkens indhold med det samme,
+  // uden at kræve en tekst-markering (samme mønster som textColor herunder).
   fontFamily?: string;
+  // Blokkens skriftSTØRRELSE-udgangspunkt (i px) – samme mønster/felt-
+  // niveau som fontFamily ovenfor: sat af blokkens egen per-blok
+  // værktøjslinje (se TextBlockEditor.tsx), gælder HELE blokkens indhold med
+  // det samme, ingen markering krævet. undefined betyder "brug rendering-
+  // stedets egen standardstørrelse" (forskellig pr. blok-type – se
+  // NewsletterCard.tsx/newsletterExport.ts), ikke en fast, global værdi.
+  fontSize?: number;
   // Blokkens TEKSTFARVE-udgangspunkt – samme mønster som fontFamily herover,
   // sat af den globale farve-vælger i Edit-mode (BRAND_COLORS). For "cta" er
   // dette knap-TEKSTENS farve, ikke knappens baggrund (den styres fortsat
@@ -411,6 +418,7 @@ export type TemplateBlock = Pick<
   | "type"
   | "hidden"
   | "fontFamily"
+  | "fontSize"
   | "textColor"
   | "bgColor"
   | "alignment"
@@ -432,6 +440,7 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     type: block.type,
     hidden: block.hidden,
     fontFamily: block.fontFamily,
+    fontSize: block.fontSize,
     // Produktvisning har ingen farve-vælger – altid fast sort, jf.
     // NewsletterCard.tsx/newsletterExport.ts. Evt. tilbageværende textColor
     // fra dengang blokken kortvarigt HAVDE en farve-vælger skal ikke leve
@@ -489,6 +498,7 @@ export function createBlocksFromTemplate(
       type: normalizedType,
       hidden: templateBlock.hidden,
       fontFamily: templateBlock.fontFamily,
+      fontSize: templateBlock.fontSize,
       // Produktvisning har ingen farve-vælger – ignorér evt. gammel gemt
       // textColor fra en skabelon, i stedet for at genoplive den her.
       textColor: templateBlock.type === "produktvisning" ? undefined : templateBlock.textColor,

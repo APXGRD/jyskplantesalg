@@ -26,7 +26,7 @@ import { ImageBlockControls } from "@/components/ImageBlockControls";
 import { GalleryBlockControls } from "@/components/GalleryBlockControls";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { stripColorStyles } from "@/lib/brandColors";
-import { FONT_FAMILIES, stripFontFamilyStyles } from "@/lib/fontFamilies";
+import { FONT_FAMILIES, stripFontFamilyStyles, stripFontSizeStyles } from "@/lib/fontFamilies";
 import {
   ButtonIcon,
   ChevronDownIcon,
@@ -248,6 +248,13 @@ interface BlockContentProps {
   // handleGlobalColorChange, som sætter samme felt på ALLE tekst-blokke på
   // én gang).
   onTextColorChange: (color: string) => void;
+  // Sætter block.fontFamily/block.fontSize for netop DENNE blok – bruges af
+  // TextBlockEditor.tsx's egen per-blok værktøjslinje (til forskel fra
+  // handleGlobalFontChange, som sætter fontFamily på ALLE tekst-blokke på én
+  // gang). Samme mønster som onTextColorChange ovenfor: gælder HELE
+  // blokkens indhold med det samme, ingen tekst-markering krævet.
+  onFontFamilyChange: (fontFamily: string) => void;
+  onFontSizeChange: (fontSize: number) => void;
   onCtaPaddingChange: (padding: CtaPadding) => void;
   onCtaBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
   onCtaStyleChange: (style: CtaStyle) => void;
@@ -282,6 +289,8 @@ function BlockContent({
   onSizeChange,
   onBgColorChange,
   onTextColorChange,
+  onFontFamilyChange,
+  onFontSizeChange,
   onCtaPaddingChange,
   onCtaBorderRadiusChange,
   onCtaStyleChange,
@@ -310,7 +319,10 @@ function BlockContent({
             content={block.content ?? ""}
             onChange={onContentChange}
             fontFamily={block.fontFamily}
+            fontSize={block.fontSize}
             textColor={block.textColor}
+            onFontFamilyChange={onFontFamilyChange}
+            onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
           />
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
@@ -324,7 +336,10 @@ function BlockContent({
             content={block.content ?? ""}
             onChange={onContentChange}
             fontFamily={block.fontFamily}
+            fontSize={block.fontSize}
             textColor={block.textColor}
+            onFontFamilyChange={onFontFamilyChange}
+            onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
           />
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
@@ -338,7 +353,10 @@ function BlockContent({
             content={block.content ?? ""}
             onChange={onContentChange}
             fontFamily={block.fontFamily}
+            fontSize={block.fontSize}
             textColor={block.textColor}
+            onFontFamilyChange={onFontFamilyChange}
+            onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
           />
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
@@ -506,7 +524,10 @@ function BlockContent({
             content={block.content ?? ""}
             onChange={onContentChange}
             fontFamily={block.fontFamily}
+            fontSize={block.fontSize}
             textColor={block.textColor}
+            onFontFamilyChange={onFontFamilyChange}
+            onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
           />
           <input
@@ -888,8 +909,14 @@ export function EditorBlockList({
         // farve kunne vise noget andet end block.textColor i Preview, og
         // forsvinde usynligt igen næste gang blokkens tekst regenereres
         // (almindelig gentagen generering ELLER en skabelon) – det var
-        // netop den fejl, der ramte "Gem som skabelon".
-        const content = RICH_TEXT_BLOCK_TYPES.includes(block.type) ? stripColorStyles(html) : html;
+        // netop den fejl, der ramte "Gem som skabelon". Samme begrundelse
+        // gælder nu font-family/font-size (se stripFontFamilyStyles/
+        // stripFontSizeStyles) – begge er BLOK-niveau-felter (block.
+        // fontFamily/block.fontSize), ikke et Tiptap-mærke i selve
+        // content-HTML'en.
+        const content = RICH_TEXT_BLOCK_TYPES.includes(block.type)
+          ? stripFontSizeStyles(stripFontFamilyStyles(stripColorStyles(html)))
+          : html;
         return { ...block, content };
       }),
     );
@@ -932,6 +959,18 @@ export function EditorBlockList({
   // regenereres frisk hver gang, men textColor gør ikke.
   function handleTextColorChange(id: string, textColor: string) {
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, textColor } : block)));
+  }
+
+  // Sætter block.fontFamily/block.fontSize for netop DENNE blok, kaldt fra
+  // TextBlockEditor.tsx's egen per-blok værktøjslinje – samme mønster som
+  // handleTextColorChange ovenfor. Gælder HELE blokkens indhold med det
+  // samme; kræver ingen tekst-markering.
+  function handleBlockFontFamilyChange(id: string, fontFamily: string) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, fontFamily } : block)));
+  }
+
+  function handleBlockFontSizeChange(id: string, fontSize: number) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, fontSize } : block)));
   }
 
   function handleCtaPaddingChange(id: string, ctaPadding: CtaPadding) {
@@ -1178,6 +1217,8 @@ export function EditorBlockList({
                     onSizeChange={(size) => handleSizeChange(block.id, size)}
                     onBgColorChange={(color) => handleBgColorChange(block.id, color)}
                     onTextColorChange={(color) => handleTextColorChange(block.id, color)}
+                    onFontFamilyChange={(fontFamily) => handleBlockFontFamilyChange(block.id, fontFamily)}
+                    onFontSizeChange={(fontSize) => handleBlockFontSizeChange(block.id, fontSize)}
                     onCtaPaddingChange={(padding) => handleCtaPaddingChange(block.id, padding)}
                     onCtaBorderRadiusChange={(borderRadius) => handleCtaBorderRadiusChange(block.id, borderRadius)}
                     onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}
