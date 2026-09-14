@@ -12,7 +12,7 @@ export function CustomerTypeCard({ title, description, selected, onSelect }: Cus
       onClick={onSelect}
       aria-pressed={selected}
       className={`flex flex-col items-start rounded-xl border-2 p-5 text-left transition-colors ${
-        selected ? "border-ink bg-primary" : "border-border bg-white hover:border-ink-faintest"
+        selected ? "border-ink bg-primary" : "border-border bg-surface hover:border-ink-faintest"
       }`}
     >
       <span className="flex items-center gap-2.5">

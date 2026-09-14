@@ -19,16 +19,21 @@
 import type { ShopifyCustomer } from "@/lib/mock/mockCustomers";
 
 const SHOPIFY_API_VERSION = "2026-07";
-// Shopifys maksimale sidestørrelse pr. GraphQL-forbindelse. Henter kun første
-// side (op til 250 kunder) for nu – tilstrækkeligt til en test-route; fuld
-// cursor-baseret paginering (pageInfo.hasNextPage/endCursor) kan tilføjes
-// senere, når funktionen rent faktisk kobles til UI'et og butikken har mere
-// end 250 kunder.
+// Shopifys maksimale sidestørrelse pr. GraphQL-forbindelse – bruges som
+// sidestørrelse for HVER side i den cursor-baserede paginering herunder (se
+// fetchShopifyCustomers), samme mønster/tilgang som PRODUCTS_PER_PAGE i
+// fetchProducts.ts.
 const CUSTOMERS_PER_PAGE = 250;
 
+// Shopifys Admin API er cost-baseret rate limitet (se throttleStatus i hvert
+// svars extensions-felt, sat automatisk af Shopify) – samme afgrænsning som
+// fetchProducts.ts allerede bruger, genbrugt her uændret.
+const LOW_THROTTLE_THRESHOLD = 200;
+const THROTTLE_WAIT_MS = 1000;
+
 const CUSTOMERS_QUERY = `
-  query FetchCustomers($first: Int!) {
-    customers(first: $first) {
+  query FetchCustomers($first: Int!, $after: String) {
+    customers(first: $first, after: $after) {
       edges {
         node {
           id
@@ -40,6 +45,10 @@ const CUSTOMERS_QUERY = `
             marketingState
           }
         }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }
@@ -65,9 +74,25 @@ interface CustomersQueryResponse {
   data?: {
     customers: {
       edges: { node: ShopifyCustomerNode }[];
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
     };
   };
   errors?: { message: string }[];
+  // Sat automatisk af Shopify på ALLE Admin API-svar (ikke noget, vi selv
+  // forespørger i CUSTOMERS_QUERY) – se LOW_THROTTLE_THRESHOLD ovenfor.
+  extensions?: {
+    cost?: {
+      throttleStatus?: {
+        currentlyAvailable: number;
+        restoreRate: number;
+        maximumAvailable: number;
+      };
+    };
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // "INVALID" (ugyldig e-mailadresse) og en helt manglende defaultEmailAddress
@@ -84,19 +109,28 @@ function mapMarketingConsentStatus(
   return marketingState;
 }
 
-// Henter og mapper kunderne fra Shopifys Admin API. Kaster en fejl med en
-// tydelig, menneskelæsbar besked (manglende miljøvariabler, netværksfejl,
-// forkert/udløbet token, GraphQL-fejl), i stedet for at lade et rå/uforståeligt
-// fetch-svar eller en uventet exception sive videre til kalderen – den skal selv
-// fange fejlen og vise/returnere beskeden (se customers/route.ts).
-export async function fetchShopifyCustomers(): Promise<ShopifyCustomer[]> {
-  const shop = process.env.SHOPIFY_SHOP_DOMAIN;
-  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+function mapCustomerNode(node: ShopifyCustomerNode): ShopifyCustomer {
+  return {
+    id: node.id,
+    firstName: node.firstName ?? "",
+    lastName: node.lastName ?? "",
+    email: node.defaultEmailAddress?.emailAddress ?? "",
+    tags: node.tags,
+    marketingConsentStatus: mapMarketingConsentStatus(node.defaultEmailAddress?.marketingState),
+  };
+}
 
-  if (!shop || !accessToken) {
-    throw new Error("Mangler SHOPIFY_SHOP_DOMAIN eller SHOPIFY_ACCESS_TOKEN i .env.local");
-  }
-
+// Henter ÉN side af CUSTOMERS_QUERY. Kaster en fejl med en tydelig,
+// menneskelæsbar besked (netværksfejl, forkert/udløbet token, GraphQL-fejl),
+// i stedet for at lade et rå/uforståeligt fetch-svar eller en uventet
+// exception sive videre til kalderen – den skal selv fange fejlen og vise/
+// returnere beskeden (se customers/route.ts). Samme opbygning som
+// fetchProductsPage i fetchProducts.ts.
+async function fetchCustomersPage(
+  shop: string,
+  accessToken: string,
+  after: string | null,
+): Promise<CustomersQueryResponse> {
   let response: Response;
   try {
     response = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
@@ -107,7 +141,7 @@ export async function fetchShopifyCustomers(): Promise<ShopifyCustomer[]> {
       },
       body: JSON.stringify({
         query: CUSTOMERS_QUERY,
-        variables: { first: CUSTOMERS_PER_PAGE },
+        variables: { first: CUSTOMERS_PER_PAGE, after },
       }),
     });
   } catch (err) {
@@ -129,14 +163,44 @@ export async function fetchShopifyCustomers(): Promise<ShopifyCustomer[]> {
     throw new Error(`Shopify GraphQL-fejl: ${json.errors.map((error) => error.message).join("; ")}`);
   }
 
-  const edges = json.data?.customers.edges ?? [];
+  return json;
+}
 
-  return edges.map(({ node }) => ({
-    id: node.id,
-    firstName: node.firstName ?? "",
-    lastName: node.lastName ?? "",
-    email: node.defaultEmailAddress?.emailAddress ?? "",
-    tags: node.tags,
-    marketingConsentStatus: mapMarketingConsentStatus(node.defaultEmailAddress?.marketingState),
-  }));
+// Henter og mapper ALLE kunder fra Shopifys Admin API, via cursor-baseret
+// paginering (250 ad gangen) – ikke kun de første 250. Samler siderne op i én
+// liste og returnerer den, i PRÆCIS samme form som hidtil (ShopifyCustomer[]),
+// så kalderen (Kunder-siden osv.) ikke behøver kende til selve pagineringen.
+// Samme mønster/tilgang som fetchShopifyProducts i fetchProducts.ts.
+export async function fetchShopifyCustomers(): Promise<ShopifyCustomer[]> {
+  const shop = process.env.SHOPIFY_SHOP_DOMAIN;
+  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+
+  if (!shop || !accessToken) {
+    throw new Error("Mangler SHOPIFY_SHOP_DOMAIN eller SHOPIFY_ACCESS_TOKEN i .env.local");
+  }
+
+  const allCustomers: ShopifyCustomer[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const json = await fetchCustomersPage(shop, accessToken, after);
+    const customers = json.data?.customers;
+    const edges = customers?.edges ?? [];
+
+    allCustomers.push(...edges.map(({ node }) => mapCustomerNode(node)));
+
+    // Endnu en side at hente, MEN Shopify har (uventet) ikke leveret et
+    // cursor at fortsætte fra – stopper her i stedet for at risikere en
+    // uendelig løkke, der blot genhenter samme (eller ingen) side igen og igen.
+    hasNextPage = Boolean(customers?.pageInfo.hasNextPage && customers.pageInfo.endCursor);
+    after = customers?.pageInfo.endCursor ?? null;
+
+    const throttleStatus = json.extensions?.cost?.throttleStatus;
+    if (hasNextPage && throttleStatus && throttleStatus.currentlyAvailable < LOW_THROTTLE_THRESHOLD) {
+      await sleep(THROTTLE_WAIT_MS);
+    }
+  }
+
+  return allCustomers;
 }

@@ -208,7 +208,7 @@ export function ProduktvaelgerClient({
           <ErrorCard title="Kunne ikke hente produkter" message={loadError} onRetry={retryLoadProducts} />
         ) : products.length === 0 ? (
           <div className="flex flex-1 items-center justify-center">
-            <div className="flex max-w-md flex-col items-center gap-3 rounded-xl border border-border bg-white p-8 text-center">
+            <div className="flex max-w-md flex-col items-center gap-3 rounded-xl border border-border bg-surface p-8 text-center">
               <p className="text-sm font-semibold text-ink">Ingen produkter synkroniseret endnu</p>
               <p className="text-sm text-ink-muted">
                 Klik på &quot;Synkroniser produkter&quot; for at hente jeres produkter fra Shopify. Det kan tage

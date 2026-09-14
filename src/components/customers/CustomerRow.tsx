@@ -3,8 +3,8 @@ import { getCustomerType, isActiveCustomer, type ShopifyCustomer } from "@/lib/c
 import { PencilIcon, TrashIcon } from "@/components/icons";
 
 const TYPE_BADGE_STYLES: Record<CustomerType, string> = {
-  privat: "bg-teal-50 text-teal-700",
-  erhverv: "bg-violet-50 text-violet-700",
+  privat: "bg-surface-badge text-ink-muted",
+  erhverv: "bg-primary/10 text-secondary",
 };
 
 const TYPE_LABEL: Record<CustomerType, string> = {
@@ -43,7 +43,7 @@ export function CustomerRow({ customer, onEdit, onDelete }: CustomerRowProps) {
         <Badge className={TYPE_BADGE_STYLES[type]}>{TYPE_LABEL[type]}</Badge>
       </td>
       <td className="px-4 py-3">
-        <Badge className={active ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500"}>
+        <Badge className={active ? "bg-primary/10 text-secondary" : "bg-surface-badge text-ink-faint"}>
           {active ? "Aktiv" : "Afmeldt"}
         </Badge>
       </td>

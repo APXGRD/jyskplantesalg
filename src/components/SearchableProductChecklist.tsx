@@ -46,7 +46,7 @@ export function SearchableProductChecklist({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder={searchPlaceholder}
-          className="rounded-md border border-border bg-white px-2 py-1.5 text-xs text-ink placeholder:text-ink-faintest focus:outline-none"
+          className="rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-faintest focus:outline-none"
         />
       )}
       <div className={`flex flex-col gap-0.5 ${showSearch ? "max-h-56 overflow-y-auto" : ""}`}>

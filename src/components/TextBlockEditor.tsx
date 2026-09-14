@@ -183,7 +183,7 @@ export function TextBlockEditor({
       style={{ fontFamily, color: textColor || "var(--ink)" }}
     >
       {isFocused && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 flex h-11 w-fit items-center gap-0.5 rounded-full border border-border bg-white px-2 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div className="absolute bottom-full left-0 z-10 mb-2 flex h-11 w-fit items-center gap-0.5 rounded-full border border-border bg-surface px-2 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div className="relative flex items-center">
             <select
               value={activeState.fontFamily}

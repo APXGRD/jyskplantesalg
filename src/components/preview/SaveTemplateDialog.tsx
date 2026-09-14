@@ -34,7 +34,7 @@ export function SaveTemplateDialog({ onClose, onSave }: SaveTemplateDialogProps)
     <div className="fixed inset-0 z-30 flex items-center justify-center px-4">
       <button type="button" aria-label="Luk" onClick={onClose} className="absolute inset-0 bg-black/30" />
 
-      <div className="relative w-full max-w-sm rounded-xl border border-border bg-white p-5 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
+      <div className="relative w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
         <h2 className="text-[15px] font-semibold text-ink">Gem som skabelon</h2>
         <p className="pt-1 text-[13px] text-ink-muted">
           Gemmer kun blokkenes opbygning og styling – ikke den konkrete AI-tekst eller de valgte produkter.
