@@ -62,7 +62,7 @@ export function CustomerPanel({ customer, onClose, onSave }: CustomerPanelProps)
     <div className="fixed inset-0 z-20 flex justify-end">
       <button type="button" aria-label="Luk panel" onClick={onClose} className="absolute inset-0 bg-black/30" />
 
-      <div className="relative flex h-full w-96 flex-col border-l border-border bg-surface shadow-[0_0_24px_rgba(0,0,0,0.12)]">
+      <div className="relative flex h-full w-full max-w-96 flex-col border-l border-border bg-surface shadow-[0_0_24px_rgba(0,0,0,0.12)]">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-[15px] font-semibold text-ink">{isEditing ? "Rediger kunde" : "Tilføj kunde"}</h2>
           <button

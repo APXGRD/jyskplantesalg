@@ -37,7 +37,7 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <div className="flex items-stretch gap-4">
+      <div className="flex flex-wrap items-stretch justify-center gap-4">
         <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-surface px-7 py-4">
           <span className="text-2xl font-semibold text-ink">{activeCustomerCount}</span>
           <span className="text-xs text-ink-muted">Aktive kunder</span>

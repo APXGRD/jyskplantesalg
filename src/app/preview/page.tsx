@@ -164,9 +164,9 @@ export default function PreviewPage() {
           subtitle="Gennemse og redigér det genererede nyhedsbrev, før det kopieres eller gemmes som skabelon"
         />
 
-        <div className="flex flex-col gap-3 border-b border-border bg-surface px-8 py-4">
+        <div className="flex flex-col gap-3 border-b border-border bg-surface px-4 py-4 md:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <SegmentedControl<View>
                 value={activeView}
                 onChange={setActiveView}
@@ -187,7 +187,7 @@ export default function PreviewPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               {activeView === "preview" && (
                 <button
                   type="button"
@@ -224,7 +224,12 @@ export default function PreviewPage() {
           </span>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        {/* overflow-x-auto – NewsletterCard's Desktop-visning (w-[600px]) er
+            BEVIDST fast bred (den viser præcis, hvad en rigtig e-mail-klient
+            viser), og skal derfor kunne scrolles vandret for sig på smalle
+            skærme, i stedet for at blive klemt/klippet eller bryde resten af
+            sidens layout. */}
+        <div className="flex-1 overflow-x-auto overflow-y-auto p-4 md:p-8">
           {!result ? (
             <div className="flex justify-center">
               <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-surface p-6">

@@ -9,7 +9,7 @@ interface SelectionFooterProps {
 
 export function SelectionFooter({ shown, total, nextDisabled, onNext }: SelectionFooterProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-8 pt-3 pb-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-4 pt-3 pb-4 md:px-8">
       <p className="text-[13px] text-ink-faint">
         {shown} af {total} produkter vist
       </p>

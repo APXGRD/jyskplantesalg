@@ -199,7 +199,7 @@ export function ProduktvaelgerClient({
         />
 
         {syncError && (
-          <p className="border-b border-border bg-surface px-8 py-2 text-[12px] text-red-600">{syncError}</p>
+          <p className="border-b border-border bg-surface px-4 py-2 text-[12px] text-red-600 md:px-8">{syncError}</p>
         )}
 
         {isLoading ? (
