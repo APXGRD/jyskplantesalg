@@ -4,10 +4,10 @@ import { CustomerRow } from "./CustomerRow";
 interface CustomerTableProps {
   customers: ShopifyCustomer[];
   onEdit: (customer: ShopifyCustomer) => void;
-  onDelete: (customer: ShopifyCustomer) => void;
+  onUnsubscribe: (customer: ShopifyCustomer) => void;
 }
 
-export function CustomerTable({ customers, onEdit, onDelete }: CustomerTableProps) {
+export function CustomerTable({ customers, onEdit, onUnsubscribe }: CustomerTableProps) {
   return (
     <div className="flex-1 overflow-y-auto px-8">
       <table className="w-full border-collapse">
@@ -24,7 +24,7 @@ export function CustomerTable({ customers, onEdit, onDelete }: CustomerTableProp
         </thead>
         <tbody>
           {customers.map((customer) => (
-            <CustomerRow key={customer.id} customer={customer} onEdit={onEdit} onDelete={onDelete} />
+            <CustomerRow key={customer.id} customer={customer} onEdit={onEdit} onUnsubscribe={onUnsubscribe} />
           ))}
         </tbody>
       </table>

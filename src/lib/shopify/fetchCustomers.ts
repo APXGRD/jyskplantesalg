@@ -31,19 +31,28 @@ const CUSTOMERS_PER_PAGE = 250;
 const LOW_THROTTLE_THRESHOLD = 200;
 const THROTTLE_WAIT_MS = 1000;
 
+// Delt af BÅDE denne fils CUSTOMERS_QUERY OG de to skrive-mutationer i
+// customerMutations.ts (customerCreate/customerEmailMarketingConsentUpdate)
+// – PRÆCIS samme felt-udvalg, uanset om kunden hentes eller lige er
+// oprettet/opdateret, så mapCustomerNode herunder kan genbruges 1:1 begge
+// steder, i stedet for at holde to kopier af feltlisten synkrone manuelt.
+export const CUSTOMER_NODE_FIELDS = `
+  id
+  firstName
+  lastName
+  tags
+  defaultEmailAddress {
+    emailAddress
+    marketingState
+  }
+`;
+
 const CUSTOMERS_QUERY = `
   query FetchCustomers($first: Int!, $after: String) {
     customers(first: $first, after: $after) {
       edges {
         node {
-          id
-          firstName
-          lastName
-          tags
-          defaultEmailAddress {
-            emailAddress
-            marketingState
-          }
+          ${CUSTOMER_NODE_FIELDS}
         }
       }
       pageInfo {
@@ -57,7 +66,7 @@ const CUSTOMERS_QUERY = `
 // De fire værdier, mock-typen ShopifyCustomer.marketingConsentStatus kender.
 type MarketingConsentStatus = ShopifyCustomer["marketingConsentStatus"];
 
-interface ShopifyCustomerNode {
+export interface ShopifyCustomerNode {
   id: string;
   firstName: string | null;
   lastName: string | null;
@@ -109,7 +118,10 @@ function mapMarketingConsentStatus(
   return marketingState;
 }
 
-function mapCustomerNode(node: ShopifyCustomerNode): ShopifyCustomer {
+// Eksporteret, så customerMutations.ts (customerCreate/
+// customerEmailMarketingConsentUpdate) kan genbruge PRÆCIS samme mapning af
+// et Shopify-kunde-node til ShopifyCustomer, i stedet for at duplikere den.
+export function mapCustomerNode(node: ShopifyCustomerNode): ShopifyCustomer {
   return {
     id: node.id,
     firstName: node.firstName ?? "",

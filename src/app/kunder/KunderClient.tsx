@@ -10,7 +10,8 @@ import { ImportCustomersButton, type ImportedFile } from "@/components/customers
 import { ErrorCard, LoadingCard } from "@/components/FetchStateCard";
 import { getCustomerType, getCustomers, isActiveCustomer, type ShopifyCustomer } from "@/lib/customers";
 import type { CustomerType } from "@/lib/format";
-import { ChevronDownIcon, PlusIcon, SearchIcon, XIcon } from "@/components/icons";
+import { formatRelativeTime } from "@/lib/format";
+import { ChevronDownIcon, PlusIcon, RefreshIcon, SearchIcon, SpinnerIcon, XIcon } from "@/components/icons";
 
 interface ImportResult extends ImportedFile {
   count: number;
@@ -24,33 +25,68 @@ const selectClassName =
 
 interface KunderClientProps {
   initialCustomers: ShopifyCustomer[];
+  initialSyncedAt: string | null;
   initialError: string | null;
 }
 
-export function KunderClient({ initialCustomers, initialError }: KunderClientProps) {
+export function KunderClient({ initialCustomers, initialSyncedAt, initialError }: KunderClientProps) {
   // Server-renderet ved første sideindlæsning (se kunder/page.tsx) – intet
   // klientside mount-fetch/loading-spinner for den almindelige, succesfulde
   // sti. isLoading bruges kun mens en fejl-retry er i gang.
   const [customers, setCustomers] = useState<ShopifyCustomer[]>(initialCustomers);
+  const [syncedAt, setSyncedAt] = useState<string | null>(initialSyncedAt);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(initialError);
+
+  // "Synkroniser kunder" – genopbygger HELE cachen fra Shopify, til brug hvis
+  // nogen har ændret noget direkte i Shopifys egen admin, uden om appen.
+  // Almindelige tilføj/afmeld-handlinger i appen opdaterer i stedet cachen
+  // øjeblikkeligt, én kunde ad gangen (se handleAddCustomer/
+  // handleUnsubscribeConfirmed herunder) – IKKE via denne knap.
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
   const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerType | "">("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [panel, setPanel] = useState<PanelState>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ShopifyCustomer | null>(null);
+  // Kunden, der venter på bekræftelse af afmelding i ConfirmDialog herunder.
+  const [unsubscribeTarget, setUnsubscribeTarget] = useState<ShopifyCustomer | null>(null);
+  const [unsubscribeError, setUnsubscribeError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   async function retryLoadCustomers() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const data = await getCustomers();
-      setCustomers(data);
+      const { customers: freshCustomers, syncedAt: freshSyncedAt } = await getCustomers();
+      setCustomers(freshCustomers);
+      setSyncedAt(freshSyncedAt);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleSync() {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const response = await fetch("/api/customers/sync", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Kunne ikke synkronisere kunder fra Shopify.");
+      }
+      const { customers: freshCustomers, syncedAt: freshSyncedAt } = await getCustomers();
+      setCustomers(freshCustomers);
+      setSyncedAt(freshSyncedAt);
+      setLoadError(null);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -76,21 +112,77 @@ export function KunderClient({ initialCustomers, initialError }: KunderClientPro
     });
   }, [customers, search, customerTypeFilter, statusFilter]);
 
-  function handleSaveCustomer(customer: ShopifyCustomer) {
-    setCustomers((current) => {
-      const exists = current.some((c) => c.id === customer.id);
-      if (exists) {
-        return current.map((c) => (c.id === customer.id ? customer : c));
-      }
-      return [...current, customer];
+  // "Tilføj"-tilstand: skriver TIL SHOPIFY FØRST (customerCreate, se
+  // customers/create/route.ts) – Shopify er den reelle kilde, af juridiske
+  // grunde. Kastes en fejl, fanger CustomerPanel.tsx den selv og viser den i
+  // panelet, som forbliver åbent (se CustomerPanel's egen isSaving/error-
+  // håndtering). Panelet lukkes derfor KUN her, ved bekræftet succes, med
+  // den RIGTIGE kunde (rigtigt Shopify-id), ikke panelets egen midlertidige
+  // crypto.randomUUID()-placeholder.
+  async function handleAddCustomer(customer: ShopifyCustomer) {
+    const response = await fetch("/api/customers/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        email: customer.email,
+        customerType: getCustomerType(customer),
+      }),
     });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error ?? "Kunne ikke oprette kunden i Shopify. Prøv igen.");
+    }
+    const created: ShopifyCustomer = await response.json();
+    setCustomers((current) => [...current, created]);
     setPanel(null);
   }
 
-  function handleDeleteConfirmed() {
-    if (!deleteTarget) return;
-    setCustomers((current) => current.filter((c) => c.id !== deleteTarget.id));
-    setDeleteTarget(null);
+  // "Rediger"-tilstand: ren, lokal opdatering – IKKE en del af denne opgave
+  // (kun "Tilføj kunde" og "Afmeld kunde" skal skrive til Shopify), forbliver
+  // derfor uændret.
+  function handleEditCustomer(customer: ShopifyCustomer) {
+    setCustomers((current) => current.map((c) => (c.id === customer.id ? customer : c)));
+    setPanel(null);
+  }
+
+  function handleUnsubscribeClick(customer: ShopifyCustomer) {
+    setUnsubscribeError(null);
+    setUnsubscribeTarget(customer);
+  }
+
+  // Skriver TIL SHOPIFY FØRST (customerEmailMarketingConsentUpdate, se
+  // customers/unsubscribe/route.ts) – Shopify er den reelle kilde til
+  // samtykke-status, af juridiske grunde. Opdaterer status optimistisk med
+  // det samme (samme mønster som skabelon-sletning i OpsaetningClient.tsx),
+  // men ruller tilbage til kundens oprindelige status, hvis selve
+  // Shopify-kaldet fejler – kunden må ALDRIG fremstå afmeldt i UI'et, uden at
+  // Shopify rent faktisk har bekræftet det. Kunden fjernes IKKE fra listen –
+  // den forbliver synlig, nu med status "Afmeldt".
+  async function handleUnsubscribeConfirmed() {
+    if (!unsubscribeTarget) return;
+    const target = unsubscribeTarget;
+    setUnsubscribeTarget(null);
+    setCustomers((current) =>
+      current.map((c) => (c.id === target.id ? { ...c, marketingConsentStatus: "UNSUBSCRIBED" } : c)),
+    );
+    try {
+      const response = await fetch("/api/customers/unsubscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: target.id }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error ?? "Kunne ikke afmelde kunden. Prøv igen.");
+      }
+      const updated: ShopifyCustomer = await response.json();
+      setCustomers((current) => current.map((c) => (c.id === updated.id ? updated : c)));
+    } catch (err) {
+      setCustomers((current) => current.map((c) => (c.id === target.id ? target : c)));
+      setUnsubscribeError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
+    }
   }
 
   function handleImport(file: ImportedFile) {
@@ -98,6 +190,18 @@ export function KunderClient({ initialCustomers, initialError }: KunderClientPro
     // at filen blev registreret, jf. opgavebeskrivelsen.
     setImportResult({ ...file, count: Math.floor(Math.random() * 18) + 3 });
   }
+
+  const syncButton = (
+    <button
+      type="button"
+      onClick={handleSync}
+      disabled={isSyncing}
+      className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted hover:bg-surface-active hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {isSyncing ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <RefreshIcon className="h-3.5 w-3.5" />}
+      {isSyncing ? "Synkroniserer..." : "Synkroniser kunder"}
+    </button>
+  );
 
   return (
     <div className="flex h-screen bg-background">
@@ -109,6 +213,12 @@ export function KunderClient({ initialCustomers, initialError }: KunderClientPro
           subtitle={`${customers.length} kunder i alt`}
           rightSlot={
             <>
+              {syncedAt && (
+                <span className="text-[12px] text-ink-faint">
+                  Sidst synkroniseret: {formatRelativeTime(new Date(syncedAt))}
+                </span>
+              )}
+              {syncButton}
               <ImportCustomersButton onImport={handleImport} />
               <button
                 type="button"
@@ -121,6 +231,10 @@ export function KunderClient({ initialCustomers, initialError }: KunderClientPro
             </>
           }
         />
+
+        {syncError && (
+          <p className="border-b border-border bg-surface px-8 py-2 text-[12px] text-red-600">{syncError}</p>
+        )}
 
         {importResult && (
           <div className="flex items-center justify-between gap-3 border-b border-border bg-emerald-50 px-8 py-3">
@@ -139,8 +253,22 @@ export function KunderClient({ initialCustomers, initialError }: KunderClientPro
           </div>
         )}
 
+        {unsubscribeError && (
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-red-50 px-8 py-3">
+            <p className="text-[13px] text-red-800">{unsubscribeError}</p>
+            <button
+              type="button"
+              onClick={() => setUnsubscribeError(null)}
+              aria-label="Luk"
+              className="text-red-700 hover:text-red-900"
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         {isLoading ? (
-          <LoadingCard message="Henter kunder fra Shopify..." />
+          <LoadingCard message="Henter kunder..." />
         ) : loadError ? (
           <ErrorCard title="Kunne ikke hente kunder" message={loadError} onRetry={retryLoadCustomers} />
         ) : (
@@ -187,7 +315,7 @@ export function KunderClient({ initialCustomers, initialError }: KunderClientPro
             <CustomerTable
               customers={filteredCustomers}
               onEdit={(customer) => setPanel({ mode: "edit", customer })}
-              onDelete={(customer) => setDeleteTarget(customer)}
+              onUnsubscribe={handleUnsubscribeClick}
             />
           </>
         )}
@@ -197,17 +325,17 @@ export function KunderClient({ initialCustomers, initialError }: KunderClientPro
         <CustomerPanel
           customer={panel.mode === "edit" ? panel.customer : undefined}
           onClose={() => setPanel(null)}
-          onSave={handleSaveCustomer}
+          onSave={panel.mode === "edit" ? handleEditCustomer : handleAddCustomer}
         />
       )}
 
-      {deleteTarget && (
+      {unsubscribeTarget && (
         <ConfirmDialog
-          title="Slet kunde"
-          description={`Er du sikker på, du vil slette ${deleteTarget.firstName} ${deleteTarget.lastName}? Dette kan ikke fortrydes.`}
-          confirmLabel="Slet"
-          onConfirm={handleDeleteConfirmed}
-          onCancel={() => setDeleteTarget(null)}
+          title="Afmeld kunde"
+          description={`Er du sikker på, du vil afmelde ${unsubscribeTarget.firstName} ${unsubscribeTarget.lastName} fra markedsføring? Kunden forbliver på listen med status "Afmeldt".`}
+          confirmLabel="Afmeld"
+          onConfirm={handleUnsubscribeConfirmed}
+          onCancel={() => setUnsubscribeTarget(null)}
         />
       )}
     </div>
