@@ -81,7 +81,7 @@ export function ImageBlockControls({
   return (
     <div ref={containerRef} onFocus={handleFocus} onBlur={handleBlur} className="relative">
       {isFocused && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 w-72 rounded-lg border border-border bg-white p-3 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div className="absolute bottom-full left-0 z-10 mb-2 w-72 rounded-lg border border-border bg-surface p-3 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div className="flex flex-col gap-3">
             <div>
               <button
@@ -102,8 +102,7 @@ export function ImageBlockControls({
 
             <label className="flex flex-col gap-1">
               <span className="text-[11px] text-ink-muted">
-                Alt-tekst <span className="text-red-500">*</span>{" "}
-                <span className="text-ink-faintest">(Anbefalet)</span>
+                Alt-tekst <span className="text-ink-faintest">(Anbefalet)</span>
               </span>
               <input
                 type="text"

@@ -6,6 +6,7 @@ import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterHtml, buildNewsletterText } from "@/lib/newsletterExport";
 import { buildTemplateBlockStructure } from "@/lib/newsletterBlocks";
 import { ErrorCard, LoadingCard } from "@/components/FetchStateCard";
+import { PageHeader } from "@/components/PageHeader";
 import { Sidebar } from "@/components/Sidebar";
 import { SegmentedControl } from "@/components/preview/SegmentedControl";
 import { NewsletterCard } from "@/components/preview/NewsletterCard";
@@ -158,6 +159,11 @@ export default function PreviewPage() {
       <Sidebar active="preview" />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface">
+        <PageHeader
+          title="Preview / Rediger"
+          subtitle="Gennemse og redigér det genererede nyhedsbrev, før det kopieres eller gemmes som skabelon"
+        />
+
         <div className="flex flex-col gap-3 border-b border-border bg-surface px-8 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -221,7 +227,7 @@ export default function PreviewPage() {
         <div className="flex-1 overflow-y-auto p-8">
           {!result ? (
             <div className="flex justify-center">
-              <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-white p-6">
+              <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-surface p-6">
                 <p className="text-sm font-semibold text-ink">Intet nyhedsbrev genereret endnu</p>
                 <p className="text-sm text-ink-muted">
                   Gå til Opsætning for at vælge målgruppe og generere nyhedsbrevet, før du kan

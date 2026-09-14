@@ -96,8 +96,8 @@ const ADD_BLOCK_OPTIONS: { kind: AddableBlockKind; label: string; icon: (props: 
 ];
 
 const BADGE_STYLES: Record<BlockBadge, string> = {
-  Struktur: "bg-zinc-100 text-zinc-600",
-  "AI-tekst": "bg-violet-50 text-violet-700",
+  Struktur: "bg-surface-active text-ink",
+  "AI-tekst": "bg-primary/10 text-secondary",
   Produktdata: "bg-surface-badge text-ink-muted",
 };
 
@@ -572,7 +572,7 @@ function SortableBlockRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-xl border border-border bg-white p-4 ${
+      className={`rounded-xl border border-border bg-surface p-4 ${
         block.hidden ? "opacity-60 grayscale" : ""
       }`}
     >
@@ -665,7 +665,7 @@ function AddBlockMenu({ onAdd }: { onAdd: (kind: AddableBlockKind) => void }) {
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-lg border border-border bg-white py-1 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           {ADD_BLOCK_OPTIONS.map(({ kind, label, icon: Icon }) => (
             <button
               key={kind}
@@ -1140,7 +1140,7 @@ export function EditorBlockList({
           onClick={handleRegenerateText}
           disabled={regenerateTextProducts.length === 0 || isRegeneratingText}
           title="Genererer Overskrift og Brødtekst på ny, ud fra det/de produkter, der aktuelt er valgt i Produktvisning og Billede/Galleri herunder – rører ikke ved blok-struktur, styling, billeder eller CTA-knappen."
-          className="inline-flex h-9 w-fit items-center gap-2 self-start rounded-full border border-border bg-white px-3.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 w-fit items-center gap-2 self-start rounded-full border border-border bg-surface px-3.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isRegeneratingText ? (
             <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />

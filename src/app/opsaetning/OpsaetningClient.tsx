@@ -261,7 +261,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                   <select
                     value={selectedTemplateId ?? ""}
                     onChange={(event) => setSelectedTemplateId(event.target.value || null)}
-                    className="w-full appearance-none rounded-lg border border-border bg-white px-4 py-2.5 pr-8 text-[13px] text-ink focus:outline-none"
+                    className="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2.5 pr-8 text-[13px] text-ink focus:outline-none"
                   >
                     <option value="">Standard layout</option>
                     {templates.map((template) => (
@@ -298,7 +298,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                 onChange={(event) => setInstructions(event.target.value)}
                 placeholder="F.eks. 'Lav et nyhedsbrev i en professionel tone til vores erhvervskunder om vores blommetræer'"
                 rows={5}
-                className="w-full resize-none rounded-xl border border-border bg-white px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
+                className="w-full resize-none rounded-lg border border-border bg-surface px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
               />
 
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface-selected px-4 py-3">
@@ -310,7 +310,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                   value={topicMinPrice}
                   onChange={(event) => setTopicMinPrice(event.target.value)}
                   placeholder="Min. pris"
-                  className="w-23 rounded-lg border border-border bg-white px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
+                  className="w-23 rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
                 />
                 <input
                   type="number"
@@ -319,13 +319,13 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                   value={topicMaxPrice}
                   onChange={(event) => setTopicMaxPrice(event.target.value)}
                   placeholder="Maks. pris"
-                  className="w-23 rounded-lg border border-border bg-white px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
+                  className="w-23 rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
                 />
                 <div className="relative">
                   <select
                     value={topicPlantForm}
                     onChange={(event) => setTopicPlantForm(event.target.value)}
-                    className="w-40 appearance-none rounded-lg border border-border bg-white px-3 py-2 pr-7 text-[13px] text-ink focus:outline-none"
+                    className="w-40 appearance-none rounded-lg border border-border bg-surface px-3 py-2 pr-7 text-[13px] text-ink focus:outline-none"
                   >
                     <option value="">Alle planteformer</option>
                     {plantForms.map((form) => (
@@ -347,7 +347,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                     min={1}
                     value={topicMaxResults}
                     onChange={(event) => setTopicMaxResults(event.target.value)}
-                    className="w-20 rounded-lg border border-border bg-white px-2.5 py-2 text-[13px] text-ink focus:outline-none"
+                    className="w-20 rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] text-ink focus:outline-none"
                   />
                 </div>
                 {showMatchCountNote && (

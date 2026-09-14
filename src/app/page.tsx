@@ -1,16 +1,29 @@
 import Link from "next/link";
-import { mockCustomers } from "@/lib/mock/mockCustomers";
+import { fetchShopifyCustomers } from "@/lib/shopify/fetchCustomers";
+import { isActiveCustomer } from "@/lib/customers";
 import { ChevronRightIcon, UsersIcon } from "@/components/icons";
 import { Logo } from "@/components/Logo";
 import { brand } from "@/config/brand";
 
-export default function HomePage() {
+export default async function HomePage() {
   // Landingssiden er app-chrome, ikke nyhedsbrevets EGET indhold – viser
   // derfor bevidst app'ens statiske, faste navn/farve (brand.ts), IKKE
   // kundens dynamiske brand-indstillinger (se BrandSettingsContext.tsx).
-  const activeCustomerCount = mockCustomers.filter(
-    (customer) => customer.marketingConsentStatus === "SUBSCRIBED",
-  ).length;
+  //
+  // Kundetallet SKAL dog være det rigtige, aktuelle antal – samme kilde
+  // (fetchShopifyCustomers) og samme "aktiv"-definition (isActiveCustomer),
+  // som Kunder-siden selv bruger (se kunder/page.tsx), IKKE længere
+  // mockCustomers, som stille var blevet stående her efter at Kunder-siden
+  // blev migreret til rigtige Shopify-data. Fejler hentningen (Shopify
+  // midlertidigt utilgængelig osv.), falder tallet roligt tilbage til 0 i
+  // stedet for at vælte hele landingssiden.
+  let activeCustomerCount = 0;
+  try {
+    const customers = await fetchShopifyCustomers();
+    activeCustomerCount = customers.filter(isActiveCustomer).length;
+  } catch (err) {
+    console.error("Kunne ikke hente kunder fra Shopify:", err);
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-10 bg-background px-6">

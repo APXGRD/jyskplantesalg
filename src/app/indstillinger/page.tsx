@@ -30,7 +30,7 @@ const LOGO_FILE_ACCEPT = ".png,.jpg,.jpeg";
 const MAX_LOGO_FILE_BYTES = 500 * 1024;
 
 const fieldClassName =
-  "w-full rounded-xl border border-border bg-white px-4 py-3 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none";
+  "w-full rounded-lg border border-border bg-surface px-4 py-3 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none";
 
 export default function IndstillingerPage() {
   const refreshBrandSettings = useRefreshBrandSettings();
@@ -212,7 +212,7 @@ export default function IndstillingerPage() {
                   PNG eller JPEG, maks. 500 KB – vises i nyhedsbrevets header (ikke i selve appens sidemenu)
                 </p>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-surface">
                     {form.logo_data ? (
                       // eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI, next/image kan ikke optimere den
                       <img src={form.logo_data} alt="Uploadet logo" className="h-full w-full object-contain" />
@@ -254,7 +254,7 @@ export default function IndstillingerPage() {
                         type="color"
                         value={color}
                         onChange={(event) => updateColorAt(index, event.target.value)}
-                        className="h-11 w-14 shrink-0 cursor-pointer rounded-lg border border-border bg-white p-1"
+                        className="h-11 w-14 shrink-0 cursor-pointer rounded-lg border border-border bg-surface p-1"
                       />
                       <input
                         value={color}

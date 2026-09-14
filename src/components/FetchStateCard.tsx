@@ -27,7 +27,7 @@ export function ErrorCard({
 }) {
   return (
     <div className="flex flex-1 items-center justify-center">
-      <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-white p-6">
+      <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-surface p-6">
         <p className="text-sm font-semibold text-ink">{title}</p>
         <p className="text-sm text-ink-muted">{message}</p>
         <button
