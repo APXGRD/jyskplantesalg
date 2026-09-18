@@ -1,9 +1,11 @@
 // src/lib/brandSettings.ts
 //
 // Serverside adgang til den ENE indstillings-række i Supabases
-// settings-tabel – company_name/brand_colors/brand_tone/primary_font.
-// Bruges af src/app/api/settings/route.ts og alle andre serverside-steder,
-// der tidligere læste direkte fra src/config/brand.ts (fx generate-
+// settings-tabel – company_name/brand_colors/brand_tone/primary_font samt
+// de fire firmaoplysnings-felter til nyhedsbrevets footer (street_address/
+// postal_code/city/business_registration_number). Bruges af
+// src/app/api/settings/route.ts og alle andre serverside-steder, der
+// tidligere læste direkte fra src/config/brand.ts (fx generate-
 // newsletter/route.ts og OAuth-callback-siden). Fejler Supabase-kaldet
 // (tabellen tom, netværksfejl osv.), falder funktionen roligt tilbage til
 // brand.ts's statiske standardværdier i stedet for at vælte kalderen – det
@@ -27,6 +29,14 @@ export interface BrandSettingsRow {
   // for denne, kun en kode-side fallback til det eksisterende leaf-logo (se
   // NewsletterCard.tsx/newsletterExport.ts).
   logo_data: string | null;
+  // Firmaoplysninger til nyhedsbrevets footer – null betyder "ikke udfyldt
+  // endnu" (kolonnerne har ingen NOT NULL-krav), håndteres pænt af
+  // formatFooterAddressLine (BrandSettingsContext.tsx), som udelader et
+  // tomt/manglende felt helt i stedet for at vise et hul i footer-linjen.
+  street_address: string | null;
+  postal_code: string | null;
+  city: string | null;
+  business_registration_number: string | null;
 }
 
 const FALLBACK_SETTINGS: BrandSettingsRow = {
@@ -36,6 +46,10 @@ const FALLBACK_SETTINGS: BrandSettingsRow = {
   brand_tone: brand.tone,
   primary_font: brand.primaryFont,
   logo_data: null,
+  street_address: null,
+  postal_code: null,
+  city: null,
+  business_registration_number: null,
 };
 
 export async function getBrandSettings(): Promise<BrandSettingsRow> {
@@ -43,7 +57,9 @@ export async function getBrandSettings(): Promise<BrandSettingsRow> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from("settings")
-      .select("id, company_name, brand_colors, brand_tone, primary_font, logo_data")
+      .select(
+        "id, company_name, brand_colors, brand_tone, primary_font, logo_data, street_address, postal_code, city, business_registration_number",
+      )
       .limit(1)
       .single();
 

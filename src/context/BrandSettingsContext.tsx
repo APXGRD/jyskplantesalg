@@ -37,9 +37,45 @@ export interface BrandSettings {
   // NewsletterCard's header), aldrig af app'ens eget Logo/Sidebar, som
   // fortsat viser det faste leaf-logo uanset denne værdi.
   logoData: string | null;
+  // Firmaoplysninger til nyhedsbrevets footer (street_address/postal_code/
+  // city/business_registration_number-kolonnerne i settings-tabellen, se
+  // Indstillinger-siden) – tom streng betyder "ikke udfyldt endnu", IKKE
+  // null, samme mønster som resten af BrandSettings' tekstfelter. Se
+  // formatFooterAddressLine herunder for hvordan de kombineres til selve
+  // footer-linjen, inkl. pæn håndtering af tomme felter.
+  streetAddress: string;
+  postalCode: string;
+  city: string;
+  businessRegistrationNumber: string;
 }
 
-const STATIC_FALLBACK: BrandSettings = { ...brand, logoData: null };
+const STATIC_FALLBACK: BrandSettings = {
+  ...brand,
+  logoData: null,
+  streetAddress: "",
+  postalCode: "",
+  city: "",
+  businessRegistrationNumber: "",
+};
+
+// Bygger nyhedsbrevets footer-adresselinje ("{firmanavn} · {adresse} ·
+// {postnr} {by} · CVR {cvr-nr}"), UDELUKKENDE af de dele, der rent faktisk
+// er udfyldt – en tom værdi udelades helt (INGEN tomt "· ·" eller "CVR "
+// uden et tal), så footeren altid ser ren og læsbar ud, uanset hvor mange af
+// de fire firmaoplysnings-felter en given kunde har nået at udfylde i
+// Indstillinger. Delt af BÅDE NewsletterCard.tsx (Preview) og
+// newsletterExport.ts (kopieret HTML + tekst), så alle tre ALTID viser
+// PRÆCIS samme linje.
+export function formatFooterAddressLine(settings: BrandSettings): string {
+  const postalAndCity = [settings.postalCode, settings.city].filter((part) => part.trim().length > 0).join(" ");
+  const parts = [
+    settings.name,
+    settings.streetAddress.trim(),
+    postalAndCity,
+    settings.businessRegistrationNumber.trim() ? `CVR ${settings.businessRegistrationNumber.trim()}` : "",
+  ];
+  return parts.filter((part) => part.trim().length > 0).join(" · ");
+}
 
 // Ren, side-effekt-fri oversættelse af /api/settings's svar til
 // BrandSettings-formen – delt mellem den indledende hentning ved mount og
@@ -51,6 +87,10 @@ function mapResponseToSettings(data: {
   brand_tone: string;
   primary_font: string;
   logo_data: unknown;
+  street_address?: unknown;
+  postal_code?: unknown;
+  city?: unknown;
+  business_registration_number?: unknown;
 }): BrandSettings {
   // Forsvar mod et uventet tomt/for kort array – resten af appen
   // (Edit-mode's swatches, colors[0]/[1] i app'ens egen branding) regner
@@ -64,6 +104,14 @@ function mapResponseToSettings(data: {
     tone: data.brand_tone,
     primaryFont: data.primary_font,
     logoData: typeof data.logo_data === "string" ? data.logo_data : null,
+    // NULL i databasen (aldrig udfyldt endnu) falder pænt tilbage til tom
+    // streng – IKKE "null" som tekst – så formatFooterAddressLine ovenfor
+    // korrekt udelader feltet, i stedet for at vise det bogstaveligt.
+    streetAddress: typeof data.street_address === "string" ? data.street_address : "",
+    postalCode: typeof data.postal_code === "string" ? data.postal_code : "",
+    city: typeof data.city === "string" ? data.city : "",
+    businessRegistrationNumber:
+      typeof data.business_registration_number === "string" ? data.business_registration_number : "",
   };
 }
 

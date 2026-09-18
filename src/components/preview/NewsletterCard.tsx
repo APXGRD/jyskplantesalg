@@ -16,7 +16,7 @@ import {
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
-import { useBrandSettings } from "@/context/BrandSettingsContext";
+import { formatFooterAddressLine, useBrandSettings } from "@/context/BrandSettingsContext";
 import { brand as staticBrand } from "@/config/brand";
 
 const JUSTIFY_CLASS = {
@@ -295,9 +295,7 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             className="flex flex-col items-center gap-1.5 border-t border-border px-8 py-5 text-center"
             style={{ backgroundColor: bgColor, color: textColor }}
           >
-            <p className="text-[11px] opacity-80">
-              {brand.name} · Skovvej 14 · 8000 Aarhus C · CVR 34 567 890
-            </p>
+            <p className="text-[11px] opacity-80">{formatFooterAddressLine(brand)}</p>
             <p className="text-[11px] opacity-80">
               Du modtager dette nyhedsbrev, fordi du er {audience}.
             </p>
