@@ -30,6 +30,13 @@ interface UpdateSettingsBody {
   brand_tone?: string;
   primary_font?: string;
   logo_data?: string | null;
+  // Firmaoplysninger til nyhedsbrevets footer – ALLE fire er valgfrie
+  // (ingen NOT NULL-krav i databasen, og en helt ny kunde har måske ikke
+  // udfyldt dem endnu), til forskel fra company_name/brand_tone ovenfor.
+  street_address?: string;
+  postal_code?: string;
+  city?: string;
+  business_registration_number?: string;
 }
 
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -53,7 +60,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Ugyldig JSON i request body" }, { status: 400 });
   }
 
-  const { company_name, brand_colors, brand_tone, primary_font, logo_data } = body;
+  const { company_name, brand_colors, brand_tone, primary_font, logo_data, street_address, postal_code, city, business_registration_number } =
+    body;
 
   if (typeof company_name !== "string" || company_name.trim().length === 0) {
     return NextResponse.json({ error: "Firmanavn må ikke være tomt" }, { status: 400 });
@@ -83,6 +91,20 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Logoet er for stort (maks. 500 KB)" }, { status: 400 });
     }
   }
+  // De fire firmaoplysnings-felter er ALLE valgfrie (se UpdateSettingsBody)
+  // – kun selve TYPEN tjekkes her (skal være en streng, hvis feltet
+  // overhovedet er sendt med), ikke om de er udfyldt. En tom streng er en
+  // helt gyldig, bevidst værdi ("ryd feltet igen"), ikke en fejl.
+  for (const [fieldName, value] of [
+    ["street_address", street_address],
+    ["postal_code", postal_code],
+    ["city", city],
+    ["business_registration_number", business_registration_number],
+  ] as const) {
+    if (value !== undefined && typeof value !== "string") {
+      return NextResponse.json({ error: `${fieldName} skal være tekst` }, { status: 400 });
+    }
+  }
 
   try {
     const supabase = getSupabaseClient();
@@ -103,6 +125,15 @@ export async function PUT(req: NextRequest) {
       brand_tone: brand_tone.trim(),
       primary_font,
       logo_data: logo_data ?? null,
+      // undefined (feltet slet ikke sendt med) betyder her "rør ikke ved
+      // denne kolonne" er IKKE muligt at udtrykke via en almindelig
+      // .update()-kald med et samlet values-objekt – Indstillinger-siden
+      // sender derfor ALTID alle fire felter med (evt. som tom streng), så
+      // dette blot bliver en ren trim, ikke en reel "undefined"-gren.
+      street_address: street_address?.trim() || null,
+      postal_code: postal_code?.trim() || null,
+      city: city?.trim() || null,
+      business_registration_number: business_registration_number?.trim() || null,
     };
 
     // De gamle primary_color/secondary_color-kolonner er NOT NULL uden

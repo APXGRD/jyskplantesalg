@@ -14,6 +14,15 @@ interface BrandSettingsForm {
   brand_tone: string;
   primary_font: string;
   logo_data: string | null;
+  // Firmaoplysninger til nyhedsbrevets footer – ALLE fire er valgfrie tekst-
+  // felter (tom streng er en helt gyldig værdi, "ikke udfyldt"), til
+  // forskel fra company_name/brand_tone ovenfor. Se formatFooterAddressLine
+  // (BrandSettingsContext.tsx) for hvordan et tomt felt håndteres pænt i
+  // selve footeren.
+  street_address: string;
+  postal_code: string;
+  city: string;
+  business_registration_number: string;
 }
 
 const MIN_BRAND_COLORS = 2;
@@ -63,6 +72,14 @@ export default function IndstillingerPage() {
             brand_tone: data.brand_tone,
             primary_font: data.primary_font,
             logo_data: typeof data.logo_data === "string" ? data.logo_data : null,
+            // NULL i databasen (aldrig udfyldt endnu) bliver til en tom
+            // streng her, så felterne blot starter tomme i formularen, i
+            // stedet for at vise "null" som tekst.
+            street_address: typeof data.street_address === "string" ? data.street_address : "",
+            postal_code: typeof data.postal_code === "string" ? data.postal_code : "",
+            city: typeof data.city === "string" ? data.city : "",
+            business_registration_number:
+              typeof data.business_registration_number === "string" ? data.business_registration_number : "",
           });
         }
       } catch (err) {
@@ -205,6 +222,57 @@ export default function IndstillingerPage() {
                   className={fieldClassName}
                 />
               </label>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold tracking-wide text-ink uppercase">
+                  Firmaoplysninger (vises i footer)
+                </span>
+                <p className="pb-1 text-xs text-ink-faint">
+                  Alle felter er valgfrie – et tomt felt udelades bare pænt fra nyhedsbrevets footer-linje i
+                  stedet for at vise et tomt hul
+                </p>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-ink-muted">Adresse</span>
+                  <input
+                    value={form.street_address}
+                    onChange={(event) => updateField("street_address", event.target.value)}
+                    placeholder="F.eks. Skovvej 14"
+                    className={fieldClassName}
+                  />
+                </label>
+
+                <div className="flex gap-2">
+                  <label className="flex w-28 shrink-0 flex-col gap-1.5">
+                    <span className="text-[11px] text-ink-muted">Postnr.</span>
+                    <input
+                      value={form.postal_code}
+                      onChange={(event) => updateField("postal_code", event.target.value)}
+                      placeholder="8000"
+                      className={fieldClassName}
+                    />
+                  </label>
+                  <label className="flex flex-1 flex-col gap-1.5">
+                    <span className="text-[11px] text-ink-muted">By</span>
+                    <input
+                      value={form.city}
+                      onChange={(event) => updateField("city", event.target.value)}
+                      placeholder="Aarhus C"
+                      className={fieldClassName}
+                    />
+                  </label>
+                </div>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] text-ink-muted">CVR-nummer</span>
+                  <input
+                    value={form.business_registration_number}
+                    onChange={(event) => updateField("business_registration_number", event.target.value)}
+                    placeholder="34 567 890"
+                    className={fieldClassName}
+                  />
+                </label>
+              </div>
 
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-semibold tracking-wide text-ink uppercase">Logo</span>
