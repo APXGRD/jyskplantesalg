@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
+import { getUnsubscribeUrl } from "@/lib/unsubscribeUrl";
 import { ImagePlaceholderIcon } from "@/components/icons";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
@@ -299,7 +300,9 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
             <p className="text-[11px] opacity-80">
               Du modtager dette nyhedsbrev, fordi du er {audience}.
             </p>
-            <p className="pt-1 text-[11px]">Afmeld nyhedsbrevet</p>
+            <a href={getUnsubscribeUrl()} target="_blank" rel="noreferrer" className="pt-1 text-[11px] underline">
+              Afmeld nyhedsbrevet
+            </a>
           </div>
         );
       }

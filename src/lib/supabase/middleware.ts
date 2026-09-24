@@ -40,18 +40,21 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Login-siden selv, samt de to sider, der er en del af invitations-
-  // FLOWET (afsendt via /inviter/actions.ts's inviteUserByEmail) – en
-  // person, der klikker invitations-linket i mailen, har PR. DEFINITION
-  // ingen session endnu, så disse to må ikke selv kræve login, ellers
-  // omdirigerer middleware'et dem til /login, før de når at sætte deres
-  // adgangskode. /inviter (selve "Inviter bruger"-siden, der AFSENDER en
-  // invitation) er bevidst IKKE på denne liste – den skal forblive
-  // beskyttet som enhver anden side.
+  // Login-siden selv, de to sider, der er en del af invitations-FLOWET
+  // (afsendt via /inviter/actions.ts's inviteUserByEmail) – en person, der
+  // klikker invitations-linket i mailen, har PR. DEFINITION ingen session
+  // endnu, så disse må ikke selv kræve login, ellers omdirigerer
+  // middleware'et dem til /login, før de når at sætte deres adgangskode.
+  // /inviter (selve "Inviter bruger"-siden, der AFSENDER en invitation) er
+  // bevidst IKKE på denne liste – den skal forblive beskyttet som enhver
+  // anden side. /afmeld er den offentlige, generiske afmeldingsside, linket
+  // i ALLE nyhedsbrevs footer (se getUnsubscribeUrl) – en rigtig
+  // nyhedsbrevsmodtager er aldrig logget ind i selve appen.
   const isPublicAuthRoute =
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/auth/confirm") ||
-    request.nextUrl.pathname.startsWith("/invite/set-password");
+    request.nextUrl.pathname.startsWith("/invite/set-password") ||
+    request.nextUrl.pathname.startsWith("/afmeld");
   // API-routes omdirigeres bevidst IKKE her – en omdirigering (307 til en
   // HTML-side) er et meningsløst svar for et API-kald, og ville desuden
   // maskere, at hver enkelt route ALLIGEVEL skal have sin egen selvstændige
