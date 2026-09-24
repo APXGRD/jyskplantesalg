@@ -16,6 +16,7 @@ import {
 import { getContrastTextColor } from "@/lib/brandColors";
 import { formatFooterAddressLine, type BrandSettings } from "@/context/BrandSettingsContext";
 import { brand as staticBrand } from "@/config/brand";
+import { getUnsubscribeUrl } from "@/lib/unsubscribeUrl";
 
 // Standard-skrifttype for HELE nyhedsbrevet, når hverken den globale
 // skrifttype-vælger eller en per-blok værdi er sat. HTML-tabeller nedarver
@@ -353,7 +354,8 @@ function renderBlockHtml(
       const textColor = getContrastTextColor(bgColor);
       return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">
         ${escapeHtml(formatFooterAddressLine(brand))}<br/>
-        Du modtager dette nyhedsbrev, fordi du er ${escapeHtml(audienceFor(customerType))}.
+        Du modtager dette nyhedsbrev, fordi du er ${escapeHtml(audienceFor(customerType))}.<br/>
+        <a href="${escapeAttr(getUnsubscribeUrl())}" style="color:${textColor};font-family:${DEFAULT_FONT_FAMILY};">Afmeld nyhedsbrevet</a>
       </td></tr>`;
     }
   }
@@ -413,7 +415,7 @@ function renderBlockText(
       return `${stripHtml(block.content ?? "")}: ${block.ctaUrl ?? ""}`;
 
     case "footer":
-      return `${formatFooterAddressLine(brand)}\nDu modtager dette nyhedsbrev, fordi du er ${audienceFor(customerType)}.`;
+      return `${formatFooterAddressLine(brand)}\nDu modtager dette nyhedsbrev, fordi du er ${audienceFor(customerType)}.\nAfmeld nyhedsbrevet: ${getUnsubscribeUrl()}`;
   }
 }
 
