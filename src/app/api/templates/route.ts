@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getTemplateSummaries } from "@/lib/templates";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 interface SaveTemplateBody {
   name?: string;
@@ -21,6 +22,9 @@ interface SaveTemplateBody {
 }
 
 export async function GET() {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   try {
     const data = await getTemplateSummaries();
     return NextResponse.json(data);
@@ -34,6 +38,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   let body: SaveTemplateBody;
   try {
     body = await req.json();

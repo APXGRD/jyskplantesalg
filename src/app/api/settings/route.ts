@@ -18,8 +18,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getBrandSettings } from "@/lib/brandSettings";
 import { FONT_FAMILIES } from "@/lib/fontFamilies";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 export async function GET() {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   const settings = await getBrandSettings();
   return NextResponse.json(settings);
 }
@@ -53,6 +57,9 @@ const MAX_LOGO_DATA_LENGTH = 700_000;
 const LOGO_DATA_URI_PATTERN = /^data:image\/(png|jpe?g);base64,/;
 
 export async function PUT(req: NextRequest) {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   let body: UpdateSettingsBody;
   try {
     body = await req.json();

@@ -17,6 +17,7 @@ import { GoogleGenAI } from "@google/genai";
 import { getCachedProducts } from "@/lib/cachedProducts";
 import { getBrandSettings } from "@/lib/brandSettings";
 import { buildNewsletterUserPrompt } from "@/lib/prompts/newsletterPrompt";
+import { requireUser } from "@/lib/supabase/requireUser";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 
 interface RegenerateTextBody {
@@ -40,6 +41,9 @@ function isCustomerType(value: unknown): value is CustomerType {
 }
 
 export async function POST(req: NextRequest) {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "Mangler GEMINI_API_KEY i .env.local" }, { status: 500 });

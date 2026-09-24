@@ -15,8 +15,12 @@
 
 import { NextResponse } from "next/server";
 import { getCachedPlantForms } from "@/lib/cachedProducts";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 export async function GET() {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   try {
     const plantForms = await getCachedPlantForms();
     return NextResponse.json({ plantForms });

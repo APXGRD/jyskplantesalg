@@ -16,12 +16,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unsubscribeShopifyCustomer } from "@/lib/shopify/customerMutations";
 import { upsertCachedCustomer } from "@/lib/cachedCustomers";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 interface UnsubscribeCustomerBody {
   customerId?: string;
 }
 
 export async function POST(req: NextRequest) {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   let body: UnsubscribeCustomerBody;
   try {
     body = await req.json();

@@ -8,8 +8,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getBrandSettings } from "@/lib/brandSettings";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 export async function GET(req: NextRequest) {
+  const { user, response: authResponse } = await requireUser();
+  if (!user) return authResponse;
+
   const clientId = process.env.SHOPIFY_CLIENT_ID;
   const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
 

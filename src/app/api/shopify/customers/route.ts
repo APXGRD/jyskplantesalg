@@ -5,8 +5,12 @@
 
 import { NextResponse } from "next/server";
 import { fetchShopifyCustomers } from "@/lib/shopify/fetchCustomers";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 export async function GET() {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   try {
     const customers = await fetchShopifyCustomers();
     return NextResponse.json(customers);
