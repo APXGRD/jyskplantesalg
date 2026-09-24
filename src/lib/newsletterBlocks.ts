@@ -303,6 +303,33 @@ export function pickGalleryProducts(products: ShopifyProduct[], count: number): 
   return withImages.slice(0, count);
 }
 
+// Vælger ÉT produkt til enkelt-billede-layoutet – bruges her af billede-
+// blokkens galleryColumns===1-gren i både createDefaultBlocks og
+// createBlocksFromTemplate herunder, OG (eksporteret) af generate-
+// newsletter/route.ts til det repræsentative billede, der sendes med i
+// selve API-svaret. Foretrækker den foretrukne productId (AI'ens valg,
+// hhv. en bestseller – se kalderne), men KUN hvis det produkt rent faktisk
+// har et billede, samme regel som pickGalleryProducts ovenfor bruger for
+// galleriet. Har det foretrukne produkt intet billede (fx et af de
+// matchede produkter uden Shopify-billede), findes i stedet det FØRSTE
+// valgte produkt, der har et – i stedet for blindt at sætte imageUrl til en
+// tom streng og lade blokken/billedet stå uden billede uden varsel (den
+// oprindelige fejl).
+// Har INGEN af de valgte produkter et billede, falder vi til sidst tilbage
+// til AI'ens valg (eller det først valgte), som hidtil – der er ganske
+// enkelt intet billede at vise i den situation.
+export function pickRepresentativeProduct(
+  products: ShopifyProduct[],
+  preferredProductId: string | undefined,
+): ShopifyProduct | undefined {
+  const preferred = products.find((product) => product.id === preferredProductId);
+  if (preferred?.hasImage && preferred.imageUrl) {
+    return preferred;
+  }
+  const firstWithImage = products.find((product) => product.hasImage && product.imageUrl);
+  return firstWithImage ?? preferred ?? products[0];
+}
+
 export function createDefaultBlocks(
   result: GeneratedNewsletter,
   customerType: CustomerType,
@@ -366,11 +393,12 @@ export function createDefaultBlocks(
         // Slå produktet op blandt de faktisk valgte produkter ud fra det
         // productId, AI'en pegede på – vi stoler ikke på, at Gemini har
         // kopieret imageUrl'en korrekt videre, kun på at productId
-        // identificerer det rigtige produkt. Findes det ikke (fx tomt/
-        // forkert productId), falder vi tilbage til det først valgte
-        // produkt, så blokken stadig starter med et rigtigt billede.
-        const matchedProduct =
-          selectedProducts.find((product) => product.id === result.image.productId) ?? selectedProducts[0];
+        // identificerer det rigtige produkt. Findes det ikke, eller mangler
+        // det et billede, falder vi tilbage til det først valgte produkt,
+        // der HAR et billede (se pickRepresentativeProduct), så blokken
+        // ikke ender uden billede, blot fordi AI'en/seed-puljens første
+        // produkt tilfældigvis er et af de få uden Shopify-billede.
+        const matchedProduct = pickRepresentativeProduct(selectedProducts, result.image.productId);
         if (matchedProduct) {
           block.imageUrl = matchedProduct.imageUrl;
           block.altText = matchedProduct.title;
@@ -533,8 +561,9 @@ export function createBlocksFromTemplate(
         block.galleryProductIds = galleryProducts.map((product) => product.id);
         block.galleryColumns = columns;
       } else {
-        const matchedProduct =
-          selectedProducts.find((product) => product.id === result.image.productId) ?? selectedProducts[0];
+        // Samme fallback som createDefaultBlocks – se
+        // pickRepresentativeProduct ovenfor.
+        const matchedProduct = pickRepresentativeProduct(selectedProducts, result.image.productId);
         if (matchedProduct) {
           block.imageUrl = matchedProduct.imageUrl;
           block.altText = matchedProduct.title;
