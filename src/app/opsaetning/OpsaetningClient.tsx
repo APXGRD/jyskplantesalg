@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/PageHeader";
 import { Sidebar } from "@/components/Sidebar";
 import { CustomerTypeCard } from "@/components/CustomerTypeCard";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { OnlyWithImageCheckbox } from "@/components/OnlyWithImageCheckbox";
 import { BoltIcon, ChevronDownIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import type { NewsletterBlock } from "@/lib/newsletterBlocks";
 import { useNewsletter, type GeneratedNewsletter } from "@/context/NewsletterContext";
@@ -15,6 +14,26 @@ import type { TemplateSummary } from "@/lib/templates";
 interface OpsaetningClientProps {
   initialTemplates: TemplateSummary[];
   initialPlantForms: string[];
+}
+
+// Checkbox-rækkerne i Filtrering-sektionen (Planteform/Visning) – egen,
+// lokal visning (kun brugt her) i stedet for den delte
+// OnlyWithImageCheckbox-"pille" (stadig brugt uændret i ProductFilterBar.tsx),
+// da denne side ønsker et andet, listet checkbox-udseende med udfyldt
+// firkant ved markering, i stedet for en bordet pille.
+function FilterCheckboxRow({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+  return (
+    <label className="relative flex cursor-pointer items-center gap-2.5 py-1 text-[13px] text-ink-muted select-none">
+      <input type="checkbox" checked={checked} onChange={onChange} className="sr-only" />
+      <span
+        aria-hidden="true"
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${
+          checked ? "border-primary bg-primary" : "border-border bg-surface"
+        }`}
+      />
+      {label}
+    </label>
+  );
 }
 
 export function OpsaetningClient({ initialTemplates, initialPlantForms }: OpsaetningClientProps) {
@@ -124,11 +143,11 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
   const showMatchCountNote = canGenerate && topicTotalMatchCount !== null;
   const matchCountText = (() => {
     if (topicTotalMatchCount === null) return "";
-    if (topicTotalMatchCount === 0) return "0 produkter matcher";
+    if (topicTotalMatchCount === 0) return "0 produkter";
     if (hasValidMaxResults && topicTotalMatchCount > parsedMaxResults) {
-      return `${topicTotalMatchCount} produkter matcher, viser de første ${parsedMaxResults}`;
+      return `${topicTotalMatchCount} produkter, viser de første ${parsedMaxResults}`;
     }
-    return `${topicTotalMatchCount} produkter matcher`;
+    return `${topicTotalMatchCount} produkter`;
   })();
 
   function handleDeleteTemplate() {
@@ -232,7 +251,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
         />
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="flex max-w-xl flex-col">
+          <div className="mx-auto flex w-full max-w-5xl flex-col">
             <section>
               <p className="text-xs font-semibold tracking-wide text-ink uppercase">Målgruppe</p>
               <div className="grid grid-cols-1 gap-4 pt-3 sm:grid-cols-2">
@@ -252,136 +271,135 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
             </section>
 
             <section className="pt-8">
-              <p className="text-xs font-semibold tracking-wide text-ink uppercase">Skabelon</p>
-              <p className="pt-1.5 pb-3 text-xs text-ink-faint">
-                Genbrug en gemt blok-opbygning og styling, eller behold standard-layoutet
-              </p>
-              <div className="flex items-center gap-2">
-                <div className="relative max-w-xs flex-1">
-                  <select
-                    value={selectedTemplateId ?? ""}
-                    onChange={(event) => setSelectedTemplateId(event.target.value || null)}
-                    className="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2.5 pr-8 text-[13px] text-ink focus:outline-none"
-                  >
-                    <option value="">Standard layout</option>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-3 w-3 -translate-y-1/2 text-ink-muted" />
+              <div className="grid grid-cols-1 gap-8 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)]">
+                <div className="flex flex-col gap-8">
+                  <div>
+                    <p className="pb-3 text-xs font-semibold tracking-wide text-ink uppercase">Skabelon</p>
+                    <div className="flex items-center gap-2">
+                      <div className="relative max-w-xs flex-1">
+                        <select
+                          value={selectedTemplateId ?? ""}
+                          onChange={(event) => setSelectedTemplateId(event.target.value || null)}
+                          className="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2.5 pr-8 text-[13px] text-ink focus:outline-none"
+                        >
+                          <option value="">Standard layout</option>
+                          {templates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-3 w-3 -translate-y-1/2 text-ink-muted" />
+                      </div>
+                      {selectedTemplate && (
+                        <button
+                          type="button"
+                          onClick={handleDeleteTemplate}
+                          aria-label={`Slet skabelonen ${selectedTemplate.name}`}
+                          title="Slet skabelon"
+                          className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-lg border border-border text-ink-faintest hover:bg-surface-active hover:text-red-600"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    {deleteError && <p className="pt-2 text-[12px] text-red-600">{deleteError}</p>}
+                  </div>
+
+                  <div>
+                    <p className="pb-3 text-xs font-semibold tracking-wide text-ink uppercase">
+                      Beskriv dit nyhedsbrev
+                    </p>
+                    <textarea
+                      value={instructions}
+                      onChange={(event) => setInstructions(event.target.value)}
+                      placeholder="F.eks. 'Lav et nyhedsbrev i en professionel tone til vores erhvervskunder om vores blommetræer'"
+                      rows={5}
+                      className="w-full resize-none rounded-lg border border-border bg-surface px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="mt-auto">
+                    {error && <p className="pb-4 text-sm text-red-600">{error}</p>}
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      disabled={!canGenerate || isGenerating}
+                      className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-7 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:opacity-100"
+                    >
+                      {isGenerating ? (
+                        <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <BoltIcon className="h-3.5 w-3.5" />
+                      )}
+                      {isGenerating ? "Genererer..." : "Generér nyhedsbrev"}
+                    </button>
+                    {!canGenerate && (
+                      <p className="pt-2 text-xs text-ink-faint">
+                        Beskriv dit nyhedsbrev ovenfor, før du kan generere det.
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {selectedTemplate && (
-                  <button
-                    type="button"
-                    onClick={handleDeleteTemplate}
-                    aria-label={`Slet skabelonen ${selectedTemplate.name}`}
-                    title="Slet skabelon"
-                    className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-lg border border-border text-ink-faintest hover:bg-surface-active hover:text-red-600"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                )}
+
+                <div>
+                  <p className="pb-3 text-xs font-semibold tracking-wide text-ink uppercase">Filtrering</p>
+
+                  <div className="flex flex-col gap-5">
+                    <div>
+                      <p className="border-b border-border pb-2 text-[13px] font-semibold text-primary">
+                        Planteform
+                      </p>
+                      <div className="flex max-h-52 flex-col overflow-y-auto pt-2 pr-1">
+                        <FilterCheckboxRow
+                          checked={topicPlantForm === ""}
+                          onChange={() => setTopicPlantForm("")}
+                          label="Alle planteformer"
+                        />
+                        {plantForms.map((form) => (
+                          <FilterCheckboxRow
+                            key={form}
+                            checked={topicPlantForm === form}
+                            onChange={() => setTopicPlantForm(form)}
+                            label={form}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="border-b border-border pb-2 text-[13px] font-semibold text-primary">Visning</p>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2">
+                        <FilterCheckboxRow
+                          checked={topicOnlyWithImage}
+                          onChange={() => setTopicOnlyWithImage(!topicOnlyWithImage)}
+                          label="Kun med billede"
+                        />
+                        <div className="flex items-center gap-2">
+                          <label htmlFor="topic-max-results" className="text-[13px] text-ink-faint whitespace-nowrap">
+                            Antal produkter
+                          </label>
+                          <input
+                            id="topic-max-results"
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            value={topicMaxResults}
+                            onChange={(event) => setTopicMaxResults(event.target.value)}
+                            className="w-20 rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] text-ink focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                      {showMatchCountNote && (
+                        <p className={`pt-2 text-[12px] ${topicTotalMatchCount === 0 ? "text-red-600" : "text-ink-faint"}`}>
+                          {matchCountText}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              {deleteError && <p className="pt-2 text-[12px] text-red-600">{deleteError}</p>}
             </section>
-
-            <section className="pt-8">
-              <p className="text-xs font-semibold tracking-wide text-ink uppercase">Beskriv dit nyhedsbrev</p>
-              <p className="pt-1.5 pb-3 text-xs text-ink-faint">
-                Bruges til automatisk at finde matchende produkter, og til at tilpasse AI-tekstens tone, fokus
-                og indhold
-              </p>
-              <textarea
-                value={instructions}
-                onChange={(event) => setInstructions(event.target.value)}
-                placeholder="F.eks. 'Lav et nyhedsbrev i en professionel tone til vores erhvervskunder om vores blommetræer'"
-                rows={5}
-                className="w-full resize-none rounded-lg border border-border bg-surface px-4 py-3.5 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
-              />
-
-              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface-selected px-4 py-3">
-                <OnlyWithImageCheckbox checked={topicOnlyWithImage} onChange={setTopicOnlyWithImage} />
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={topicMinPrice}
-                  onChange={(event) => setTopicMinPrice(event.target.value)}
-                  placeholder="Min. pris"
-                  className="w-23 rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
-                />
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={topicMaxPrice}
-                  onChange={(event) => setTopicMaxPrice(event.target.value)}
-                  placeholder="Maks. pris"
-                  className="w-23 rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] text-ink placeholder:text-ink-faintest focus:outline-none"
-                />
-                <div className="relative">
-                  <select
-                    value={topicPlantForm}
-                    onChange={(event) => setTopicPlantForm(event.target.value)}
-                    className="w-40 appearance-none rounded-lg border border-border bg-surface px-3 py-2 pr-7 text-[13px] text-ink focus:outline-none"
-                  >
-                    <option value="">Alle planteformer</option>
-                    {plantForms.map((form) => (
-                      <option key={form} value={form}>
-                        {form}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-3 w-3 -translate-y-1/2 text-ink-muted" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <label htmlFor="topic-max-results" className="text-[13px] text-ink-faint whitespace-nowrap">
-                    Maks. antal produkter
-                  </label>
-                  <input
-                    id="topic-max-results"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    value={topicMaxResults}
-                    onChange={(event) => setTopicMaxResults(event.target.value)}
-                    className="w-20 rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] text-ink focus:outline-none"
-                  />
-                </div>
-                {showMatchCountNote && (
-                  <p
-                    className={`w-full text-[12px] ${topicTotalMatchCount === 0 ? "text-red-600" : "text-ink-faint"}`}
-                  >
-                    {matchCountText}
-                  </p>
-                )}
-              </div>
-            </section>
-
-            {error && <p className="pt-4 text-sm text-red-600">{error}</p>}
-
-            <div className="pt-8">
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={!canGenerate || isGenerating}
-                className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-7 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:opacity-100"
-              >
-                {isGenerating ? (
-                  <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <BoltIcon className="h-3.5 w-3.5" />
-                )}
-                {isGenerating ? "Genererer..." : "Generér nyhedsbrev"}
-              </button>
-              {!canGenerate && (
-                <p className="pt-2 text-xs text-ink-faint">
-                  Beskriv dit nyhedsbrev ovenfor, før du kan generere det.
-                </p>
-              )}
-            </div>
           </div>
         </div>
       </div>

@@ -22,6 +22,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import {
   createBlocksFromTemplate,
   isBestSeller,
+  pickRepresentativeProduct,
   type NewsletterBlock,
   type TemplateBlock,
 } from "@/lib/newsletterBlocks";
@@ -250,8 +251,13 @@ export async function POST(req: NextRequest) {
     // billede-blokkens enkelt-billede-layout, valgt blandt seedProducts
     // (IKKE det fulde matchedProducts) – overskriver samtidig AI'ens eget
     // image-valg, af samme grund som cta.url ovenfor: det skal være
-    // deterministisk, ikke AI'ens gæt.
-    const representative = seedProducts.find(isBestSeller) ?? seedProducts[0];
+    // deterministisk, ikke AI'ens gæt. pickRepresentativeProduct sikrer
+    // desuden, at en bestseller UDEN billede ikke bare gør nyhedsbrevets
+    // billede tomt – findes et andet seed-produkt MED billede, bruges det
+    // i stedet (se newsletterBlocks.ts for den oprindelige fejl, dette
+    // retter).
+    const bestSeller = seedProducts.find(isBestSeller);
+    const representative = pickRepresentativeProduct(seedProducts, bestSeller?.id) ?? seedProducts[0];
     newsletter.image = {
       productId: representative.id,
       imageUrl: representative.imageUrl,
