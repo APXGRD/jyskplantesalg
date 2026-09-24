@@ -7,8 +7,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 export async function DELETE(_req: NextRequest, ctx: RouteContext<"/api/templates/[id]">) {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   const { id } = await ctx.params;
 
   if (!id) {

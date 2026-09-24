@@ -26,6 +26,7 @@ import {
   type TemplateBlock,
 } from "@/lib/newsletterBlocks";
 import { buildNewsletterUserPrompt } from "@/lib/prompts/newsletterPrompt";
+import { requireUser } from "@/lib/supabase/requireUser";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 
 interface GenerateNewsletterBody {
@@ -94,6 +95,9 @@ function isCustomerType(value: unknown): value is CustomerType {
 }
 
 export async function POST(req: NextRequest) {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { DocumentIcon, GearIcon, PaletteIcon, UsersIcon } from "./icons";
+import { DocumentIcon, GearIcon, LogoutIcon, PaletteIcon, PlusIcon, UsersIcon } from "./icons";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
+import { logout } from "@/app/login/actions";
 
 // "products" (den tidligere "Vælg produkter"-side) er BEVIDST ikke længere
 // en mulig værdi her – siden er fjernet fra navigationen/det normale flow
@@ -25,19 +26,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: "customers", label: "Kunder", href: "/kunder", icon: UsersIcon },
   { id: "brand-settings", label: "Indstillinger", href: "/indstillinger", icon: PaletteIcon },
 ];
-
-function formatDraftSavedAt(date: Date) {
-  const datePart = new Intl.DateTimeFormat("da-DK", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-  const timePart = new Intl.DateTimeFormat("da-DK", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-  return `${datePart} · ${timePart}`;
-}
 
 interface SidebarProps {
   // Valgfri – den nu nav-løse /produkter-side (se SidebarPage ovenfor)
@@ -104,9 +92,24 @@ export function Sidebar({ active }: SidebarProps) {
         </nav>
       </div>
 
-      <div className="border-t border-border px-5 py-4">
-        <p className="text-[11px] text-ink-faint">Udkast gemt</p>
-        <p className="pt-0.5 text-[11px] font-medium text-ink-muted">{formatDraftSavedAt(new Date())}</p>
+      <div className="border-t border-border px-3 py-3">
+        <Link
+          href="/inviter"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-ink-muted hover:bg-surface-active hover:text-ink"
+        >
+          <PlusIcon className="h-3.75 w-3.75" />
+          Inviter bruger
+        </Link>
+
+        <form action={logout}>
+          <button
+            type="submit"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium text-ink-muted hover:bg-surface-active hover:text-ink"
+          >
+            <LogoutIcon className="h-3.75 w-3.75" />
+            Log ud
+          </button>
+        </form>
       </div>
     </>
   );

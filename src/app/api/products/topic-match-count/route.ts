@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { searchCachedProductsByTopic } from "@/lib/cachedProducts";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 interface TopicMatchCountBody {
   instructions?: string;
@@ -27,6 +28,9 @@ function parseOptionalPrice(value: unknown): number | undefined {
 }
 
 export async function POST(req: NextRequest) {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   let body: TopicMatchCountBody;
   try {
     body = await req.json();

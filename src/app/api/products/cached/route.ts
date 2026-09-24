@@ -10,8 +10,12 @@
 
 import { NextResponse } from "next/server";
 import { getCachedProducts } from "@/lib/cachedProducts";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 export async function GET() {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   try {
     const result = await getCachedProducts();
     return NextResponse.json(result);

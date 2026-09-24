@@ -15,8 +15,12 @@ import { NextResponse } from "next/server";
 import { fetchShopifyCustomers } from "@/lib/shopify/fetchCustomers";
 import { getCustomerType } from "@/lib/customers";
 import { getSupabaseClient } from "@/lib/supabase";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 export async function POST() {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   try {
     const customers = await fetchShopifyCustomers();
     const supabase = getSupabaseClient();

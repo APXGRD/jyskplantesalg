@@ -5,10 +5,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { requireUser } from "@/lib/supabase/requireUser";
 
 const SCOPES = "read_products,read_customers,write_customers";
 
 export async function GET(_req: NextRequest) {
+  const { user, response: authResponse } = await requireUser();
+  if (!user) return authResponse;
+
   const shop = process.env.SHOPIFY_SHOP_DOMAIN;
   const clientId = process.env.SHOPIFY_CLIENT_ID;
   const redirectUri = process.env.SHOPIFY_REDIRECT_URI;

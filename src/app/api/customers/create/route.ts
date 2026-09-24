@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createShopifyCustomer } from "@/lib/shopify/customerMutations";
 import { upsertCachedCustomer } from "@/lib/cachedCustomers";
+import { requireUser } from "@/lib/supabase/requireUser";
 import type { CustomerType } from "@/lib/format";
 
 interface CreateCustomerBody {
@@ -23,6 +24,9 @@ function isCustomerType(value: unknown): value is CustomerType {
 }
 
 export async function POST(req: NextRequest) {
+  const { user, response } = await requireUser();
+  if (!user) return response;
+
   let body: CreateCustomerBody;
   try {
     body = await req.json();
