@@ -54,6 +54,11 @@ export default function IndstillingerPage() {
 
   const [logoError, setLogoError] = useState<string | null>(null);
 
+  // Felterne viser den gemte værdi (eksempel-placeholder kun når intet er
+  // gemt). Et felt, der ryddes helt og gemmes, beholder den gemte værdi, da
+  // API'et ikke tillader tomt firmanavn/tone.
+  const [savedText, setSavedText] = useState({ company_name: "", brand_tone: "" });
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -66,10 +71,11 @@ export default function IndstillingerPage() {
           throw new Error(data?.error ?? "Kunne ikke hente indstillingerne.");
         }
         if (!cancelled) {
+          setSavedText({ company_name: data.company_name ?? "", brand_tone: data.brand_tone ?? "" });
           setForm({
-            company_name: data.company_name,
+            company_name: data.company_name ?? "",
             brand_colors: Array.isArray(data.brand_colors) ? data.brand_colors : [],
-            brand_tone: data.brand_tone,
+            brand_tone: data.brand_tone ?? "",
             primary_font: data.primary_font,
             logo_data: typeof data.logo_data === "string" ? data.logo_data : null,
             // NULL i databasen (aldrig udfyldt endnu) bliver til en tom
@@ -170,11 +176,14 @@ export default function IndstillingerPage() {
     setSaveError(null);
     setJustSaved(false);
 
+    const company_name = form.company_name.trim() || savedText.company_name;
+    const brand_tone = form.brand_tone.trim() || savedText.brand_tone;
+
     try {
       const response = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, company_name, brand_tone }),
       });
 
       if (!response.ok) {
@@ -188,6 +197,8 @@ export default function IndstillingerPage() {
       // men være usynlig alle andre steder i appen (fx nyhedsbrevets header).
       await refreshBrandSettings();
 
+      setSavedText({ company_name, brand_tone });
+      setForm((current) => (current ? { ...current, company_name, brand_tone } : current));
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 2000);
     } catch (err) {
@@ -199,7 +210,7 @@ export default function IndstillingerPage() {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar active="brand-settings" />
+      <Sidebar active="brand-settings" previewName={form?.company_name} />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface">
         <PageHeader
@@ -219,6 +230,7 @@ export default function IndstillingerPage() {
                 <input
                   value={form.company_name}
                   onChange={(event) => updateField("company_name", event.target.value)}
+                  placeholder="F.eks. Jysk Plantesalg ApS"
                   className={fieldClassName}
                 />
               </label>
@@ -381,6 +393,7 @@ export default function IndstillingerPage() {
                 <textarea
                   value={form.brand_tone}
                   onChange={(event) => updateField("brand_tone", event.target.value)}
+                  placeholder="F.eks. Varm, venlig og faglig – vi fremhæver kvalitet og giver gode råd om pleje"
                   rows={4}
                   className={`${fieldClassName} resize-none`}
                 />

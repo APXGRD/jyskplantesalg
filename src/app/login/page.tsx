@@ -9,7 +9,7 @@
 
 import { login } from "./actions";
 import { Logo } from "@/components/Logo";
-import { brand } from "@/config/brand";
+import { getBrandSettings } from "@/lib/brandSettings";
 
 export default async function LoginPage({
   searchParams,
@@ -17,6 +17,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+  const companyName = (await getBrandSettings()).company_name.trim();
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-6">
@@ -25,7 +26,11 @@ export default async function LoginPage({
           <Logo className="h-8 w-8" />
         </div>
         <div className="flex flex-col items-center gap-1 text-center leading-tight">
-          <h1 className="text-2xl font-semibold tracking-wide text-ink uppercase">{brand.name}</h1>
+          <h1
+            className={`text-2xl font-semibold tracking-wide uppercase ${companyName ? "text-ink" : "text-ink-faintest"}`}
+          >
+            {companyName || "Logo"}
+          </h1>
           <p className="text-sm text-ink-muted">Log ind for at fortsætte</p>
         </div>
       </div>
