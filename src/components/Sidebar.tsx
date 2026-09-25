@@ -32,9 +32,12 @@ interface SidebarProps {
   // rendrer Sidebar UDEN denne prop, så intet punkt fejlagtigt vises som
   // aktivt for en side, der ikke længere har et tilsvarende menupunkt.
   active?: SidebarPage;
+  // Live-forhåndsvisning af firmanavnet, mens det skrives på Indstillinger-
+  // siden (før det er gemt). Tom/udeladt = vis det gemte navn.
+  previewName?: string;
 }
 
-export function Sidebar({ active }: SidebarProps) {
+export function Sidebar({ active, previewName }: SidebarProps) {
   // Resten af Sidebar (nav-ikoner, badge-BAGGRUNDSFARVE, "Udkast gemt" osv.)
   // er fortsat app-chrome og forbliver bevidst statisk – kun selve
   // identitets-visningen øverst (logo-billede + firmanavn) er en PRÆCIST
@@ -42,6 +45,9 @@ export function Sidebar({ active }: SidebarProps) {
   // opgavebeskrivelsen. Navnet vises PRÆCIST som skrevet i Indstillinger,
   // ingen opsplitning/omformatering.
   const settings = useBrandSettings();
+  // previewName er kun sat på Indstillinger-siden: dér afspejler hjørnet
+  // feltet direkte, så et tomt felt viser placeholderen "Logo".
+  const displayName = (previewName ?? settings.name).trim();
 
   const navBody = (
     <>
@@ -56,8 +62,11 @@ export function Sidebar({ active }: SidebarProps) {
           // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
           <img src={settings.logoData} alt="" className="h-8 w-8 shrink-0 object-contain" />
         )}
-        <span className="truncate text-xs font-semibold tracking-wide text-ink uppercase" title={settings.name}>
-          {settings.name}
+        <span
+          className={`truncate text-xs font-semibold tracking-wide uppercase ${displayName ? "text-ink" : "text-ink-faintest"}`}
+          title={displayName || "Logo"}
+        >
+          {displayName || "Logo"}
         </span>
       </div>
 

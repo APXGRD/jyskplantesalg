@@ -3,13 +3,13 @@ import { fetchShopifyCustomers } from "@/lib/shopify/fetchCustomers";
 import { isActiveCustomer } from "@/lib/customers";
 import { ChevronRightIcon, UsersIcon } from "@/components/icons";
 import { Logo } from "@/components/Logo";
-import { brand } from "@/config/brand";
+import { getBrandSettings } from "@/lib/brandSettings";
 
 export default async function HomePage() {
-  // Landingssiden er app-chrome, ikke nyhedsbrevets EGET indhold – viser
-  // derfor bevidst app'ens statiske, faste navn/farve (brand.ts), IKKE
-  // kundens dynamiske brand-indstillinger (se BrandSettingsContext.tsx).
-  //
+  // Firmanavnet følger Indstillinger-siden (samme som sidemenuen), så en
+  // anden virksomhed kan bruge appen under sit eget navn.
+  const companyName = (await getBrandSettings()).company_name.trim();
+
   // Kundetallet SKAL dog være det rigtige, aktuelle antal – samme kilde
   // (fetchShopifyCustomers) og samme "aktiv"-definition (isActiveCustomer),
   // som Kunder-siden selv bruger (se kunder/page.tsx), IKKE længere
@@ -32,7 +32,11 @@ export default async function HomePage() {
           <Logo className="h-8 w-8" />
         </div>
         <div className="flex flex-col items-center gap-1 text-center leading-tight">
-          <h1 className="text-2xl font-semibold tracking-wide text-ink uppercase">{brand.name}</h1>
+          <h1
+            className={`text-2xl font-semibold tracking-wide uppercase ${companyName ? "text-ink" : "text-ink-faintest"}`}
+          >
+            {companyName || "Logo"}
+          </h1>
           <p className="text-sm text-ink-muted">Nyhedsbrev-generator</p>
         </div>
       </div>
