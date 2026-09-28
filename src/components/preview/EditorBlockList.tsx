@@ -23,7 +23,7 @@ import type { CustomerType } from "@/lib/format";
 import { resolveCtaLink } from "@/lib/ctaLink";
 import { TextBlockEditor } from "@/components/TextBlockEditor";
 import { ImageBlockControls } from "@/components/ImageBlockControls";
-import { GalleryBlockControls } from "@/components/GalleryBlockControls";
+import { GalleryBlockControls, type GallerySlotMode } from "@/components/GalleryBlockControls";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { stripColorStyles } from "@/lib/brandColors";
 import { FONT_FAMILIES, stripFontFamilyStyles, stripFontSizeStyles } from "@/lib/fontFamilies";
@@ -48,6 +48,8 @@ import {
   buildBodyTextHtml,
   createNewBlock,
   duplicateBlock,
+  getGalleryProductSlotCount,
+  getGallerySlots,
   isGalleryLayout,
   CTA_BORDER_RADIUS_PX,
   MEDIA_LAYOUT_OPTIONS,
@@ -57,6 +59,7 @@ import {
   type CtaBorderRadius,
   type CtaPadding,
   type CtaStyle,
+  type GalleryUpload,
   type MediaLayout,
   type ImageAlignment,
   type ImageSize,
@@ -260,6 +263,10 @@ interface BlockContentProps {
   onCtaStyleChange: (style: CtaStyle) => void;
   onGalleryProductIdsChange: (productIds: string[]) => void;
   onGalleryColumnsChange: (layout: MediaLayout) => void;
+  // Galleri-layout: skift en enkelt plads mellem produkt og upload, og sæt
+  // en upload-plads' billede/alt-tekst.
+  onGallerySlotModeChange: (index: number, mode: GallerySlotMode) => void;
+  onGallerySlotUploadChange: (index: number, upload: GalleryUpload) => void;
   // Kun relevant for den samlede Billede-/Galleri-blok ved layout "1" – sætter
   // billedet ud fra et produkt valgt via den søgbare vælger (se
   // handleImageProductSelect i EditorBlockList).
@@ -296,6 +303,8 @@ function BlockContent({
   onCtaStyleChange,
   onGalleryProductIdsChange,
   onGalleryColumnsChange,
+  onGallerySlotModeChange,
+  onGallerySlotUploadChange,
   onImageProductSelect,
   onProductDisplayIdsChange,
   onProductBorderRadiusChange,
@@ -401,7 +410,10 @@ function BlockContent({
               products={products}
               selectedProductIds={block.galleryProductIds ?? []}
               columns={layout}
+              uploads={block.galleryUploads}
               onProductIdsChange={onGalleryProductIdsChange}
+              onSlotModeChange={onGallerySlotModeChange}
+              onSlotUploadChange={onGallerySlotUploadChange}
               showProductSearch={showProductSearch}
             />
           ) : (
@@ -1010,17 +1022,27 @@ export function EditorBlockList({
     const next = blocks.map((block) => {
       if (block.id !== id) return block;
       if (isGalleryLayout(layout)) {
-        return { ...block, galleryColumns: layout, galleryProductIds: (block.galleryProductIds ?? []).slice(0, layout) };
+        // Upload-pladser uden for det nye layout forsvinder; produkt-id'erne
+        // beskæres til antallet af produkt-pladser, der er tilbage.
+        const galleryUploads = (block.galleryUploads ?? []).slice(0, layout);
+        const capacity = getGalleryProductSlotCount({ galleryColumns: layout, galleryUploads });
+        return {
+          ...block,
+          galleryColumns: layout,
+          galleryUploads,
+          galleryProductIds: (block.galleryProductIds ?? []).slice(0, capacity),
+        };
       }
       const keptProductId = block.galleryProductIds?.[0];
       const galleryProductIds = keptProductId ? [keptProductId] : block.galleryProductIds;
       if (block.imageUrl || !keptProductId) {
-        return { ...block, galleryColumns: layout, galleryProductIds };
+        return { ...block, galleryColumns: layout, galleryProductIds, galleryUploads: undefined };
       }
       const product = products.find((item) => item.id === keptProductId);
       return {
         ...block,
         galleryColumns: layout,
+        galleryUploads: undefined,
         galleryProductIds,
         imageUrl: product?.imageUrl ?? block.imageUrl,
         altText: product?.title ?? block.altText,
@@ -1031,6 +1053,44 @@ export function EditorBlockList({
     // genberegnes ud fra unionen af alle blokke, samme som ved et almindeligt
     // produktvalg (se applyCtaLinkUpdate).
     onBlocksChange(applyCtaLinkUpdate(next, products, topicSearchTerm));
+  }
+
+  // Galleri-layout: skifter plads `index` mellem "Vælg produkt" og "Upload
+  // eget billede". Bliver en produkt-plads til upload, fjernes netop det
+  // produkt, der stod på pladsen (de øvrige produkter bliver stående). Bliver
+  // en upload-plads til produkt, fyldes den af næste valgte produkt – eller
+  // står tom, til der vælges et i listen.
+  function handleGallerySlotModeChange(id: string, index: number, mode: GallerySlotMode) {
+    const next = blocks.map((block) => {
+      if (block.id !== id) return block;
+      const slot = getGallerySlots(block)[index];
+      if (!slot || slot.kind === mode) return block;
+      const galleryUploads = [...(block.galleryUploads ?? [])];
+      let galleryProductIds = block.galleryProductIds ?? [];
+      if (mode === "upload") {
+        galleryUploads[index] = {};
+        if (slot.kind === "product" && slot.productId) {
+          galleryProductIds = galleryProductIds.filter((productId) => productId !== slot.productId);
+        }
+      } else {
+        galleryUploads[index] = null;
+      }
+      return { ...block, galleryUploads, galleryProductIds };
+    });
+    // Et fjernet produkt ændrer, hvad galleriet viser – CTA-linket
+    // genberegnes, samme som ved et almindeligt produktvalg.
+    onBlocksChange(applyCtaLinkUpdate(next, products, topicSearchTerm));
+  }
+
+  function handleGallerySlotUploadChange(id: string, index: number, upload: GalleryUpload) {
+    onBlocksChange(
+      blocks.map((block) => {
+        if (block.id !== id) return block;
+        const galleryUploads = [...(block.galleryUploads ?? [])];
+        galleryUploads[index] = upload;
+        return { ...block, galleryUploads };
+      }),
+    );
   }
 
   // Kun relevant ved layout "1 billede" – vælger (eller fravælger, ved klik
@@ -1224,6 +1284,8 @@ export function EditorBlockList({
                     onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}
                     onGalleryProductIdsChange={(productIds) => handleGalleryProductIdsChange(block.id, productIds)}
                     onGalleryColumnsChange={(layout) => handleGalleryColumnsChange(block.id, layout)}
+                    onGallerySlotModeChange={(index, mode) => handleGallerySlotModeChange(block.id, index, mode)}
+                    onGallerySlotUploadChange={(index, upload) => handleGallerySlotUploadChange(block.id, index, upload)}
                     onImageProductSelect={(productId) => handleImageProductSelect(block.id, productId)}
                     onProductDisplayIdsChange={(productIds) => handleProductDisplayIdsChange(block.id, productIds)}
                     onProductBorderRadiusChange={(borderRadius) => handleProductBorderRadiusChange(block.id, borderRadius)}

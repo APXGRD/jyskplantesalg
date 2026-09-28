@@ -13,6 +13,7 @@ import {
   IMAGE_SIZE_PX,
   PRODUCT_ROW_PADDING_PX,
   isGalleryLayout,
+  resolveGalleryImages,
   type GalleryColumns,
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
@@ -92,10 +93,10 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
       case "galleri": {
         if (isGalleryLayout(block.galleryColumns)) {
           const columns = block.galleryColumns as GalleryColumns;
-          const galleryProducts = (block.galleryProductIds ?? [])
-            .map((id) => products.find((product) => product.id === id))
-            .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl));
-          if (galleryProducts.length === 0) {
+          // Produkt- og upload-pladser i rækkefølge (se getGallerySlots) –
+          // begge render'es med PRÆCIS samme <img>, så de ser ens ud.
+          const galleryImages = resolveGalleryImages(block, products);
+          if (galleryImages.length === 0) {
             return (
               <div className="px-8 py-3">
                 <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-surface-active text-xs text-ink-faint">
@@ -110,12 +111,12 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
                 {/* CSS grid ombryder automatisk til en ny række, når der er flere
                     billeder end kolonner – "6 billeder"-layoutet (3 kolonner) giver
                     derfor 2 pæne rækker af 3 helt af sig selv, uden ekstra markup. */}
-                {galleryProducts.map((product) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- Shopify-hostet billede-URL, samme mønster som produktvisning
+                {galleryImages.map((galleryImage) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- Shopify-hostet billede-URL eller lokal data-URI
                   <img
-                    key={product.id}
-                    src={product.imageUrl}
-                    alt={product.title}
+                    key={galleryImage.key}
+                    src={galleryImage.src}
+                    alt={galleryImage.alt}
                     className="aspect-square w-full rounded-lg object-cover"
                   />
                 ))}

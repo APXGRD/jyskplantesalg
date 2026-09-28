@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import { ImagePlaceholderIcon } from "@/components/icons";
+import { ImagePlaceholderIcon, PencilIcon } from "@/components/icons";
 import type { ImageAlignment, ImageSize } from "@/lib/newsletterBlocks";
 
 interface ImageBlockControlsProps {
@@ -160,17 +160,37 @@ export function ImageBlockControls({
         </div>
       )}
 
-      <button type="button" className="block w-full text-left">
+      <button
+        type="button"
+        aria-label={imageUrl ? "Rediger billede" : "Tilføj billede"}
+        className="group relative block w-full text-left"
+      >
         {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI, next/image kan ikke optimere den
-          <img src={imageUrl} alt={altText ?? ""} className="h-24 w-full rounded-lg object-cover" />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI, next/image kan ikke optimere den */}
+            <img src={imageUrl} alt={altText ?? ""} className="h-24 w-full rounded-lg object-cover" />
+            {/* Vises ved hover/fokus, så det er tydeligt, at billedet kan klikkes. */}
+            <span
+              className={`absolute inset-0 flex items-center justify-center gap-1.5 rounded-lg bg-black/45 text-xs font-medium text-white transition-opacity ${
+                isFocused ? "opacity-0" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+              }`}
+            >
+              <PencilIcon className="h-3.5 w-3.5" />
+              Klik for at redigere
+            </span>
+          </>
         ) : (
-          <div className="flex h-16 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-active text-ink-faint">
+          <div className="flex h-16 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-active text-ink-faint group-hover:border-ink-faintest">
             <ImagePlaceholderIcon className="h-5 w-5" />
             <span className="text-xs">Klik for at tilføje billede</span>
           </div>
         )}
       </button>
+      {imageUrl && !isFocused && (
+        <p className="pt-1.5 text-[11px] text-ink-muted">
+          Klik på billedet for at udskifte det og ændre alt-tekst, justering og størrelse.
+        </p>
+      )}
     </div>
   );
 }

@@ -10,6 +10,8 @@ import {
   IMAGE_SIZE_PX,
   PRODUCT_ROW_PADDING_PX,
   isGalleryLayout,
+  resolveGalleryImages,
+  type GalleryImage,
   type GalleryColumns,
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
@@ -128,10 +130,10 @@ function renderBlockHtml(
     case "galleri": {
       if (isGalleryLayout(block.galleryColumns)) {
         const columns = block.galleryColumns as GalleryColumns;
-        const galleryProducts = (block.galleryProductIds ?? [])
-          .map((id) => products.find((product) => product.id === id))
-          .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl));
-        if (galleryProducts.length === 0) return "";
+        // Produkt- og upload-pladser i rækkefølge (se getGallerySlots) – begge
+        // bliver til PRÆCIS samme <td>/<img>-markup, så de ser ens ud.
+        const galleryImages = resolveGalleryImages(block, products);
+        if (galleryImages.length === 0) return "";
         // Outlooks Word-baserede rendering-motor understøtter ikke CSS
         // flexbox/grid pålideligt – billederne sættes derfor side om side via
         // <table>'er (samme teknik som CTA-knappen), med en fast bredde pr.
@@ -141,17 +143,17 @@ function renderBlockHtml(
         // strukturen forbliver simpel og forudsigelig i kopieret HTML.
         const imageWidth = GALLERY_IMAGE_WIDTH_PX[columns];
         const rowSize = GALLERY_ROW_SIZE[columns];
-        const rows: ShopifyProduct[][] = [];
-        for (let i = 0; i < galleryProducts.length; i += rowSize) {
-          rows.push(galleryProducts.slice(i, i + rowSize));
+        const rows: GalleryImage[][] = [];
+        for (let i = 0; i < galleryImages.length; i += rowSize) {
+          rows.push(galleryImages.slice(i, i + rowSize));
         }
         const tables = rows
-          .map((rowProducts, rowIndex) => {
-            const cells = rowProducts
-              .map((product, index) => {
-                const isLast = index === rowProducts.length - 1;
+          .map((rowImages, rowIndex) => {
+            const cells = rowImages
+              .map((galleryImage, index) => {
+                const isLast = index === rowImages.length - 1;
                 return `<td style="width:${imageWidth}px;${isLast ? "" : "padding-right:8px;"}" valign="top">
-                <img src="${escapeAttr(product.imageUrl)}" alt="${escapeAttr(product.title)}" width="${imageWidth}" style="width:${imageWidth}px;max-width:100%;border-radius:8px;display:block;" />
+                <img src="${escapeAttr(galleryImage.src)}" alt="${escapeAttr(galleryImage.alt)}" width="${imageWidth}" style="width:${imageWidth}px;max-width:100%;border-radius:8px;display:block;" />
               </td>`;
               })
               .join("");
@@ -382,10 +384,8 @@ function renderBlockText(
     case "img":
     case "galleri": {
       if (isGalleryLayout(block.galleryColumns)) {
-        return (block.galleryProductIds ?? [])
-          .map((id) => products.find((product) => product.id === id))
-          .filter((product): product is ShopifyProduct => Boolean(product?.imageUrl))
-          .map((product) => `[Billede: ${product.title}]`)
+        return resolveGalleryImages(block, products)
+          .map((galleryImage) => `[Billede: ${galleryImage.alt || "Billede"}]`)
           .join("  ");
       }
       return block.imageUrl ? `[Billede: ${block.altText || image.altText}]` : `[Billede: ${image.altText}]`;
