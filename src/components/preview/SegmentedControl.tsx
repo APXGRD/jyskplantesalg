@@ -16,7 +16,7 @@ export function SegmentedControl<T extends string>({
   onChange,
 }: SegmentedControlProps<T>) {
   return (
-    <div className="flex items-center gap-0.5 rounded-lg bg-surface-badge p-0.5">
+    <div className="inline-flex items-center rounded-sm border border-[#dcdcd8] bg-[#f0f0ed] p-0.5 font-jetbrains text-xs">
       {options.map((option) => {
         const isActive = option.value === value;
         const Icon = option.icon;
@@ -24,11 +24,12 @@ export function SegmentedControl<T extends string>({
           <button
             key={option.value}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(option.value)}
-            className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-[1px] border px-3 py-1 transition-colors ${
               isActive
-                ? "bg-surface text-ink shadow-[0_1px_1.5px_rgba(0,0,0,0.1),0_1px_1px_rgba(0,0,0,0.1)]"
-                : "text-ink-muted hover:text-ink"
+                ? "border-neutral-300/80 bg-white font-semibold text-black shadow-xs"
+                : "border-transparent text-neutral-600 hover:text-black"
             }`}
           >
             {Icon && <Icon className="h-3.5 w-3.5" />}

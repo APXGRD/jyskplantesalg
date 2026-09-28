@@ -11,8 +11,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { inviteUser } from "./actions";
-import { PageHeader } from "@/components/PageHeader";
-import { Sidebar } from "@/components/Sidebar";
+import { SectionLabel, StitchShell } from "@/components/StitchShell";
 
 export default async function InviterPage({
   searchParams,
@@ -31,19 +30,27 @@ export default async function InviterPage({
   const { error, success } = await searchParams;
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
+    <StitchShell>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Titel */}
+        <section className="border-b border-black/10 bg-white/40 px-4 py-7 sm:px-8">
+          <div className="mb-1.5 font-jetbrains text-[10px] tracking-widest text-[#71717A] uppercase">
+            Brugere <span className="text-black/30">/</span> Adgang
+          </div>
+          <h1 className="text-3xl font-bold tracking-[-0.04em] uppercase sm:text-4xl">Inviter bruger</h1>
+          <p className="mt-1.5 text-sm text-[#555555]">Send en invitation via email til en ny bruger</p>
+        </section>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface">
-        <PageHeader title="Inviter bruger" subtitle="Send en invitation via email til en ny bruger" />
-
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        {/* Formularen centreret på skærmen */}
+        <main className="flex flex-1 items-center justify-center bg-[#f8f9fa] px-4 py-12 sm:px-8">
           <form
             action={inviteUser}
-            className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-border bg-background p-6"
+            className="flex w-full max-w-md flex-col gap-5 rounded-sm border border-black/15 bg-white p-6 shadow-[0_20px_50px_rgba(0,0,0,0.06)] sm:p-8"
           >
+            <SectionLabel>Ny invitation</SectionLabel>
+
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className="text-xs font-medium text-ink-muted">
+              <label htmlFor="email" className="font-jetbrains text-[11px] text-[#666666] uppercase">
                 Email
               </label>
               <input
@@ -51,24 +58,34 @@ export default async function InviterPage({
                 name="email"
                 type="email"
                 required
-                className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-primary"
+                placeholder="F.eks. kollega@firma.dk"
+                className="w-full rounded-xs border border-[#cfcfcf] bg-[#fdfdfd] px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-neutral-400 transition-colors focus:border-black focus:bg-white focus:outline-none"
               />
+              <p className="text-xs text-[#777777]">
+                Personen modtager et link på mail og vælger selv sin adgangskode.
+              </p>
             </div>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && (
+              <p className="border-l-2 border-red-600 bg-red-50 px-3 py-2 font-jetbrains text-xs text-red-700">
+                {error}
+              </p>
+            )}
             {success && (
-              <p className="text-sm text-green-600">Invitation sendt til {success}.</p>
+              <p className="border-l-2 border-black bg-[#f5f5f5] px-3 py-2 font-jetbrains text-xs text-black">
+                Invitation sendt til {success}.
+              </p>
             )}
 
             <button
               type="submit"
-              className="mt-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="w-full bg-black px-7 py-3 font-jetbrains text-xs font-bold tracking-wider text-white uppercase shadow-sm transition-all hover:bg-[#222222] active:scale-[0.99]"
             >
               Send invitation
             </button>
           </form>
-        </div>
+        </main>
       </div>
-    </div>
+    </StitchShell>
   );
 }

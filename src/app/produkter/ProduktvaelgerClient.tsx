@@ -10,7 +10,7 @@ import { ProductFilterBar } from "@/components/ProductFilterBar";
 import { ProductTable } from "@/components/ProductTable";
 import { SelectionCounter } from "@/components/SelectionCounter";
 import { SelectionFooter } from "@/components/SelectionFooter";
-import { Sidebar } from "@/components/Sidebar";
+import { StitchShell } from "@/components/StitchShell";
 import { useNewsletter } from "@/context/NewsletterContext";
 import { formatRelativeTime } from "@/lib/format";
 
@@ -166,10 +166,8 @@ export function ProduktvaelgerClient({
   );
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface">
+    <StitchShell>
+      <div className="flex min-w-0 flex-1 flex-col bg-surface">
         <PageHeader
           title="Vælg produkter"
           subtitle="Markér de planter, der skal indgå i nyhedsbrevet"
@@ -260,6 +258,6 @@ export function ProduktvaelgerClient({
           </>
         )}
       </div>
-    </div>
+    </StitchShell>
   );
 }

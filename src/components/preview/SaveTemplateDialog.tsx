@@ -70,14 +70,14 @@ export function SaveTemplateDialog({ onClose, onSave }: SaveTemplateDialogProps)
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="flex-1 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 px-4 py-2.5 rounded border border-neutral-300 bg-white font-jetbrains text-xs tracking-wider text-neutral-800 uppercase shadow-xs transition-colors hover:border-black hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Annullér
             </button>
             <button
               type="submit"
               disabled={!name.trim() || isSaving}
-              className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 px-4 py-2.5 rounded bg-black font-jetbrains text-xs font-semibold tracking-wider text-white uppercase transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300"
             >
               {isSaving ? "Gemmer..." : "Gem skabelon"}
             </button>
