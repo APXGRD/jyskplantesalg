@@ -137,6 +137,63 @@ export function isGalleryLayout(columns: MediaLayout | undefined): columns is Ga
   return (columns ?? 1) > 1;
 }
 
+// Én billedplads i et galleri, i layout-rækkefølge.
+export type GallerySlot =
+  | { index: number; kind: "upload"; upload: GalleryUpload }
+  | { index: number; kind: "product"; productId?: string };
+
+// Galleriets pladser i rækkefølge: upload-pladser står fast på deres plads,
+// og de øvrige (produkt-)pladser fyldes i rækkefølge med galleryProductIds.
+// Den ENESTE sandhed om "hvad står på plads N" – bruges af både kontrol-
+// panelet (GalleryBlockControls), Preview (NewsletterCard) og den kopierede
+// HTML/tekst (newsletterExport), så de aldrig kan blive uenige.
+export function getGallerySlots(
+  block: Pick<NewsletterBlock, "galleryColumns" | "galleryProductIds" | "galleryUploads">,
+): GallerySlot[] {
+  if (!isGalleryLayout(block.galleryColumns)) return [];
+  const uploads = block.galleryUploads ?? [];
+  const productQueue = [...(block.galleryProductIds ?? [])];
+  return Array.from({ length: block.galleryColumns }, (_, index): GallerySlot => {
+    const upload = uploads[index];
+    if (upload) return { index, kind: "upload", upload };
+    return { index, kind: "product", productId: productQueue.shift() };
+  });
+}
+
+// Antal pladser, der fyldes med produkter (= layoutets antal minus upload-
+// pladser) – loftet for, hvor mange produkter produktvælgeren må vælge.
+export function getGalleryProductSlotCount(
+  block: Pick<NewsletterBlock, "galleryColumns" | "galleryProductIds" | "galleryUploads">,
+): number {
+  return getGallerySlots(block).filter((slot) => slot.kind === "product").length;
+}
+
+// Et færdigt galleri-billede, klar til rendering – ens for produkt- og
+// upload-pladser, så de vises helt ens side om side.
+export interface GalleryImage {
+  key: string;
+  src: string;
+  alt: string;
+}
+
+// De pladser, der rent faktisk har et billede, i rækkefølge. Tomme pladser
+// (ingen fil uploadet endnu / intet produkt valgt / produkt uden billede)
+// springes over – samme regel som galleriet altid har haft for produkter.
+export function resolveGalleryImages(
+  block: Pick<NewsletterBlock, "galleryColumns" | "galleryProductIds" | "galleryUploads">,
+  products: ShopifyProduct[],
+): GalleryImage[] {
+  return getGallerySlots(block).flatMap((slot): GalleryImage[] => {
+    if (slot.kind === "upload") {
+      return slot.upload.imageUrl
+        ? [{ key: `upload-${slot.index}`, src: slot.upload.imageUrl, alt: slot.upload.altText ?? "" }]
+        : [];
+    }
+    const product = products.find((item) => item.id === slot.productId);
+    return product?.imageUrl ? [{ key: `product-${slot.index}-${product.id}`, src: product.imageUrl, alt: product.title }] : [];
+  });
+}
+
 // Fast billedbredde pr. layout-valg i den kopierede, tabel-baserede HTML
 // (samme Outlook-kompatible teknik som CTA-knappen bruger – CSS
 // flexbox/grid understøttes ikke pålideligt af Outlook, så billederne skal
@@ -157,6 +214,19 @@ export const GALLERY_ROW_SIZE: Record<GalleryColumns, number> = {
   3: 3,
   6: 3,
 };
+
+// Et manuelt uploadet billede på én galleri-plads (se
+// NewsletterBlock.galleryUploads). imageUrl er en base64 data-URI (samme
+// teknik som "1 billede"-uploaden) – undefined, indtil der er valgt en fil.
+export interface GalleryUpload {
+  imageUrl?: string;
+  altText?: string;
+}
+
+// Max. filstørrelse for et uploadet galleri-billede (samme loft som logo-
+// uploaden på Indstillinger-siden) – et data-URI-billede rejser med selve
+// nyhedsbrevets HTML, så det skal holdes nede.
+export const MAX_GALLERY_UPLOAD_BYTES = 500 * 1024;
 
 export interface NewsletterBlock {
   id: string;
@@ -234,6 +304,13 @@ export interface NewsletterBlock {
   // end layoutet reelt har plads til.
   galleryProductIds?: string[];
   galleryColumns?: MediaLayout;
+  // Kun relevant ved galleri-layout (2/3/6). Én post pr. billedplads (index =
+  // pladsens nummer): et GalleryUpload-objekt betyder "denne plads viser et
+  // manuelt uploadet billede"; null/undefined/manglende post betyder
+  // "produkt-plads". Produkt-pladserne fyldes i rækkefølge med
+  // galleryProductIds ovenfor – et galleri uden uploads opfører sig derfor
+  // præcis som før feltet fandtes. Se getGallerySlots herunder.
+  galleryUploads?: (GalleryUpload | null)[];
   // Kun relevant for "produktvisning"-blokken. productDisplayIds er
   // brugerens egen, frie multi-select blandt de tilgængelige produkter
   // (INGEN øvre grænse, til forskel fra galleryProductIds) – undefined
