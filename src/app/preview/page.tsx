@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterHtml, buildNewsletterText } from "@/lib/newsletterExport";
 import { buildTemplateBlockStructure } from "@/lib/newsletterBlocks";
-import { ErrorCard, LoadingCard } from "@/components/FetchStateCard";
-import { PageHeader } from "@/components/PageHeader";
-import { Sidebar } from "@/components/Sidebar";
+import { SectionLabel, StitchShell } from "@/components/StitchShell";
 import { SegmentedControl } from "@/components/preview/SegmentedControl";
 import { NewsletterCard } from "@/components/preview/NewsletterCard";
 import { EditorBlockList } from "@/components/preview/EditorBlockList";
@@ -22,6 +20,42 @@ import {
 } from "@/components/icons";
 import { useNewsletter } from "@/context/NewsletterContext";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
+
+// Små "+"-sigtekorn på lærredets hjørner (Stitch-redesignet).
+function Crosshairs() {
+  const corner =
+    "pointer-events-none absolute z-10 h-2.5 w-2.5 before:absolute before:top-1 before:left-0 before:h-px before:w-2.5 before:bg-neutral-500 after:absolute after:top-0 after:left-1 after:h-2.5 after:w-px after:bg-neutral-500";
+  return (
+    <>
+      <span className={`${corner} -top-1.5 -left-1.5`} />
+      <span className={`${corner} -top-1.5 -right-1.5`} />
+      <span className={`${corner} -bottom-1.5 -left-1.5`} />
+      <span className={`${corner} -right-1.5 -bottom-1.5`} />
+    </>
+  );
+}
+
+function InspectorCard({
+  label,
+  tag,
+  tagClassName = "bg-neutral-100 text-neutral-900",
+  children,
+}: {
+  label: string;
+  tag?: string;
+  tagClassName?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="border border-[#e2e2df] bg-white p-3">
+      <div className="mb-1 flex justify-between gap-2 text-[10px] tracking-wider text-neutral-400 uppercase">
+        <span>{label}</span>
+        {tag && <span className={`px-1 font-bold ${tagClassName}`}>{tag}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 type View = "preview" | "rediger";
 type Viewport = "desktop" | "mobil";
@@ -154,94 +188,107 @@ export default function PreviewPage() {
     setTimeout(() => setSaveTemplateState("idle"), 2000);
   }
 
+
+  const isB2B = customerType === "erhverv";
+
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar active="preview" />
+    <StitchShell active="preview">
+      {/* Titel + målgruppe-badge + trinindikator */}
+      <section className="border-b border-black/10 bg-white/40 px-4 py-6 sm:px-8">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div>
+            <div className="mb-1.5 font-jetbrains text-[10px] tracking-widest text-[#71717A] uppercase">
+              Trin 02 <span className="text-black/30">/</span> Nyhedsbrev
+            </div>
+            <h1 className="text-3xl font-bold tracking-[-0.04em] uppercase sm:text-4xl">Preview / Rediger</h1>
+            <p className="mt-1 max-w-2xl text-sm text-[#71717A]">
+              Gennemse og redigér det genererede nyhedsbrev, før det kopieres eller gemmes som skabelon.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <span className="inline-flex items-center gap-2 rounded border border-black/10 bg-white px-2.5 py-1 font-jetbrains text-[11px] shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+              <span className="h-2 w-2 rounded-full bg-neutral-900" />
+              <span className="font-medium text-neutral-800">{customerTypeLabel}</span>
+            </span>
+            <span className="font-jetbrains text-2xl leading-none font-light tracking-tighter text-neutral-900">
+              02<span className="text-lg text-neutral-400">/04</span>
+            </span>
+          </div>
+        </div>
+      </section>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface">
-        <PageHeader
-          title="Preview / Rediger"
-          subtitle="Gennemse og redigér det genererede nyhedsbrev, før det kopieres eller gemmes som skabelon"
-        />
-
-        <div className="flex flex-col gap-3 border-b border-border bg-surface px-4 py-4 md:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <SegmentedControl<View>
-                value={activeView}
-                onChange={setActiveView}
+      {/* Værktøjslinje */}
+      <section className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 bg-white px-4 py-2.5 font-jetbrains text-xs sm:px-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl<View>
+            value={activeView}
+            onChange={setActiveView}
+            options={[
+              { value: "preview", label: "Preview" },
+              { value: "rediger", label: "Rediger" },
+            ]}
+          />
+          {activeView === "preview" && (
+            <>
+              <span className="mx-1 hidden h-4 w-px bg-neutral-300 sm:block" />
+              <SegmentedControl<Viewport>
+                value={viewport}
+                onChange={setViewport}
                 options={[
-                  { value: "preview", label: "Preview" },
-                  { value: "rediger", label: "Rediger" },
+                  { value: "desktop", label: "Desktop", icon: DesktopIcon },
+                  { value: "mobil", label: "Mobil", icon: MobileIcon },
                 ]}
               />
-              {activeView === "preview" && (
-                <SegmentedControl<Viewport>
-                  value={viewport}
-                  onChange={setViewport}
-                  options={[
-                    { value: "desktop", label: "Desktop", icon: DesktopIcon },
-                    { value: "mobil", label: "Mobil", icon: MobileIcon },
-                  ]}
-                />
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              {activeView === "preview" && (
-                <button
-                  type="button"
-                  onClick={() => setIsSaveTemplateOpen(true)}
-                  disabled={!result || blocks.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saveTemplateState === "saved" ? (
-                    <CheckIcon className="h-3.5 w-3.5" />
-                  ) : (
-                    <DocumentIcon className="h-3.5 w-3.5" />
-                  )}
-                  {saveTemplateState === "saved" ? "Skabelon gemt!" : "Gem som skabelon"}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleCopy}
-                disabled={!result}
-                className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {copyState === "copied" ? (
-                  <CheckIcon className="h-3.5 w-3.5" />
-                ) : (
-                  <CopyIcon className="h-3.5 w-3.5" />
-                )}
-                {copyState === "copied" ? "Kopieret!" : "Kopiér nyhedsbrev"}
-              </button>
-            </div>
-          </div>
-
-          <span className="inline-flex w-fit items-center rounded-full bg-surface-active px-2.5 py-1 text-[11px] font-medium text-ink">
-            {customerTypeLabel}
-          </span>
+            </>
+          )}
         </div>
 
-        {/* overflow-x-auto – NewsletterCard's Desktop-visning (w-[600px]) er
-            BEVIDST fast bred (den viser præcis, hvad en rigtig e-mail-klient
-            viser), og skal derfor kunne scrolles vandret for sig på smalle
-            skærme, i stedet for at blive klemt/klippet eller bryde resten af
-            sidens layout. */}
-        <div className="flex-1 overflow-x-auto overflow-y-auto p-4 md:p-8">
+        <div className="flex flex-wrap items-center gap-2">
+          {activeView === "preview" && (
+            <button
+              type="button"
+              onClick={() => setIsSaveTemplateOpen(true)}
+              disabled={!result || blocks.length === 0}
+              className="flex items-center gap-1.5 border border-neutral-300 bg-white px-3 py-1.5 tracking-wider text-neutral-800 shadow-xs transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saveTemplateState === "saved" ? (
+                <CheckIcon className="h-3.5 w-3.5" />
+              ) : (
+                <DocumentIcon className="h-3.5 w-3.5 text-neutral-600" />
+              )}
+              {saveTemplateState === "saved" ? "Skabelon gemt!" : "Gem som skabelon"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!result}
+            className="flex items-center gap-1.5 bg-black px-4 py-1.5 font-medium tracking-wider text-white shadow-sm transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300"
+          >
+            {copyState === "copied" ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
+            {copyState === "copied" ? "Kopieret!" : copyState === "error" ? "Kunne ikke kopiere" : "Kopiér nyhedsbrev"}
+          </button>
+        </div>
+      </section>
+
+      <main className="grid flex-1 grid-cols-1 bg-[#eeeeea] lg:grid-cols-12">
+        {/* Lærred: nyhedsbrevet (Preview) eller blok-editoren (Rediger).
+            overflow-x-auto – NewsletterCard's Desktop-visning er BEVIDST fast
+            600px bred (præcis som en rigtig e-mail-klient), og skal kunne
+            scrolles vandret på smalle skærme i stedet for at blive klemt. */}
+        <section className="min-w-0 overflow-x-auto border-b border-black/10 p-4 md:p-8 lg:col-span-8 lg:border-r lg:border-b-0">
           {!result ? (
             <div className="flex justify-center">
-              <div className="flex max-w-md flex-col gap-3 rounded-xl border border-border bg-surface p-6">
-                <p className="text-sm font-semibold text-ink">Intet nyhedsbrev genereret endnu</p>
-                <p className="text-sm text-ink-muted">
-                  Gå til Opsætning for at vælge målgruppe og generere nyhedsbrevet, før du kan
-                  forhåndsvise eller redigere det her.
+              <div className="flex max-w-md flex-col gap-3 border border-black/15 bg-white p-6">
+                <SectionLabel>Intet nyhedsbrev genereret endnu</SectionLabel>
+                <p className="text-sm text-[#71717A]">
+                  Gå til Opsætning for at vælge målgruppe og generere nyhedsbrevet, før du kan forhåndsvise eller
+                  redigere det her.
                 </p>
                 <button
                   type="button"
                   onClick={() => router.push("/opsaetning")}
-                  className="mt-1 inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+                  className="mt-1 inline-flex w-fit items-center gap-2 rounded bg-black px-5 py-2.5 font-jetbrains text-xs font-semibold tracking-wider text-white uppercase transition-colors hover:bg-neutral-800"
                 >
                   <ArrowLeftIcon className="h-3.5 w-3.5" />
                   Til Opsætning
@@ -249,18 +296,37 @@ export default function PreviewPage() {
               </div>
             </div>
           ) : isLoadingProducts ? (
-            <LoadingCard message="Henter produkter..." />
+            <p className="py-16 text-center font-jetbrains text-xs tracking-wider text-[#71717A] uppercase">
+              Henter produkter...
+            </p>
           ) : productsError ? (
-            <ErrorCard title="Kunne ikke hente produkter" message={productsError} onRetry={retryLoadProducts} />
+            <div className="mx-auto flex max-w-md flex-col gap-3 border border-red-200 bg-white p-6">
+              <SectionLabel>Kunne ikke hente produkter</SectionLabel>
+              <p className="text-sm text-red-600">{productsError}</p>
+              <button
+                type="button"
+                onClick={retryLoadProducts}
+                className="w-fit rounded border border-black/20 bg-white px-4 py-2 font-jetbrains text-xs tracking-wider uppercase hover:border-black"
+              >
+                Prøv igen
+              </button>
+            </div>
           ) : activeView === "preview" ? (
-            <div className="flex justify-center">
-              <NewsletterCard
-                blocks={blocks}
-                image={result.image}
-                customerType={customerType}
-                products={selectedProducts}
-                viewport={viewport}
-              />
+            <div className="flex w-max min-w-full flex-col items-center">
+              <div className="mb-2 flex w-full max-w-150 items-center justify-between px-1 font-jetbrains text-[10px] text-neutral-400 uppercase">
+                <span>Lærred: e-mail</span>
+                <span>{viewport === "mobil" ? "375" : "600"} x auto</span>
+              </div>
+              <div className="relative">
+                <Crosshairs />
+                <NewsletterCard
+                  blocks={blocks}
+                  image={result.image}
+                  customerType={customerType}
+                  products={selectedProducts}
+                  viewport={viewport}
+                />
+              </div>
             </div>
           ) : (
             <div className="flex justify-center">
@@ -275,12 +341,54 @@ export default function PreviewPage() {
               />
             </div>
           )}
-        </div>
-      </div>
+        </section>
+
+        {/* Inspektør: de rigtige parametre bag nyhedsbrevet */}
+        <aside className="flex flex-col gap-6 bg-[#fbfbfa] p-4 sm:p-6 lg:col-span-4">
+          <div className="border-b border-[#e2e2df] pb-3">
+            <SectionLabel>Inspektør</SectionLabel>
+          </div>
+
+          <div className="space-y-3 font-jetbrains text-xs">
+            <InspectorCard label="01. Målgruppe" tag={isB2B ? "B2B valgt" : "B2C valgt"}>
+              <div className="font-bold text-neutral-900">{isB2B ? "Erhvervskunder" : "Privatkunder"}</div>
+              <div className="mt-1 font-grotesk text-[11px] text-neutral-600">
+                {isB2B
+                  ? "Fagligt, præcist sprog · Fokus på specifikationer og robusthed"
+                  : "Tilgængeligt, inspirerende sprog · Fokus på udtryk og haveoplevelse"}
+              </div>
+            </InspectorCard>
+
+            <InspectorCard label="02. Prisberegning" tag={isB2B ? "Moms: ekskl" : "Moms: inkl"} tagClassName="text-neutral-900">
+              <div className="text-neutral-800">Priser vist {isB2B ? "ekskl." : "inkl."} moms</div>
+              <div className="mt-1 text-[10px] text-neutral-400">Valuta: DKK</div>
+            </InspectorCard>
+
+            <InspectorCard label="03. AI-instruks">
+              <div className="text-[11px] text-neutral-900">
+                {instructions.trim() ? `"${instructions.trim()}"` : "Ingen instruks angivet"}
+              </div>
+            </InspectorCard>
+
+            <InspectorCard
+              label="04. Produkter fra databasen"
+              tag={result ? `${selectedProducts.length} matchede` : undefined}
+              tagClassName="text-neutral-900"
+            >
+              <div className="font-medium text-neutral-900">
+                {topicSearchTerm ? `Søgeord: ${topicSearchTerm}` : "Ingen søgning endnu"}
+              </div>
+              <div className="mt-1 text-[10px] text-neutral-500">
+                Vælg under Rediger, hvilke produkter der vises i nyhedsbrevet.
+              </div>
+            </InspectorCard>
+          </div>
+        </aside>
+      </main>
 
       {isSaveTemplateOpen && (
         <SaveTemplateDialog onClose={() => setIsSaveTemplateOpen(false)} onSave={handleSaveTemplate} />
       )}
-    </div>
+    </StitchShell>
   );
 }

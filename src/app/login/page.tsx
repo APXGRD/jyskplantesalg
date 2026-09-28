@@ -8,8 +8,11 @@
 // omdirigere til sig selv i det uendelige.
 
 import { login } from "./actions";
-import { Logo } from "@/components/Logo";
 import { getBrandSettings } from "@/lib/brandSettings";
+import { initials } from "@/lib/initials";
+
+const fieldClassName =
+  "w-full rounded-xs border border-[#cfcfcf] bg-[#fdfdfd] px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-neutral-400 transition-colors focus:border-black focus:bg-white focus:outline-none";
 
 export default async function LoginPage({
   searchParams,
@@ -17,65 +20,75 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  const companyName = (await getBrandSettings()).company_name.trim();
+  const settings = await getBrandSettings();
+  const companyName = settings.company_name.trim();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-6">
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white">
-          <Logo className="h-8 w-8" />
-        </div>
-        <div className="flex flex-col items-center gap-1 text-center leading-tight">
-          <h1
-            className={`text-2xl font-semibold tracking-wide uppercase ${companyName ? "text-ink" : "text-ink-faintest"}`}
+    <div className="flex min-h-screen w-full items-center justify-center bg-[#EAEAEA] bg-[linear-gradient(to_right,rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-size-[32px_32px] px-4 py-12 font-grotesk text-[#111111] antialiased selection:bg-black selection:text-white">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/15 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.06)]">
+        {/* Brand-linje, samme opbygning som topbaren */}
+        <div className="flex items-center gap-3 border-b border-black/10 bg-white/70 px-6 py-4">
+          {settings.logo_data ? (
+            // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
+            <img src={settings.logo_data} alt="" className="h-7 w-7 shrink-0 object-contain" />
+          ) : (
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-black font-jetbrains text-xs font-bold tracking-tighter text-white">
+              {companyName ? initials(companyName) : "–"}
+            </div>
+          )}
+          <span
+            className={`truncate text-lg leading-none font-bold tracking-tight uppercase ${
+              companyName ? "text-[#111111]" : "text-black/30"
+            }`}
           >
             {companyName || "Logo"}
-          </h1>
-          <p className="text-sm text-ink-muted">Log ind for at fortsætte</p>
+          </span>
+        </div>
+
+        <div className="px-6 pt-7 pb-8 sm:px-8">
+          <div className="mb-1.5 font-jetbrains text-[10px] tracking-widest text-[#71717A] uppercase">
+            Nyhedsbrev-generator <span className="text-black/30">/</span> Adgang
+          </div>
+          <h1 className="text-3xl font-bold tracking-[-0.04em] uppercase">Log ind</h1>
+          <p className="mt-1.5 text-sm text-[#555555]">Log ind for at fortsætte</p>
+
+          <form action={login} className="mt-7 flex flex-col gap-5">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="email" className="font-jetbrains text-[11px] text-[#666666] uppercase">
+                Email
+              </label>
+              <input id="email" name="email" type="email" required autoComplete="email" className={fieldClassName} />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="password" className="font-jetbrains text-[11px] text-[#666666] uppercase">
+                Adgangskode
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className={fieldClassName}
+              />
+            </div>
+
+            {error && (
+              <p className="border-l-2 border-red-600 bg-red-50 px-3 py-2 font-jetbrains text-xs text-red-700">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="mt-1 w-full bg-black px-7 py-3 font-jetbrains text-xs font-bold tracking-wider text-white uppercase shadow-sm transition-all hover:bg-[#222222] active:scale-[0.99]"
+            >
+              Log ind
+            </button>
+          </form>
         </div>
       </div>
-
-      <form
-        action={login}
-        className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-border bg-surface p-6"
-      >
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-xs font-medium text-ink-muted">
-            Email
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-primary"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="password" className="text-xs font-medium text-ink-muted">
-            Adgangskode
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-primary"
-          />
-        </div>
-
-        {error && <p className="text-sm text-red-500">{error}</p>}
-
-        <button
-          type="submit"
-          className="mt-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-        >
-          Log ind
-        </button>
-      </form>
     </div>
   );
 }

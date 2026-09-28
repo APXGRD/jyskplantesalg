@@ -1,4 +1,3 @@
-"use client";
 // src/app/afmeld/page.tsx
 //
 // Den OFFENTLIGE, generiske afmeldingsside – FAST link i footeren på ALLE
@@ -10,88 +9,51 @@
 // kalder en TILSVARENDE offentlig, login-fri API-route
 // (api/customers/unsubscribe-by-email), da en rigtig nyhedsbrevsmodtager
 // aldrig er logget ind i selve appen.
+//
+// Server Component, så firmanavn/logo hentes direkte fra settings-tabellen –
+// den beskyttede /api/settings kan ikke bruges her uden login.
 
-import { useState } from "react";
-import { Logo } from "@/components/Logo";
-import { brand } from "@/config/brand";
+import { getBrandSettings } from "@/lib/brandSettings";
+import { AfmeldForm } from "./AfmeldForm";
+import { initials } from "@/lib/initials";
 
-type Status = "idle" | "submitting" | "done";
-
-export default function AfmeldPage() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setStatus("submitting");
-
-    try {
-      const response = await fetch("/api/customers/unsubscribe-by-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Der skete en fejl. Prøv igen.");
-      }
-      setStatus("done");
-    } catch (err) {
-      setStatus("idle");
-      setError(err instanceof Error ? err.message : "Der skete en fejl. Prøv igen.");
-    }
-  }
+export default async function AfmeldPage() {
+  const settings = await getBrandSettings();
+  const companyName = settings.company_name.trim();
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-6">
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white">
-          <Logo className="h-8 w-8" />
+    <div className="flex min-h-screen w-full items-center justify-center bg-[#EAEAEA] bg-[linear-gradient(to_right,rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-size-[32px_32px] px-4 py-12 font-grotesk text-[#111111] antialiased selection:bg-black selection:text-white">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/15 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.06)]">
+        <div className="flex items-center gap-3 border-b border-black/10 bg-white/70 px-6 py-4">
+          {settings.logo_data ? (
+            // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
+            <img src={settings.logo_data} alt="" className="h-7 w-7 shrink-0 object-contain" />
+          ) : (
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-black font-jetbrains text-xs font-bold tracking-tighter text-white">
+              {companyName ? initials(companyName) : "–"}
+            </div>
+          )}
+          <span
+            className={`truncate text-lg leading-none font-bold tracking-tight uppercase ${
+              companyName ? "text-[#111111]" : "text-black/30"
+            }`}
+          >
+            {companyName || "Logo"}
+          </span>
         </div>
-        <div className="flex flex-col items-center gap-1 text-center leading-tight">
-          <h1 className="text-2xl font-semibold tracking-wide text-ink uppercase">{brand.name}</h1>
-          <p className="text-sm text-ink-muted">Afmeld nyhedsbrevet</p>
+
+        <div className="px-6 pt-7 pb-8 sm:px-8">
+          <div className="mb-1.5 font-jetbrains text-[10px] tracking-widest text-[#71717A] uppercase">
+            Nyhedsbrev <span className="text-black/30">/</span> Afmelding
+          </div>
+          <h1 className="text-3xl font-bold tracking-[-0.04em] uppercase">Afmeld</h1>
+          <p className="mt-1.5 text-sm text-[#555555]">
+            Indtast din email for at afmelde dig nyhedsbrevet.
+          </p>
+
+          <AfmeldForm />
         </div>
       </div>
-
-      {status === "done" ? (
-        <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-xl border border-border bg-surface p-6 text-center">
-          <p className="text-sm text-ink">Hvis denne email er tilmeldt, er den nu afmeldt.</p>
-        </div>
-      ) : (
-        <form
-          onSubmit={handleSubmit}
-          className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-border bg-surface p-6"
-        >
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="email" className="text-xs font-medium text-ink-muted">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-primary"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={status === "submitting"}
-            className="mt-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {status === "submitting" ? "Afmelder..." : "Bekræft afmelding"}
-          </button>
-        </form>
-      )}
     </div>
   );
 }

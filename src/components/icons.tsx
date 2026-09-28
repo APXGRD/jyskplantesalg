@@ -62,22 +62,6 @@ export function DividerIcon({ className }: IconProps) {
   );
 }
 
-export function PaletteIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <path
-        d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.4-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-7.5-9-7.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <circle cx="7.5" cy="10.5" r="1" fill="currentColor" />
-      <circle cx="12" cy="7.5" r="1" fill="currentColor" />
-      <circle cx="16.5" cy="10.5" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-
 export function GearIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className}>
@@ -102,20 +86,6 @@ export function DocumentIcon({ className }: IconProps) {
         strokeLinejoin="round"
       />
       <path d="M14 3v4h4M9 12h6M9 16h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function UsersIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M3.5 19a5.5 5.5 0 0 1 11 0M15 8.5a2.5 2.5 0 1 1 0-5M16 11a4.5 4.5 0 0 1 4.5 4.5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
     </svg>
   );
 }
@@ -193,20 +163,6 @@ export function ArrowLeftIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className}>
       <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-export function LogoutIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <path
-        d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }

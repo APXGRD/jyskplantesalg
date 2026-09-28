@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import { DM_Sans, Instrument_Serif } from "next/font/google";
+import { DM_Sans, Instrument_Serif, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { ClientOnlyNewsletterProvider } from "@/context/ClientOnlyNewsletterProvider";
 import { BrandSettingsProvider } from "@/context/BrandSettingsContext";
 import { brand } from "@/config/brand";
@@ -30,6 +30,18 @@ const instrumentSerif = Instrument_Serif({
   weight: "400",
 });
 
+// Opsætning-sidens "industrial" redesign (Stitch) – bruges via font-grotesk/
+// font-jetbrains, ikke som app'ens standard-skrifttype.
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: `${brand.name} – Nyhedsbrevsværktøj`,
   description: `Nyhedsbrev-generator til ${brand.name}`,
@@ -39,7 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="da"
-      className={`${dmSans.variable} ${instrumentSerif.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${instrumentSerif.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
       style={brandColorVariables}
     >
       <body className="min-h-full flex flex-col">

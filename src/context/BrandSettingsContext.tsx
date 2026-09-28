@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { brand } from "@/config/brand";
 
 // Samme FORM som src/config/brand.ts, så forbrugere kunne skifte fra
@@ -148,11 +149,20 @@ export function BrandSettingsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Providerens mount sker typisk på login-siden, hvor /api/settings svarer
+  // 401 (ikke logget ind endnu) – og da den sidder i root-layoutet,
+  // genmonteres den ikke efter login. Derfor forsøges der igen ved hvert
+  // sideskift, indtil én hentning er lykkedes (derefter holdes state ajour
+  // via refreshBrandSettings).
+  //
   // Inline async IIFE (i stedet for at kalde refreshBrandSettings direkte)
   // for at overholde react-hooks/set-state-in-effect – reglen tillader en
   // setState-kaldende funktion DEFINERET INDE I selve effekt-kroppen, men
   // ikke et kald til en navngivet/useCallback-indpakket funktion udefra.
+  const pathname = usePathname();
+  const [hasLoaded, setHasLoaded] = useState(false);
   useEffect(() => {
+    if (hasLoaded) return;
     let cancelled = false;
     (async () => {
       try {
@@ -160,16 +170,18 @@ export function BrandSettingsProvider({ children }: { children: ReactNode }) {
         const data = await response.json();
         if (!cancelled && response.ok) {
           setSettings(mapResponseToSettings(data));
+          setHasLoaded(true);
         }
       } catch {
         // Ignoreres bevidst – state forbliver den statiske brand.ts-værdi,
-        // sat som initial state ovenfor.
+        // sat som initial state ovenfor, og der prøves igen ved næste
+        // sideskift.
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pathname, hasLoaded]);
 
   return (
     <BrandSettingsContext.Provider value={settings}>

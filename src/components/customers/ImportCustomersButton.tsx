@@ -30,10 +30,10 @@ export function ImportCustomersButton({ onImport }: ImportCustomersButtonProps) 
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-[13px] font-semibold text-ink-muted hover:bg-surface-active hover:text-ink"
+        className="inline-flex items-center gap-1.5 border border-[#cfcfcf] bg-white px-3 py-1.5 font-jetbrains text-xs font-medium text-black uppercase shadow-sm transition hover:border-black"
       >
         <UploadIcon className="h-3.5 w-3.5" />
-        Importér CSV-fil
+        Importér CSV
       </button>
       <input ref={inputRef} type="file" accept=".csv" onChange={handleChange} className="sr-only" />
     </>
