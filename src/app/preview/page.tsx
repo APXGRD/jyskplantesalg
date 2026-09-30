@@ -275,7 +275,14 @@ export default function PreviewPage() {
             overflow-x-auto – NewsletterCard's Desktop-visning er BEVIDST fast
             600px bred (præcis som en rigtig e-mail-klient), og skal kunne
             scrolles vandret på smalle skærme i stedet for at blive klemt. */}
-        <section className="min-w-0 overflow-x-auto border-b border-black/10 p-4 md:p-8 lg:col-span-8 lg:border-r lg:border-b-0">
+        <section
+          className={`min-w-0 overflow-x-auto border-b border-black/10 p-4 md:p-8 lg:col-span-8 lg:border-r lg:border-b-0 ${
+            // Rediger: prikket "blueprint"-baggrund bag blok-kortene.
+            activeView === "rediger" && result
+              ? "bg-[#f6f6f4] bg-[radial-gradient(rgba(0,0,0,0.08)_1px,transparent_0)] bg-size-[20px_20px]"
+              : ""
+          }`}
+        >
           {!result ? (
             <div className="flex justify-center">
               <div className="flex max-w-md flex-col gap-3 border border-black/15 bg-white p-6">
