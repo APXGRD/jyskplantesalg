@@ -53,6 +53,24 @@ const FALLBACK_SETTINGS: BrandSettingsRow = {
 };
 
 export async function getBrandSettings(): Promise<BrandSettingsRow> {
+  return (await getBrandSettingsWithStatus()).settings;
+}
+
+// Hvor værdierne kommer fra: "configured" = gemt i settings-tabellen,
+// "empty" = intet gemt endnu (brand.ts's standardværdier), "error" = Supabase
+// kunne ikke svare (også brand.ts's standardværdier).
+export type BrandSettingsStatus = "configured" | "empty" | "error";
+
+// Som getBrandSettings, men fortæller også, HVOR værdierne kommer fra (se
+// BrandSettingsStatus). Indstillinger-siden bruger det til at starte med
+// TOMME felter (kun eksempel-placeholders), når intet er gemt – i stedet for
+// at vise de hardcodede standardværdier, som om de var kundens egne – og til
+// at vise en fejl (i stedet for en tom formular, der kunne overskrive de
+// rigtige indstillinger), når Supabase ikke kunne svare.
+export async function getBrandSettingsWithStatus(): Promise<{
+  settings: BrandSettingsRow;
+  status: BrandSettingsStatus;
+}> {
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
@@ -61,22 +79,32 @@ export async function getBrandSettings(): Promise<BrandSettingsRow> {
         "id, company_name, brand_colors, brand_tone, primary_font, logo_data, street_address, postal_code, city, business_registration_number",
       )
       .limit(1)
-      .single();
+      // .maybeSingle() (i stedet for .single()) giver data === null uden fejl
+      // ved 0 rækker – .single() kastede ellers "Cannot coerce the result to
+      // a single JSON object", som Next's dev-overlay viser som en fejl.
+      .maybeSingle();
 
-    if (error || !data) {
-      throw new Error(error?.message ?? "Ingen indstillinger fundet i settings-tabellen");
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Ingen række endnu (ny database, eller rækken er slettet): ikke en fejl
+    // – brand.ts's standardværdier bruges, indtil nogen trykker "Gem" på
+    // Indstillinger-siden, som opretter rækken igen (se api/settings/route.ts).
+    if (!data) {
+      return { settings: FALLBACK_SETTINGS, status: "empty" };
     }
 
     // Forsvar mod et uventet tomt/for kort array (fx en tabel, der endnu
     // ikke er migreret) – Edit-mode's swatches og "farve[0]/farve[1]"-brug i
     // app'ens egen branding kræver mindst 2 farver at virke korrekt.
     if (!Array.isArray(data.brand_colors) || data.brand_colors.length < 2) {
-      return { ...data, brand_colors: brand.colors };
+      return { settings: { ...data, brand_colors: brand.colors }, status: "configured" };
     }
 
-    return data;
+    return { settings: data, status: "configured" };
   } catch (err) {
     console.error("Kunne ikke hente brand-indstillinger fra Supabase (falder tilbage til brand.ts):", err);
-    return FALLBACK_SETTINGS;
+    return { settings: FALLBACK_SETTINGS, status: "error" };
   }
 }

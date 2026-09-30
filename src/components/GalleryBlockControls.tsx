@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import {
   MAX_GALLERY_UPLOAD_BYTES,
   getGallerySlots,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/newsletterBlocks";
 import { ImagePlaceholderIcon } from "@/components/icons";
 import { SearchableProductChecklist } from "./SearchableProductChecklist";
+import { UploadCaptionFields } from "./UploadCaptionFields";
 
 export type GallerySlotMode = "product" | "upload";
 
@@ -34,6 +36,8 @@ interface GalleryBlockControlsProps {
   // Sat, når `products` stammer fra en emne-søgning (kan være mange, uden
   // grænse) – viser da et ekstra søgefelt øverst i produktlisten.
   showProductSearch?: boolean;
+  // Nyhedsbrevets målgruppe – til produkternes pris (inkl./ekskl. moms).
+  customerType: CustomerType;
 }
 
 const MODE_OPTIONS: { value: GallerySlotMode; label: string }[] = [
@@ -116,6 +120,12 @@ function GallerySlotUpload({
           }`}
         />
       </label>
+      <UploadCaptionFields
+        title={upload.title}
+        price={upload.price}
+        onTitleChange={(title) => onChange({ ...upload, title })}
+        onPriceChange={(price) => onChange({ ...upload, price })}
+      />
     </div>
   );
 }
@@ -129,6 +139,7 @@ export function GalleryBlockControls({
   onSlotModeChange,
   onSlotUploadChange,
   showProductSearch = false,
+  customerType,
 }: GalleryBlockControlsProps) {
   // Et galleri uden billede er meningsløst (og giver et tomt src-attribut i
   // Preview/eksporten) – produkter uden billede kan derfor slet ikke vælges
@@ -190,8 +201,17 @@ export function GalleryBlockControls({
                   onChange={(upload) => onSlotUploadChange(slot.index, upload)}
                 />
               ) : (
-                <p className="truncate text-[11px] text-ink-muted">
-                  {product ? product.title : "Intet produkt valgt – vælg i listen herunder"}
+                <p className="flex gap-2 text-[11px] text-ink-muted">
+                  {product ? (
+                    <>
+                      <span className="min-w-0 flex-1 truncate">{product.title}</span>
+                      <span className="shrink-0 font-medium text-ink whitespace-nowrap tabular-nums">
+                        {formatPriceForCustomer(product.price, customerType)}
+                      </span>
+                    </>
+                  ) : (
+                    "Intet produkt valgt – vælg i listen herunder"
+                  )}
                 </p>
               )}
             </div>
@@ -209,7 +229,7 @@ export function GalleryBlockControls({
         ) : (
           <div className="flex flex-col gap-1">
             <span className="text-[11px] text-ink-muted">
-              Produkter i galleriet ({selectedProductIds.length}/{productSlotCount})
+              Valgte produkter ({selectedProductIds.length}/{productSlotCount})
             </span>
             <SearchableProductChecklist
               products={availableProducts}
@@ -217,6 +237,7 @@ export function GalleryBlockControls({
               onToggle={toggleProduct}
               isDisabled={() => selectedProductIds.length >= productSlotCount}
               showSearch={showProductSearch}
+              customerType={customerType}
               searchPlaceholder={`Søg blandt de ${availableProducts.length} matchede produkter...`}
             />
           </div>

@@ -4,7 +4,7 @@
 // skal returnere. "Multistammet" har bevidst 7 produkter her (i stedet for 1-2), så
 // I kan teste "vælg hele kategorien"-flowet ved en skala, der minder om det rigtige
 // katalog (900+ produkter) — med kun 1-2 pr. kategori ser I aldrig, om AI-teksten og
-// Produktvisnings-blokken holder ved flere valgte produkter på én gang.
+// Billede/Galleri-blokkens produktkort holder ved flere valgte produkter på én gang.
 //
 // Skift denne fil ud med en rigtig fetchShopifyProducts()-funktion, når access-
 // token'en er på plads.

@@ -3,8 +3,8 @@
 // CENTRAL, delt funktion til at udregne CTA-knappens link ud fra en liste af
 // produkter – deterministisk, ingen AI involveret. Bruges BÅDE server-side
 // (generate-newsletter/route.ts, ved selve genereringen) OG client-side
-// (EditorBlockList.tsx, hver gang produktvalget i Produktvisnings- eller
-// billede-/galleri-blokken ændres i Edit-mode) – præcis SAMME logik begge
+// (EditorBlockList.tsx, hver gang produktvalget i en
+// billede-/galleri-blok ændres i Edit-mode) – præcis SAMME logik begge
 // steder, så CTA-linket altid er korrekt, uanset hvornår det udregnes.
 
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";

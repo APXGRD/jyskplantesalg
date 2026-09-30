@@ -42,9 +42,10 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+// Appens eget navn i browser-fanen – ikke brand.ts's hardcodede firmanavn.
 export const metadata: Metadata = {
-  title: `${brand.name} – Nyhedsbrevsværktøj`,
-  description: `Nyhedsbrev-generator til ${brand.name}`,
+  title: "Nyhedsbrev generator",
+  description: "Generér, redigér og kopiér nyhedsbreve ud fra jeres produkter",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
