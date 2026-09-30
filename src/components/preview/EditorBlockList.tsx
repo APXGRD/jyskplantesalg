@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -25,7 +25,8 @@ import { TextBlockEditor } from "@/components/TextBlockEditor";
 import { ImageBlockControls } from "@/components/ImageBlockControls";
 import { GalleryBlockControls, type GallerySlotMode } from "@/components/GalleryBlockControls";
 import { ColorSwatches } from "@/components/ColorSwatches";
-import { stripColorStyles } from "@/lib/brandColors";
+import { getContrastTextColor, stripColorStyles } from "@/lib/brandColors";
+import { formatFooterAddressLine, useBrandSettings } from "@/context/BrandSettingsContext";
 import { FONT_FAMILIES, stripFontFamilyStyles, stripFontSizeStyles } from "@/lib/fontFamilies";
 import {
   ButtonIcon,
@@ -54,7 +55,6 @@ import {
   getMediaRowSize,
   isGalleryLayout,
   resolveSingleImageUrl,
-  CTA_BORDER_RADIUS_PX,
   MEDIA_LAYOUT_OPTIONS,
   RICH_TEXT_BLOCK_TYPES,
   type AddableBlockKind,
@@ -85,19 +85,27 @@ type BlockBadge = "Struktur" | "AI-tekst" | "Produktdata";
 const MEDIA_BLOCK_TITLE = "Billede & produktvisning";
 const MEDIA_BLOCK_DESCRIPTION = "Billeder og produkter med navn, pris og link";
 
-const BLOCK_META: Record<BlockType, { title: string; badge: BlockBadge }> = {
-  header: { title: "Header", badge: "Struktur" },
-  overskrift: { title: "Overskrift", badge: "AI-tekst" },
-  brodtekst: { title: "Brødtekst", badge: "AI-tekst" },
+// `subtitle` vises efter titlen i blok-kortets top ("01. HEADER // LOGO &
+// BUTIKSNAVN") – kun en beskrivende tekst, ingen funktion.
+const BLOCK_META: Record<BlockType, { title: string; subtitle?: string; badge: BlockBadge }> = {
+  header: { title: "Header", subtitle: "Logo & butiksnavn", badge: "Struktur" },
+  overskrift: { title: "Overskrift", subtitle: "Headline", badge: "AI-tekst" },
+  brodtekst: { title: "Brødtekst", subtitle: "Intro & salgskopi", badge: "AI-tekst" },
   billede: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
-  skillelinje: { title: "Skillelinje", badge: "Struktur" },
+  skillelinje: { title: "Skillelinje", subtitle: "Luft & divider", badge: "Struktur" },
   cta: { title: "Knap / CTA", badge: "AI-tekst" },
-  footer: { title: "Footer", badge: "Struktur" },
-  tekst: { title: "Tekst", badge: "AI-tekst" },
+  footer: { title: "Footer", subtitle: "Juridisk & adresse", badge: "Struktur" },
+  tekst: { title: "Tekst", subtitle: "Fritekst", badge: "AI-tekst" },
   img: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
   produkt: { title: "Produkt", badge: "Produktdata" },
   galleri: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
 };
+
+// Den samlede billede-/produktblok er nyhedsbrevets kerne og fremhæves med
+// en kraftigere ramme (samme type-regel som BLOCK_META ovenfor).
+function isMediaBlockType(type: BlockType): boolean {
+  return type === "billede" || type === "img" || type === "galleri";
+}
 
 const ADD_BLOCK_OPTIONS: {
   kind: AddableBlockKind;
@@ -112,15 +120,15 @@ const ADD_BLOCK_OPTIONS: {
 ];
 
 const BADGE_STYLES: Record<BlockBadge, string> = {
-  Struktur: "bg-surface-active text-ink",
-  "AI-tekst": "bg-primary/10 text-secondary",
-  Produktdata: "bg-surface-badge text-ink-muted",
+  Struktur: "border-neutral-300 bg-white text-neutral-600",
+  "AI-tekst": "border-emerald-300 bg-emerald-50 text-emerald-800",
+  Produktdata: "border-black bg-black text-white",
 };
 
 function Badge({ type }: { type: BlockBadge }) {
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${BADGE_STYLES[type]}`}
+      className={`hidden border px-2 py-0.5 font-jetbrains text-[10px] font-semibold tracking-wider uppercase sm:inline ${BADGE_STYLES[type]}`}
     >
       {type}
     </span>
@@ -128,7 +136,12 @@ function Badge({ type }: { type: BlockBadge }) {
 }
 
 const fieldClassName =
-  "w-full rounded-lg border border-border px-3 py-2 text-[13px] text-ink focus:outline-none focus:border-ink-faintest";
+  "w-full rounded-none border border-neutral-300 bg-[#fdfdfb] px-3 py-2 font-jetbrains text-xs text-neutral-900 focus:border-black focus:outline-none";
+
+// Feltetiketter i blokkene ("Antal billeder:", "Tekstfarve:" …).
+const labelClassName = "font-jetbrains text-xs text-neutral-600";
+// Beskrivende hjælpetekst øverst i en blok.
+const helpTextClassName = "font-jetbrains text-xs text-neutral-500";
 
 // Kompakt gruppe af gensidigt udelukkende valg (samme mønster som
 // ImageBlockControls' justering/størrelse-knapper) – bruges til CTA-knappens
@@ -144,7 +157,7 @@ function SegmentedButtons<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="flex gap-1">
+    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
       {options.map((option) => (
         <button
           key={option.value}
@@ -152,8 +165,10 @@ function SegmentedButtons<T extends string>({
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           title={option.label}
-          className={`flex flex-1 flex-col items-center gap-1 rounded-md px-2 py-1.5 text-[10px] leading-none ${
-            value === option.value ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
+          className={`flex min-w-0 items-center justify-center gap-2 border px-2 py-1.5 text-center font-jetbrains text-[11px] leading-tight transition-colors ${
+            value === option.value
+              ? "border-black bg-neutral-200 font-bold text-black"
+              : "border-neutral-300 bg-white text-neutral-600 hover:border-black"
           }`}
         >
           {option.preview}
@@ -199,7 +214,7 @@ function ArrangementPreview({ count, perRow }: { count: number; perRow: number }
       {rows.map((size, rowIndex) => (
         <span key={rowIndex} className="flex gap-0.5">
           {Array.from({ length: size }, (_, index) => (
-            <span key={index} className="h-2 w-2 rounded-[1px] bg-current opacity-70" />
+            <span key={index} className="h-2 w-2 bg-current" />
           ))}
         </span>
       ))}
@@ -231,9 +246,9 @@ function CtaAdvancedControls({
   onCtaStyleChange: (style: CtaStyle) => void;
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-1">
-        <span className="text-[11px] text-ink-muted">Padding</span>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <span className={labelClassName}>Padding:</span>
         <SegmentedButtons
           options={CTA_PADDING_OPTIONS}
           value={block.ctaPadding ?? "normal"}
@@ -241,26 +256,20 @@ function CtaAdvancedControls({
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <span className="text-[11px] text-ink-muted">Knap-form</span>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="flex flex-col gap-1.5">
+        <span className={labelClassName}>Knap-form:</span>
         <SegmentedButtons
           value={block.ctaBorderRadius ?? "afrundet"}
           onChange={onCtaBorderRadiusChange}
-          options={CTA_BORDER_RADIUS_OPTIONS.map((option) => ({
-            ...option,
-            preview: (
-              <span
-                className="h-3 w-6 border border-current"
-                style={{ borderRadius: CTA_BORDER_RADIUS_PX[option.value] }}
-              />
-            ),
-          }))}
+          options={CTA_BORDER_RADIUS_OPTIONS}
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <span className="text-[11px] text-ink-muted">Stil</span>
+      <div className="flex flex-col gap-1.5">
+        <span className={labelClassName}>Stil:</span>
         <SegmentedButtons options={CTA_STYLE_OPTIONS} value={block.ctaStyle ?? "udfyldt"} onChange={onCtaStyleChange} />
+      </div>
       </div>
     </div>
   );
@@ -355,19 +364,35 @@ function BlockContent({
   topicMatchedProductIds,
   customerType,
 }: BlockContentProps) {
+  // Kun til header-/footer-blokkenes små farve-forhåndsvisninger – samme
+  // standardbaggrunde som NewsletterCard.tsx.
+  const brand = useBrandSettings();
+  const headerBgColor = block.bgColor || brand.colors[0] || "#111111";
+  const footerBgColor = block.bgColor || "#f5f7f4";
+
   switch (block.type) {
     case "header":
       return (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-ink-muted">Logo og butiksnavn – vises fast øverst i nyhedsbrevet.</p>
-          <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
-          <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
+        <div className="flex flex-col gap-3">
+          <p className={helpTextClassName}>Logo og butiksnavn – vises fast øverst i nyhedsbrevet.</p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
+            <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
+          </div>
+          {/* Lille forhåndsvisning af headerens farver – samme regel som
+              NewsletterCard (valgt farve, ellers auto sort/hvid). */}
+          <div
+            className="border border-black/10 p-3 text-center font-jetbrains text-xs tracking-widest uppercase"
+            style={{ backgroundColor: headerBgColor, color: block.textColor || getContrastTextColor(headerBgColor) }}
+          >
+            {brand.name || "Logo"}
+          </div>
         </div>
       );
 
     case "overskrift":
       return (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <TextBlockEditor
             content={block.content ?? ""}
             onChange={onContentChange}
@@ -384,7 +409,7 @@ function BlockContent({
 
     case "brodtekst":
       return (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <TextBlockEditor
             content={block.content ?? ""}
             onChange={onContentChange}
@@ -401,7 +426,7 @@ function BlockContent({
 
     case "tekst":
       return (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <TextBlockEditor
             content={block.content ?? ""}
             onChange={onContentChange}
@@ -430,15 +455,15 @@ function BlockContent({
       const showProductSearch = topicMatchedProductIds !== null;
       const showImage = block.showImage ?? true;
       return (
-        <div className="flex flex-col gap-3">
-          <p className="text-xs text-ink-muted">
+        <div className="flex flex-col gap-5">
+          <p className={helpTextClassName}>
             Vis billeder og produkter – vælg produkter (med navn, pris og link til produktets side) eller upload
             egne billeder.
           </p>
-          <label className="relative flex cursor-pointer items-center justify-between gap-3 rounded-md border border-border px-2.5 py-2">
-            <span className="flex flex-col">
-              <span className="text-xs font-medium text-ink">Vis billede</span>
-              <span className="text-[11px] text-ink-muted">
+          <label className="relative flex cursor-pointer items-center justify-between gap-3 border-b border-neutral-200 pb-3">
+            <span className="flex flex-col gap-0.5">
+              <span className="font-jetbrains text-xs font-bold text-neutral-900">Vis billede</span>
+              <span className="font-jetbrains text-[11px] text-neutral-500">
                 {showImage
                   ? "Produktkort med billede, navn og pris – billedet linker til produktets side."
                   : "Tekstliste med navn og pris – produktnavnet linker til produktets side."}
@@ -453,21 +478,21 @@ function BlockContent({
             />
             <span
               aria-hidden
-              className={`relative h-5 w-9 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ink-faintest ${
-                showImage ? "bg-ink" : "bg-border"
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-black peer-focus-visible:ring-offset-1 ${
+                showImage ? "bg-neutral-900" : "bg-neutral-300"
               }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                  showImage ? "translate-x-4" : ""
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full border border-neutral-300 bg-white transition-transform ${
+                  showImage ? "translate-x-5 border-white" : ""
                 }`}
               />
             </span>
           </label>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-ink-muted">Antal billeder</span>
-            <div className="flex gap-1">
+          <div className="flex flex-col gap-1.5">
+            <span className={labelClassName}>Antal billeder:</span>
+            <div className="grid max-w-sm grid-cols-6 gap-1">
               {MEDIA_LAYOUT_OPTIONS.map((option) => (
                 <button
                   key={option}
@@ -475,8 +500,10 @@ function BlockContent({
                   onClick={() => onGalleryColumnsChange(option)}
                   aria-pressed={layout === option}
                   aria-label={option === 1 ? "1 billede" : `${option} billeder`}
-                  className={`flex-1 rounded-md px-2 py-1.5 text-[11px] ${
-                    layout === option ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
+                  className={`border py-1 text-center font-jetbrains text-xs transition-colors ${
+                    layout === option
+                      ? "border-black bg-black font-bold text-white"
+                      : "border-neutral-300 bg-white text-neutral-700 hover:border-black"
                   }`}
                 >
                   {option}
@@ -488,8 +515,8 @@ function BlockContent({
           {/* Kun relevant, når billederne står side om side (Vis billede
               slået til) – tekstlisten er altid lodret. */}
           {isGalleryLayout(layout) && showImage && (
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] text-ink-muted">Placering</span>
+            <div className="flex max-w-md flex-col gap-1.5">
+              <span className={labelClassName}>Placering:</span>
               <SegmentedButtons
                 value={getGalleryArrangement(block)}
                 onChange={onGalleryArrangementChange}
@@ -550,8 +577,10 @@ function BlockContent({
                     : undefined
                 }
               />
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] text-ink-muted">Eller vælg billede fra et produkt</span>
+              <div className="flex flex-col gap-2 border-t border-neutral-200 pt-3">
+                <span className="font-jetbrains text-xs font-bold tracking-wider text-neutral-800 uppercase">
+                  Eller vælg billede fra et produkt
+                </span>
                 <SearchableProductChecklist
                   products={products.filter((product) => product.hasImage)}
                   selectedProductIds={block.galleryProductIds ?? []}
@@ -564,33 +593,27 @@ function BlockContent({
             </div>
           )}
 
+          <div className="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-3 md:grid-cols-2">
           {/* Kant-form gælder kun kortene – tekstlisten har ingen kort. */}
           {showImage && (
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] text-ink-muted">Kant-form</span>
+            <div className="flex flex-col gap-1.5">
+              <span className={labelClassName}>Kant-form:</span>
               <SegmentedButtons
                 value={block.productBorderRadius ?? "afrundet"}
                 onChange={onProductBorderRadiusChange}
-                options={CTA_BORDER_RADIUS_OPTIONS.map((option) => ({
-                  ...option,
-                  preview: (
-                    <span
-                      className="h-3 w-6 border border-current"
-                      style={{ borderRadius: CTA_BORDER_RADIUS_PX[option.value] }}
-                    />
-                  ),
-                }))}
+                options={CTA_BORDER_RADIUS_OPTIONS}
               />
             </div>
           )}
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-ink-muted">Tæthed</span>
+          <div className="flex flex-col gap-1.5">
+            <span className={labelClassName}>Tæthed:</span>
             <SegmentedButtons
               options={PRODUCT_DENSITY_OPTIONS}
               value={block.productDensity ?? "normal"}
               onChange={onProductDensityChange}
             />
+          </div>
           </div>
         </div>
       );
@@ -613,33 +636,48 @@ function BlockContent({
       );
 
     case "skillelinje":
-      return <p className="text-xs text-ink-muted">Visuel luft mellem indhold og knappen.</p>;
+      return (
+        <div className="flex items-center justify-between gap-4">
+          <p className={helpTextClassName}>Visuel luft mellem indhold og knappen.</p>
+          <span className="h-px w-24 shrink-0 bg-neutral-400" aria-hidden />
+        </div>
+      );
 
     case "cta":
       return (
-        <div className="flex flex-col gap-2">
-          <TextBlockEditor
-            content={block.content ?? ""}
-            onChange={onContentChange}
-            fontFamily={block.fontFamily}
-            fontSize={block.fontSize}
-            textColor={block.textColor}
-            onFontFamilyChange={onFontFamilyChange}
-            onFontSizeChange={onFontSizeChange}
-            showColorPicker={false}
-          />
-          <input
-            value={block.ctaUrl ?? ""}
-            onChange={(event) => onCtaUrlChange(event.target.value)}
-            placeholder="Link"
-            className={fieldClassName}
-          />
-          <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
-          {(block.ctaStyle ?? "udfyldt") === "kontur" ? (
-            <p className="text-[11px] text-ink-faintest">I kontur-stil bruges knapfarven til både kant og tekst.</p>
-          ) : (
-            <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
-          )}
+        <div className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1">
+            <span className={labelClassName}>Destinationslink:</span>
+            <input
+              value={block.ctaUrl ?? ""}
+              onChange={(event) => onCtaUrlChange(event.target.value)}
+              placeholder="F.eks. https://jyskplantesalg.dk/collections/frugttraeer"
+              className={fieldClassName}
+            />
+          </label>
+          <div className="flex flex-col gap-1">
+            <span className={labelClassName}>Knaptekst:</span>
+            <TextBlockEditor
+              content={block.content ?? ""}
+              onChange={onContentChange}
+              fontFamily={block.fontFamily}
+              fontSize={block.fontSize}
+              textColor={block.textColor}
+              onFontFamilyChange={onFontFamilyChange}
+              onFontSizeChange={onFontSizeChange}
+              showColorPicker={false}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
+            {(block.ctaStyle ?? "udfyldt") === "kontur" ? (
+              <p className="font-jetbrains text-[11px] text-neutral-400">
+                I kontur-stil bruges knapfarven til både kant og tekst.
+              </p>
+            ) : (
+              <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
+            )}
+          </div>
 
           <CtaAdvancedControls
             block={block}
@@ -652,10 +690,21 @@ function BlockContent({
 
     case "footer":
       return (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-ink-muted">Adresse, CVR og afmeldingslink – vises fast nederst.</p>
-          <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
-          <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
+        <div className="flex flex-col gap-3">
+          <p className={helpTextClassName}>Adresse, CVR og afmeldingslink – vises fast nederst.</p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
+            <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
+          </div>
+          {/* Lille forhåndsvisning af footerens farver og firmaoplysninger –
+              samme regel som NewsletterCard. */}
+          <div
+            className="space-y-1 border border-neutral-200 p-3 text-center font-jetbrains text-[11px]"
+            style={{ backgroundColor: footerBgColor, color: block.textColor || getContrastTextColor(footerBgColor) }}
+          >
+            <p className="font-bold">{formatFooterAddressLine(brand) || "Ingen firmaoplysninger udfyldt"}</p>
+            <p className="opacity-80">Du modtager dette nyhedsbrev … · Afmeld nyhedsbrevet</p>
+          </div>
         </div>
       );
   }
@@ -663,7 +712,9 @@ function BlockContent({
 
 function SortableBlockRow({
   block,
+  number,
   title,
+  subtitle,
   badge,
   onDuplicate,
   onToggleHidden,
@@ -671,7 +722,10 @@ function SortableBlockRow({
   children,
 }: {
   block: NewsletterBlock;
+  // Blokkens position i nyhedsbrevet (1-baseret) – vises som "01.".
+  number: number;
   title: string;
+  subtitle?: string;
   badge: BlockBadge;
   onDuplicate: () => void;
   onToggleHidden: () => void;
@@ -687,38 +741,48 @@ function SortableBlockRow({
     transition,
     opacity: isDragging ? 0.6 : undefined,
   };
+  const emphasized = isMediaBlockType(block.type);
+  const iconButtonClassName =
+    "flex h-7 w-7 items-center justify-center text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black";
 
   return (
-    <div
+    <article
       ref={setNodeRef}
       style={style}
-      className={`rounded-xl border border-border bg-surface p-4 ${
-        block.hidden ? "opacity-60 grayscale" : ""
-      }`}
+      className={`bg-white transition-shadow duration-150 ${
+        emphasized ? "border-2 border-black shadow-sm" : "border border-black shadow-xs hover:shadow-md"
+      } ${isDragging ? "shadow-lg" : ""} ${block.hidden ? "opacity-60 grayscale" : ""}`}
     >
-      <div className="flex items-center justify-between pb-3">
-        <div className="flex items-center gap-2">
+      <div
+        className={`flex items-center justify-between gap-3 border-b px-3 py-2 sm:px-4 ${
+          emphasized ? "border-black bg-neutral-100" : "border-neutral-200 bg-[#fafaf8]"
+        }`}
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
           <button
             type="button"
             {...attributes}
             {...listeners}
             aria-label={`Flyt blokken ${title}`}
-            className="cursor-grab touch-none rounded-md p-1 text-ink-faintest hover:bg-surface-active hover:text-ink-muted active:cursor-grabbing"
+            title="Træk for at flytte blokken op/ned"
+            className="-ml-1 shrink-0 cursor-grab touch-none p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-black active:cursor-grabbing"
           >
             <GripIcon className="h-4 w-4" />
           </button>
-          <p className="text-sm font-semibold text-ink">{title}</p>
+          <p className="truncate font-jetbrains text-xs font-bold tracking-wider text-neutral-900 uppercase">
+            {String(number).padStart(2, "0")}. {title}
+            {subtitle && <span className="font-normal text-neutral-500">{` // ${subtitle}`}</span>}
+          </p>
+          <Badge type={badge} />
         </div>
 
-        <div className="flex items-center gap-1">
-          <Badge type={badge} />
-
+        <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"
             onClick={onDuplicate}
             aria-label={`Dupliker blokken ${title}`}
-            title="Dupliker"
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faintest hover:bg-surface-active hover:text-ink-muted"
+            title="Duplikér blok"
+            className={iconButtonClassName}
           >
             <DuplicateIcon className="h-3.5 w-3.5" />
           </button>
@@ -728,8 +792,8 @@ function SortableBlockRow({
             onClick={onToggleHidden}
             aria-label={block.hidden ? `Vis blokken ${title}` : `Skjul blokken ${title}`}
             aria-pressed={block.hidden}
-            title={block.hidden ? "Vis" : "Skjul"}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faintest hover:bg-surface-active hover:text-ink-muted"
+            title={block.hidden ? "Vis blok" : "Skjul blok"}
+            className={iconButtonClassName}
           >
             {block.hidden ? <EyeOffIcon className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
           </button>
@@ -738,70 +802,40 @@ function SortableBlockRow({
             type="button"
             onClick={onDelete}
             aria-label={`Slet blokken ${title}`}
-            title="Slet"
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-faintest hover:bg-red-50 hover:text-red-600"
+            title="Slet blok"
+            className="flex h-7 w-7 items-center justify-center text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-700"
           >
             <TrashIcon className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
-      {children}
-    </div>
+      <div className={emphasized ? "p-4 sm:p-5" : "p-4"}>{children}</div>
+    </article>
   );
 }
 
+// "+ Tilføj ny sektion": alle blok-typer, der kan tilføjes, som knapper på
+// én gang (samme valg og samme handling som den tidligere dropdown).
 function AddBlockMenu({ onAdd }: { onAdd: (kind: AddableBlockKind) => void }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [open]);
-
-  function handleSelect(kind: AddableBlockKind) {
-    onAdd(kind);
-    setOpen(false);
-  }
-
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-[13px] font-medium text-ink-muted hover:border-ink-faintest hover:bg-surface-active hover:text-ink"
-      >
-        <PlusIcon className="h-3.5 w-3.5" />
-        Tilføj blok
-      </button>
-
-      {open && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-          {ADD_BLOCK_OPTIONS.map(({ kind, label, description, icon: Icon }) => (
-            <button
-              key={kind}
-              type="button"
-              onClick={() => handleSelect(kind)}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-ink hover:bg-surface-active"
-            >
-              <Icon className="h-4 w-4 shrink-0 text-ink-muted" />
-              <span className="flex flex-col">
-                <span>{label}</span>
-                {description && <span className="text-[11px] text-ink-muted">{description}</span>}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="border-2 border-dashed border-neutral-400 bg-white p-4 text-center transition-colors hover:border-black">
+      <p className="mb-2.5 flex items-center justify-center gap-1.5 font-jetbrains text-xs font-bold tracking-wider text-neutral-800 uppercase">
+        <PlusIcon className="h-3 w-3" />
+        Tilføj ny sektion til nyhedsbrevet
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {ADD_BLOCK_OPTIONS.map(({ kind, label, description, icon: Icon }) => (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => onAdd(kind)}
+            title={description}
+            className="flex items-center gap-1.5 border border-neutral-300 bg-neutral-50 px-3 py-1.5 font-jetbrains text-xs text-neutral-800 transition-colors hover:border-black hover:bg-black hover:text-white"
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0" />+ {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1273,22 +1307,25 @@ export function EditorBlockList({
   const globalTextColor = firstTextBlock?.textColor;
 
   return (
-    <div className="flex max-w-xl flex-col gap-4">
-      <div
-        className="flex h-11 w-fit shrink-0 items-center gap-1 self-start rounded-full border border-border bg-surface-active px-3 shadow-sm"
+    <div className="flex w-full max-w-3xl flex-col gap-4">
+      {/* Typografi & farveprofil for hele nyhedsbrevet */}
+      <section
+        className="flex flex-wrap items-center justify-between gap-3 border border-neutral-300 bg-white p-3.5 font-jetbrains text-xs shadow-xs"
         title="Indstillinger for hele nyhedsbrevet"
       >
-        <GearIcon className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
-
-        <div className="mx-1 h-5 w-px bg-border" />
-
-        <div className="relative flex items-center">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-1.5 text-[11px] tracking-wider text-neutral-500 uppercase">
+            <GearIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Typografi &amp; farveprofil:
+          </span>
+          <div className="relative flex items-center">
           <select
             id="global-font-family"
             value={globalFontFamily}
             onChange={(event) => handleGlobalFontChange(event.target.value)}
             aria-label="Skrifttype for hele nyhedsbrevet"
-            className="appearance-none rounded-full bg-transparent py-1 pr-6 pl-2 text-xs text-ink-muted hover:bg-surface focus:outline-none"
+            style={{ fontFamily: globalFontFamily || undefined }}
+            className="appearance-none rounded-none border border-neutral-300 bg-[#fbfbf9] py-1 pr-7 pl-3 text-xs text-neutral-900 focus:border-black focus:outline-none"
           >
             <option value="" disabled>
               Skrifttype
@@ -1299,15 +1336,17 @@ export function EditorBlockList({
               </option>
             ))}
           </select>
-          <ChevronDownIcon className="pointer-events-none absolute right-1.5 h-2.5 w-2.5 text-ink-muted" />
+          <ChevronDownIcon className="pointer-events-none absolute right-2 h-2.5 w-2.5 text-neutral-500" />
+          </div>
         </div>
 
-        <div className="mx-1 h-5 w-px bg-border" />
-
-        <div aria-label="Tekstfarve for hele nyhedsbrevet">
-          <ColorSwatches value={globalTextColor} onChange={handleGlobalColorChange} />
+        <div className="flex items-center gap-2" aria-label="Tekstfarve for hele nyhedsbrevet">
+          <span className="text-[11px] text-neutral-400 uppercase">Global tekstfarve:</span>
+          <div className="border border-neutral-200 bg-[#fbfbf9] p-1">
+            <ColorSwatches value={globalTextColor} onChange={handleGlobalColorChange} />
+          </div>
         </div>
-      </div>
+      </section>
 
       <div className="flex flex-col gap-1.5">
         <button
@@ -1315,7 +1354,7 @@ export function EditorBlockList({
           onClick={handleRegenerateText}
           disabled={regenerateTextProducts.length === 0 || isRegeneratingText}
           title="Genererer Overskrift og Brødtekst på ny, ud fra det/de produkter, der aktuelt er valgt i Billede & produktvisning-blokkene herunder – rører ikke ved blok-struktur, styling, billeder eller CTA-knappen."
-          className="inline-flex h-9 w-fit items-center gap-2 self-start rounded-full border border-border bg-surface px-3.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex w-fit items-center gap-1.5 self-start border border-neutral-400 bg-white px-3 py-1.5 font-jetbrains text-xs text-neutral-800 transition-all hover:border-black hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isRegeneratingText ? (
             <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -1324,19 +1363,33 @@ export function EditorBlockList({
           )}
           {isRegeneratingText ? "Regenererer tekst..." : "Regenerér tekst ud fra det viste produkt"}
         </button>
-        {regenerateTextError && <p className="text-[12px] text-red-600">{regenerateTextError}</p>}
+        {regenerateTextError && <p className="font-jetbrains text-[12px] text-red-600">{regenerateTextError}</p>}
+      </div>
+
+      {/* Hjælpelinje til drag-and-drop + antal blokke */}
+      <div className="flex items-center justify-between gap-3 border border-dashed border-neutral-400 bg-[#f0f0eb] px-3 py-1.5 font-jetbrains text-[11px] text-neutral-600">
+        <span className="flex items-center gap-1.5 font-medium uppercase">
+          <GripIcon className="h-3.5 w-3.5 shrink-0" />
+          Træk i håndtagene for at ændre rækkefølgen af sektionerne
+        </span>
+        <span className="hidden shrink-0 text-neutral-500 sm:inline">
+          {blocks.filter((block) => !block.hidden).length} blokke aktive · {blocks.filter((block) => block.hidden).length}{" "}
+          skjult
+        </span>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
-          <div className="flex flex-col gap-3">
-            {blocks.map((block) => {
+          <div className="flex flex-col gap-4">
+            {blocks.map((block, index) => {
               const meta = BLOCK_META[block.type];
               return (
                 <SortableBlockRow
                   key={block.id}
                   block={block}
+                  number={index + 1}
                   title={meta.title}
+                  subtitle={meta.subtitle}
                   badge={meta.badge}
                   onDuplicate={() => handleDuplicate(block.id)}
                   onToggleHidden={() => handleToggleHidden(block.id)}

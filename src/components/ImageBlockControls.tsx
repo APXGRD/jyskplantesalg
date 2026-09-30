@@ -91,13 +91,13 @@ export function ImageBlockControls({
   return (
     <div ref={containerRef} onFocus={handleFocus} onBlur={handleBlur} className="relative">
       {isFocused && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 w-72 rounded-lg border border-border bg-surface p-3 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div className="absolute bottom-full left-0 z-10 mb-2 w-80 border border-black bg-white p-3 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)]">
           <div className="flex flex-col gap-3">
             <div>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-muted hover:bg-surface-active hover:text-ink"
+                className="w-full border border-black bg-white px-3 py-1.5 font-jetbrains text-xs font-medium text-black hover:bg-neutral-100"
               >
                 Udskift billede
               </button>
@@ -111,16 +111,16 @@ export function ImageBlockControls({
             </div>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] text-ink-muted">
-                Alt-tekst <span className="text-ink-faintest">(Anbefalet)</span>
+              <span className="font-jetbrains text-[11px] text-neutral-600">
+                Alt-tekst <span className="text-neutral-400">(Anbefalet)</span>
               </span>
               <input
                 type="text"
                 value={altText ?? ""}
                 onChange={(event) => onAltTextChange(event.target.value)}
                 placeholder="Beskriv billedet (vises hvis billedet ikke indlæses)"
-                className={`rounded-md border px-2 py-1.5 text-xs text-ink focus:outline-none ${
-                  altText ? "border-border" : "border-amber-300"
+                className={`rounded-none border bg-white px-2 py-1.5 font-jetbrains text-xs text-neutral-900 focus:border-black focus:outline-none ${
+                  altText ? "border-neutral-300" : "border-amber-300"
                 }`}
               />
             </label>
@@ -135,7 +135,7 @@ export function ImageBlockControls({
             )}
 
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] text-ink-muted">Justering</span>
+              <span className="font-jetbrains text-[11px] text-neutral-600">Justering:</span>
               <div className="flex gap-1">
                 {ALIGNMENT_OPTIONS.map((option) => (
                   <button
@@ -143,10 +143,10 @@ export function ImageBlockControls({
                     type="button"
                     onClick={() => onAlignmentChange(option.value)}
                     aria-pressed={alignment === option.value}
-                    className={`flex-1 rounded-md px-2 py-1 text-[11px] ${
+                    className={`flex-1 border px-2 py-1 font-jetbrains text-[11px] ${
                       alignment === option.value
-                        ? "bg-surface-active text-ink"
-                        : "text-ink-muted hover:bg-surface-active"
+                        ? "border-black bg-neutral-200 font-bold text-black"
+                        : "border-neutral-300 bg-white text-neutral-600 hover:border-black"
                     }`}
                   >
                     {option.label}
@@ -156,7 +156,7 @@ export function ImageBlockControls({
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] text-ink-muted">Størrelse</span>
+              <span className="font-jetbrains text-[11px] text-neutral-600">Størrelse:</span>
               <div className="flex gap-1">
                 {SIZE_OPTIONS.map((option) => (
                   <button
@@ -164,10 +164,10 @@ export function ImageBlockControls({
                     type="button"
                     onClick={() => onSizeChange(option.value)}
                     aria-pressed={size === option.value}
-                    className={`flex-1 rounded-md px-2 py-1 text-[11px] ${
+                    className={`flex-1 border px-2 py-1 font-jetbrains text-[11px] ${
                       size === option.value
-                        ? "bg-surface-active text-ink"
-                        : "text-ink-muted hover:bg-surface-active"
+                        ? "border-black bg-neutral-200 font-bold text-black"
+                        : "border-neutral-300 bg-white text-neutral-600 hover:border-black"
                     }`}
                   >
                     {option.label}
@@ -187,10 +187,10 @@ export function ImageBlockControls({
         {imageUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI, next/image kan ikke optimere den */}
-            <img src={imageUrl} alt={altText ?? ""} className="h-24 w-full rounded-lg object-cover" />
+            <img src={imageUrl} alt={altText ?? ""} className="h-32 w-full border border-neutral-300 object-cover" />
             {/* Vises ved hover/fokus, så det er tydeligt, at billedet kan klikkes. */}
             <span
-              className={`absolute inset-0 flex items-center justify-center gap-1.5 rounded-lg bg-black/45 text-xs font-medium text-white transition-opacity ${
+              className={`absolute inset-0 flex items-center justify-center gap-1.5 bg-black/50 font-jetbrains text-xs font-medium text-white transition-opacity ${
                 isFocused ? "opacity-0" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
               }`}
             >
@@ -199,14 +199,14 @@ export function ImageBlockControls({
             </span>
           </>
         ) : (
-          <div className="flex h-16 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-active text-ink-faint group-hover:border-ink-faintest">
+          <div className="flex h-20 items-center justify-center gap-2 border-2 border-dashed border-neutral-400 bg-white text-neutral-500 group-hover:border-black group-hover:text-black">
             <ImagePlaceholderIcon className="h-5 w-5" />
-            <span className="text-xs">Klik for at tilføje billede</span>
+            <span className="font-jetbrains text-xs">Klik for at tilføje billede</span>
           </div>
         )}
       </button>
       {imageUrl && !isFocused && (
-        <p className="pt-1.5 text-[11px] text-ink-muted">
+        <p className="pt-1.5 font-jetbrains text-[11px] text-neutral-500">
           {caption
             ? "Klik på billedet for at udskifte det og ændre alt-tekst, overskrift, pris, justering og størrelse."
             : "Klik på billedet for at udskifte det og ændre alt-tekst, justering og størrelse."}

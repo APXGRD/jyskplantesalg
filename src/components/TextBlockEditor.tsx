@@ -45,8 +45,8 @@ const MIN_FONT_SIZE = 10;
 const MAX_FONT_SIZE = 36;
 
 const toolbarIconButtonClassName = (active: boolean) =>
-  `flex h-7 w-7 items-center justify-center rounded-full ${
-    active ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
+  `flex h-7 w-7 items-center justify-center ${
+    active ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-100 hover:text-black"
   }`;
 
 const EDITOR_EXTENSIONS = [
@@ -102,7 +102,8 @@ export function TextBlockEditor({
           // uanset hvad fontSize/textColor er sat til – uden at det giver
           // fejl, ser det bare ud som om den per-blok størrelse-/
           // farve-vælger ikke gør noget i selve Edit-mode-listen.
-          class: "outline-none leading-relaxed",
+          class:
+            "outline-none leading-relaxed border border-neutral-300 bg-[#fdfdfb] p-3 focus:border-black transition-colors",
         },
       },
       onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -219,13 +220,13 @@ export function TextBlockEditor({
       style={{ fontFamily, fontSize: `${fontSize ?? DEFAULT_FONT_SIZE}px`, color: textColor || "var(--ink)" }}
     >
       {isFocused && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 flex h-11 w-fit items-center gap-0.5 rounded-full border border-border bg-surface px-2 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+        <div className="absolute bottom-full left-0 z-10 mb-2 flex h-11 w-fit items-center gap-0.5 border border-black bg-white px-2 font-jetbrains shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)]">
           <div className="relative flex items-center">
             <select
               value={fontFamily ?? ""}
               onChange={(event) => onFontFamilyChange(event.target.value)}
               aria-label="Skrifttype"
-              className="appearance-none rounded-full bg-transparent py-1 pr-5 pl-2 text-xs text-ink-muted hover:bg-surface-active focus:outline-none"
+              className="appearance-none rounded-none bg-transparent py-1 pr-5 pl-2 text-xs text-neutral-700 hover:bg-neutral-100 focus:outline-none"
             >
               <option value="">Skrifttype</option>
               {FONT_FAMILIES.map((font) => (
@@ -234,10 +235,10 @@ export function TextBlockEditor({
                 </option>
               ))}
             </select>
-            <ChevronDownIcon className="pointer-events-none absolute right-1.5 h-2.5 w-2.5 text-ink-muted" />
+            <ChevronDownIcon className="pointer-events-none absolute right-1.5 h-2.5 w-2.5 text-neutral-500" />
           </div>
 
-          <div className="mx-1 h-5 w-px bg-border" />
+          <div className="mx-1 h-5 w-px bg-neutral-300" />
 
           <div className="flex items-center gap-0.5" aria-label="Skriftstørrelse">
             <button
@@ -245,11 +246,11 @@ export function TextBlockEditor({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => stepFontSize(-1)}
               aria-label="Mindre skrift"
-              className="flex h-6 w-6 items-center justify-center rounded-full text-ink-muted hover:bg-surface-active"
+              className="flex h-6 w-6 items-center justify-center text-neutral-600 hover:bg-neutral-100 hover:text-black"
             >
               <MinusIcon className="h-3 w-3" />
             </button>
-            <span className="w-4 text-center text-[11px] tabular-nums text-ink-muted">
+            <span className="w-4 text-center text-[11px] tabular-nums text-neutral-700">
               {fontSize ?? DEFAULT_FONT_SIZE}
             </span>
             <button
@@ -257,13 +258,13 @@ export function TextBlockEditor({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => stepFontSize(1)}
               aria-label="Større skrift"
-              className="flex h-6 w-6 items-center justify-center rounded-full text-ink-muted hover:bg-surface-active"
+              className="flex h-6 w-6 items-center justify-center text-neutral-600 hover:bg-neutral-100 hover:text-black"
             >
               <PlusIcon className="h-3 w-3" />
             </button>
           </div>
 
-          <div className="mx-1 h-5 w-px bg-border" />
+          <div className="mx-1 h-5 w-px bg-neutral-300" />
 
           <button
             type="button"
@@ -301,7 +302,7 @@ export function TextBlockEditor({
 
           {showColorPicker && (
             <>
-              <div className="mx-1 h-5 w-px bg-border" />
+              <div className="mx-1 h-5 w-px bg-neutral-300" />
 
               <ColorSwatches
                 value={activeState.color}

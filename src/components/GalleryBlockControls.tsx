@@ -86,7 +86,7 @@ function GallerySlotUpload({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-surface-active text-ink-faint hover:border-ink-faintest"
+          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden border border-dashed border-neutral-400 bg-white text-neutral-400 hover:border-black"
           aria-label={upload.imageUrl ? "Udskift billede" : "Vælg billede"}
         >
           {upload.imageUrl ? (
@@ -99,24 +99,24 @@ function GallerySlotUpload({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-muted hover:bg-surface-active hover:text-ink"
+          className="border border-neutral-300 bg-white px-2.5 py-1 font-jetbrains text-xs text-neutral-700 hover:border-black"
         >
           {upload.imageUrl ? "Udskift billede" : "Upload billede"}
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="sr-only" />
       </div>
-      {error && <p className="text-[11px] text-red-600">{error}</p>}
+      {error && <p className="font-jetbrains text-[11px] text-red-600">{error}</p>}
       <label className="flex flex-col gap-1">
-        <span className="text-[11px] text-ink-muted">
-          Alt-tekst <span className="text-ink-faintest">(Anbefalet)</span>
+        <span className="font-jetbrains text-[11px] text-neutral-600">
+          Alt-tekst <span className="text-neutral-400">(Anbefalet)</span>
         </span>
         <input
           type="text"
           value={upload.altText ?? ""}
           onChange={(event) => onChange({ ...upload, altText: event.target.value })}
           placeholder="Beskriv billedet (vises hvis billedet ikke indlæses)"
-          className={`rounded-md border px-2 py-1.5 text-xs text-ink focus:outline-none ${
-            upload.altText ? "border-border" : "border-amber-300"
+          className={`rounded-none border bg-white px-2 py-1.5 font-jetbrains text-xs text-neutral-900 focus:border-black focus:outline-none ${
+            upload.altText ? "border-neutral-300" : "border-amber-300"
           }`}
         />
       </label>
@@ -167,27 +167,53 @@ export function GalleryBlockControls({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <span className="text-[11px] text-ink-muted">Billedpladser</span>
+        <span className="font-jetbrains text-xs font-bold tracking-wider text-neutral-700 uppercase">Billedpladser:</span>
         {slots.map((slot) => {
           const product =
             slot.kind === "product" ? products.find((item) => item.id === slot.productId) : undefined;
+          // "Malus domestica 'Cox Orange' - Æbletræ - Højstammet" vises som
+          // navn (fed) + variant (lille, grå) – kun visning, selve titlen er
+          // uændret.
+          const [productName, ...productVariant] = product ? product.title.split(" - ") : [];
           return (
-            <div key={slot.index} className="flex flex-col gap-2 rounded-md border border-border p-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-ink">Plads {slot.index + 1}</span>
-                <div className="flex gap-1">
+            <div key={slot.index} className="flex flex-col gap-3 border border-neutral-300 bg-[#fafaf8] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center bg-black font-jetbrains text-xs font-bold text-white">
+                    {slot.index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <span className="block truncate font-jetbrains text-xs font-bold text-neutral-900">
+                      Plads {slot.index + 1}:{" "}
+                      {slot.kind === "upload" ? "Eget billede" : (productName ?? "Intet produkt valgt")}
+                    </span>
+                    <span className="block truncate font-jetbrains text-[11px] text-neutral-500">
+                      {slot.kind === "upload"
+                        ? "Upload et billede herunder"
+                        : product
+                          ? productVariant.join(" - ") || "\u00a0"
+                          : "Vælg i listen herunder"}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {product && (
+                    <span className="mr-1 font-jetbrains text-xs font-bold whitespace-nowrap text-neutral-900 tabular-nums">
+                      {formatPriceForCustomer(product.price, customerType)}
+                    </span>
+                  )}
                   {MODE_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       onClick={() => onSlotModeChange(slot.index, option.value)}
                       aria-pressed={slot.kind === option.value}
-                      className={`rounded-md px-2 py-1 text-[11px] ${
+                      className={`border px-2.5 py-1 font-jetbrains text-xs transition-colors ${
                         slot.kind === option.value
-                          ? "bg-surface-active text-ink"
-                          : "text-ink-muted hover:bg-surface-active"
+                          ? "border-black bg-white font-medium text-black"
+                          : "border-neutral-300 bg-white text-neutral-500 hover:border-black"
                       }`}
                     >
                       {option.label}
@@ -195,24 +221,11 @@ export function GalleryBlockControls({
                   ))}
                 </div>
               </div>
-              {slot.kind === "upload" ? (
+              {slot.kind === "upload" && (
                 <GallerySlotUpload
                   upload={slot.upload}
                   onChange={(upload) => onSlotUploadChange(slot.index, upload)}
                 />
-              ) : (
-                <p className="flex gap-2 text-[11px] text-ink-muted">
-                  {product ? (
-                    <>
-                      <span className="min-w-0 flex-1 truncate">{product.title}</span>
-                      <span className="shrink-0 font-medium text-ink whitespace-nowrap tabular-nums">
-                        {formatPriceForCustomer(product.price, customerType)}
-                      </span>
-                    </>
-                  ) : (
-                    "Intet produkt valgt – vælg i listen herunder"
-                  )}
-                </p>
               )}
             </div>
           );
@@ -221,16 +234,19 @@ export function GalleryBlockControls({
 
       {productSlotCount > 0 &&
         (!hasEnoughProducts ? (
-          <p className="rounded-md bg-amber-50 px-2.5 py-2 text-[11px] text-amber-700">
+          <p className="border border-amber-300 bg-amber-50 px-2.5 py-2 font-jetbrains text-[11px] text-amber-800">
             Du har kun valgt {availableProducts.length}{" "}
             {availableProducts.length === 1 ? "produkt" : "produkter"} med billede på &quot;Vælg produkter&quot;-siden
             – vælg mindst {productSlotCount} dér, eller brug &quot;Upload eget billede&quot; på flere pladser.
           </p>
         ) : (
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-ink-muted">
-              Valgte produkter ({selectedProductIds.length}/{productSlotCount})
-            </span>
+          <div className="flex flex-col gap-2 border-t border-neutral-200 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 font-jetbrains">
+              <span className="text-xs font-bold tracking-wider text-neutral-800 uppercase">
+                Vælg produkter ({selectedProductIds.length}/{productSlotCount} valgt)
+              </span>
+              <span className="text-[11px] text-neutral-500 uppercase">{availableProducts.length} matchede produkter</span>
+            </div>
             <SearchableProductChecklist
               products={availableProducts}
               selectedProductIds={selectedProductIds}

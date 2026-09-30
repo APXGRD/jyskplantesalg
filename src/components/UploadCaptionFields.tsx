@@ -8,7 +8,7 @@ interface UploadCaptionFieldsProps {
 }
 
 const inputClassName =
-  "w-full rounded-md border border-border px-2 py-1.5 text-xs text-ink focus:border-ink-faintest focus:outline-none";
+  "w-full rounded-none border border-neutral-300 bg-white px-2 py-1.5 font-jetbrains text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-black focus:outline-none";
 
 // Valgfri overskrift og pris til et UPLOADET billede i Billede-/Galleri-
 // blokken – vises under billedet i samme kort-stil som et produkts navn/pris
@@ -19,8 +19,8 @@ export function UploadCaptionFields({ title, price, onTitleChange, onPriceChange
   return (
     <div className="flex gap-2">
       <label className="flex min-w-0 flex-2 flex-col gap-1">
-        <span className="text-[11px] text-ink-muted">
-          Overskrift <span className="text-ink-faintest">(valgfri)</span>
+        <span className="font-jetbrains text-[11px] text-neutral-600">
+          Overskrift <span className="text-neutral-400">(valgfri)</span>
         </span>
         <input
           type="text"
@@ -31,8 +31,8 @@ export function UploadCaptionFields({ title, price, onTitleChange, onPriceChange
         />
       </label>
       <label className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-[11px] text-ink-muted">
-          Pris <span className="text-ink-faintest">(valgfri)</span>
+        <span className="font-jetbrains text-[11px] text-neutral-600">
+          Pris <span className="text-neutral-400">(valgfri)</span>
         </span>
         <input
           type="text"
