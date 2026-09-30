@@ -31,7 +31,7 @@ const PRODUCTS_QUERY = `
           id
           title
           handle
-          onlineStorePreviewUrl
+          onlineStoreUrl
           productType
           tags
           images(first: 1) {
@@ -73,7 +73,7 @@ interface ShopifyProductNode {
   id: string;
   title: string;
   handle: string;
-  onlineStorePreviewUrl: string | null;
+  onlineStoreUrl: string | null;
   productType: string;
   tags: string[];
   images: { edges: { node: { url: string } }[] };
@@ -122,21 +122,24 @@ function mapProductNode(node: ShopifyProductNode, shop: string): ShopifyProduct 
   const imageUrl = node.images.edges[0]?.node.url ?? "";
   const rawPrice = node.variants.edges[0]?.node.price;
   const price = rawPrice ? Number.parseFloat(rawPrice) : 0;
-  // onlineStorePreviewUrl er den korrekte, altid-gyldige kunde-URL (respekterer
-  // evt. custom domain) – men kan være null, hvis produktet ikke er publiceret
-  // til Online Store-kanalen. Falder i så fald tilbage til at bygge URL'en ud
-  // fra handle + shop-domænet direkte.
-  const url = node.onlineStorePreviewUrl || `https://${shop}/products/${node.handle}`;
-
-  // Collection-siden har intet onlineStorePreviewUrl-modstykke i Admin
-  // API'et (kun handle) – bygges derfor altid ud fra shop-domænet, samme
-  // fallback-mønster som produkt-URL'en ovenfor. jyskplantesalg.myshopify.com
-  // redirecter (301) korrekt videre til den rigtige butiksdomæne, så dette
-  // er et gyldigt, klikbart link, selv når shop her IKKE er kundens eget
-  // domæne.
+  // Collection-siden har intet onlineStoreUrl-modstykke i Admin API'et (kun
+  // handle) – bygges derfor altid ud fra shop-domænet.
+  // jyskplantesalg.myshopify.com redirecter (301) korrekt videre til den
+  // rigtige butiksdomæne, så dette er et gyldigt, klikbart link, selv når
+  // shop her IKKE er kundens eget domæne.
   const primaryCollection = node.collections.edges[0]?.node;
   const collectionHandle = primaryCollection?.handle ?? null;
   const collectionUrl = collectionHandle ? `https://${shop}/collections/${collectionHandle}` : null;
+
+  // onlineStoreUrl er produktets rigtige, offentlige side (respekterer evt.
+  // custom domain) – men er null, når produktet IKKE er publiceret til
+  // Online Store-kanalen. Så findes der ingen offentlig produktside: både
+  // /products/<handle> (404) og onlineStorePreviewUrl (et midlertidigt
+  // shopifypreview.com-link, der udløber – 410) er døde links i et
+  // nyhedsbrev. I stedet linkes til produktets collection-side, ellers en
+  // søgning på produktnavnet i butikken – begge virker altid.
+  const url =
+    node.onlineStoreUrl ?? collectionUrl ?? `https://${shop}/search?q=${encodeURIComponent(node.title)}`;
 
   // Håndteres pænt, hvis metafeltet mangler (null) eller er sat til en tom
   // streng – begge tælles som "ingen planteform sat", selvom en tidligere

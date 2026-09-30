@@ -8,8 +8,12 @@
 // omdirigere til sig selv i det uendelige.
 
 import { login } from "./actions";
-import { getBrandSettings } from "@/lib/brandSettings";
+import { getBrandSettingsWithStatus } from "@/lib/brandSettings";
 import { initials } from "@/lib/initials";
+
+// Vises, når der endnu ikke er gemt et firmanavn på Indstillinger-siden – i
+// stedet for brand.ts's hardcodede standardnavn.
+const APP_NAME = "Nyhedsbrev generator";
 
 const fieldClassName =
   "w-full rounded-xs border border-[#cfcfcf] bg-[#fdfdfd] px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-neutral-400 transition-colors focus:border-black focus:bg-white focus:outline-none";
@@ -20,28 +24,25 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  const settings = await getBrandSettings();
-  const companyName = settings.company_name.trim();
+  const { settings, status } = await getBrandSettingsWithStatus();
+  // Kun et GEMT firmanavn vises; ellers appens eget navn (se APP_NAME).
+  const companyName = (status === "configured" && settings.company_name.trim()) || APP_NAME;
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-[#EAEAEA] bg-[linear-gradient(to_right,rgba(0,0,0,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.035)_1px,transparent_1px)] bg-size-[32px_32px] px-4 py-12 font-grotesk text-[#111111] antialiased selection:bg-black selection:text-white">
       <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/15 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.06)]">
         {/* Brand-linje, samme opbygning som topbaren */}
         <div className="flex items-center gap-3 border-b border-black/10 bg-white/70 px-6 py-4">
-          {settings.logo_data ? (
+          {status === "configured" && settings.logo_data ? (
             // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
             <img src={settings.logo_data} alt="" className="h-7 w-7 shrink-0 object-contain" />
           ) : (
             <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-black font-jetbrains text-xs font-bold tracking-tighter text-white">
-              {companyName ? initials(companyName) : "–"}
+              {initials(companyName)}
             </div>
           )}
-          <span
-            className={`truncate text-lg leading-none font-bold tracking-tight uppercase ${
-              companyName ? "text-[#111111]" : "text-black/30"
-            }`}
-          >
-            {companyName || "Logo"}
+          <span className="truncate text-lg leading-none font-bold tracking-tight text-[#111111] uppercase">
+            {companyName}
           </span>
         </div>
 

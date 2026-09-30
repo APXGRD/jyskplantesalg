@@ -3,6 +3,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { ImagePlaceholderIcon, PencilIcon } from "@/components/icons";
 import type { ImageAlignment, ImageSize } from "@/lib/newsletterBlocks";
+import { UploadCaptionFields } from "./UploadCaptionFields";
 
 interface ImageBlockControlsProps {
   imageUrl?: string;
@@ -13,6 +14,14 @@ interface ImageBlockControlsProps {
   onAltTextChange: (altText: string) => void;
   onAlignmentChange: (alignment: ImageAlignment) => void;
   onSizeChange: (size: ImageSize) => void;
+  // Kun sat, når billedet er UPLOADET (ikke et valgt produkts billede) – så
+  // kan det have sin egen overskrift/pris (se UploadCaptionFields).
+  caption?: {
+    title?: string;
+    price?: string;
+    onTitleChange: (title: string) => void;
+    onPriceChange: (price: string) => void;
+  };
 }
 
 const ALIGNMENT_OPTIONS: { value: ImageAlignment; label: string }[] = [
@@ -36,6 +45,7 @@ export function ImageBlockControls({
   onAltTextChange,
   onAlignmentChange,
   onSizeChange,
+  caption,
 }: ImageBlockControlsProps) {
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,6 +125,15 @@ export function ImageBlockControls({
               />
             </label>
 
+            {caption && (
+              <UploadCaptionFields
+                title={caption.title}
+                price={caption.price}
+                onTitleChange={caption.onTitleChange}
+                onPriceChange={caption.onPriceChange}
+              />
+            )}
+
             <div className="flex flex-col gap-1">
               <span className="text-[11px] text-ink-muted">Justering</span>
               <div className="flex gap-1">
@@ -188,7 +207,9 @@ export function ImageBlockControls({
       </button>
       {imageUrl && !isFocused && (
         <p className="pt-1.5 text-[11px] text-ink-muted">
-          Klik på billedet for at udskifte det og ændre alt-tekst, justering og størrelse.
+          {caption
+            ? "Klik på billedet for at udskifte det og ændre alt-tekst, overskrift, pris, justering og størrelse."
+            : "Klik på billedet for at udskifte det og ændre alt-tekst, justering og størrelse."}
         </p>
       )}
     </div>

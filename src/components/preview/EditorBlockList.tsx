@@ -38,7 +38,6 @@ import {
   GripIcon,
   ImagePlaceholderIcon,
   PlusIcon,
-  ProductIcon,
   RefreshIcon,
   SpinnerIcon,
   TextIcon,
@@ -50,7 +49,11 @@ import {
   duplicateBlock,
   getGalleryProductSlotCount,
   getGallerySlots,
+  getSingleImageProduct,
+  getGalleryArrangement,
+  getMediaRowSize,
   isGalleryLayout,
+  resolveSingleImageUrl,
   CTA_BORDER_RADIUS_PX,
   MEDIA_LAYOUT_OPTIONS,
   RICH_TEXT_BLOCK_TYPES,
@@ -59,6 +62,7 @@ import {
   type CtaBorderRadius,
   type CtaPadding,
   type CtaStyle,
+  type GalleryArrangement,
   type GalleryUpload,
   type MediaLayout,
   type ImageAlignment,
@@ -75,25 +79,34 @@ type BlockBadge = "Struktur" | "AI-tekst" | "Produktdata";
 // nyhedsbrev-udkast/skabeloner fra FØR Billede og Galleri blev konsolideret
 // til én blok-type stadig får samme titel/badge (se BlockContent's samlede
 // "billede"-case herunder).
+// Den samlede blok kan BÅDE vise billeder og produkter (navn, pris og link
+// til produktets side) – navnet siger derfor begge dele, så brugeren ved, at
+// den også er stedet til produktvisning.
+const MEDIA_BLOCK_TITLE = "Billede & produktvisning";
+const MEDIA_BLOCK_DESCRIPTION = "Billeder og produkter med navn, pris og link";
+
 const BLOCK_META: Record<BlockType, { title: string; badge: BlockBadge }> = {
   header: { title: "Header", badge: "Struktur" },
   overskrift: { title: "Overskrift", badge: "AI-tekst" },
   brodtekst: { title: "Brødtekst", badge: "AI-tekst" },
-  billede: { title: "Billede/Galleri", badge: "Produktdata" },
-  produktvisning: { title: "Produktvisning", badge: "Produktdata" },
+  billede: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
   skillelinje: { title: "Skillelinje", badge: "Struktur" },
   cta: { title: "Knap / CTA", badge: "AI-tekst" },
   footer: { title: "Footer", badge: "Struktur" },
   tekst: { title: "Tekst", badge: "AI-tekst" },
-  img: { title: "Billede/Galleri", badge: "Produktdata" },
+  img: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
   produkt: { title: "Produkt", badge: "Produktdata" },
-  galleri: { title: "Billede/Galleri", badge: "Produktdata" },
+  galleri: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
 };
 
-const ADD_BLOCK_OPTIONS: { kind: AddableBlockKind; label: string; icon: (props: { className?: string }) => React.JSX.Element }[] = [
+const ADD_BLOCK_OPTIONS: {
+  kind: AddableBlockKind;
+  label: string;
+  description?: string;
+  icon: (props: { className?: string }) => React.JSX.Element;
+}[] = [
   { kind: "tekst", label: "Tekst", icon: TextIcon },
-  { kind: "billede", label: "Billede/Galleri", icon: ImagePlaceholderIcon },
-  { kind: "produkt", label: "Produkt", icon: ProductIcon },
+  { kind: "billede", label: MEDIA_BLOCK_TITLE, description: MEDIA_BLOCK_DESCRIPTION, icon: ImagePlaceholderIcon },
   { kind: "knap", label: "Knap", icon: ButtonIcon },
   { kind: "skillelinje", label: "Skillelinje", icon: DividerIcon },
 ];
@@ -168,21 +181,38 @@ const CTA_STYLE_OPTIONS: { value: CtaStyle; label: string }[] = [
   { value: "kontur", label: "Kontur" },
 ];
 
-// Produktvisnings-blokkens "Tæthed"-valg – se PRODUCT_ROW_PADDING_PX i
-// newsletterBlocks.ts, brugt af både Preview og den kopierede HTML.
+// Produktkortenes/tekstlistens "Tæthed"-valg (Billede/Galleri) –
+// se PRODUCT_ROW_PADDING_PX i newsletterBlocks.ts, brugt af både Preview og
+// den kopierede HTML.
 const PRODUCT_DENSITY_OPTIONS: { value: ProductListDensity; label: string }[] = [
   { value: "kompakt", label: "Kompakt" },
   { value: "normal", label: "Normal" },
 ];
 
-// Den samlede Billede-/Galleri-blokkens fire layout-valg (se MediaLayout i
-// newsletterBlocks.ts).
-const MEDIA_LAYOUT_LABELS: Record<MediaLayout, string> = {
-  1: "1 billede",
-  2: "2 billeder",
-  3: "3 billeder",
-  6: "6 billeder",
-};
+// Lille visuel forhåndsvisning af, hvordan `count` billeder fordeles med
+// `perRow` pr. række – bruges på "Placering"-knapperne.
+function ArrangementPreview({ count, perRow }: { count: number; perRow: number }) {
+  const rows: number[] = [];
+  for (let remaining = count; remaining > 0; remaining -= perRow) rows.push(Math.min(perRow, remaining));
+  return (
+    <span className="flex flex-col items-center gap-0.5" aria-hidden>
+      {rows.map((size, rowIndex) => (
+        <span key={rowIndex} className="flex gap-0.5">
+          {Array.from({ length: size }, (_, index) => (
+            <span key={index} className="h-2 w-2 rounded-[1px] bg-current opacity-70" />
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Tekst til "Fordelt på flere rækker" for et givent antal, fx "2 + 2".
+function describeGridRows(count: number): string {
+  const perRow = getMediaRowSize({ galleryColumns: count as MediaLayout, galleryArrangement: "grid" });
+  if (perRow === 1) return "Under hinanden";
+  return `${perRow} + ${count - perRow}`;
+}
 
 // CTA-blokkens udvidede styling (Padding/Knap-form/Stil) er sammenklappet som
 // standard – kun URL-feltet og Knapfarve-vælgeren vises med det samme. Åben/
@@ -243,6 +273,10 @@ interface BlockContentProps {
   onProductIdChange: (productId: string) => void;
   onImageChange: (imageUrl: string) => void;
   onAltTextChange: (altText: string) => void;
+  // Overskrift/pris under et UPLOADET billede ved layout "1" (se
+  // NewsletterBlock.imageTitle/imagePrice).
+  onImageTitleChange: (imageTitle: string) => void;
+  onImagePriceChange: (imagePrice: string) => void;
   onAlignmentChange: (alignment: ImageAlignment) => void;
   onSizeChange: (size: ImageSize) => void;
   onBgColorChange: (color: string) => void;
@@ -263,6 +297,8 @@ interface BlockContentProps {
   onCtaStyleChange: (style: CtaStyle) => void;
   onGalleryProductIdsChange: (productIds: string[]) => void;
   onGalleryColumnsChange: (layout: MediaLayout) => void;
+  // Galleri-layout: alle billeder på én række eller fordelt på flere rækker.
+  onGalleryArrangementChange: (arrangement: GalleryArrangement) => void;
   // Galleri-layout: skift en enkelt plads mellem produkt og upload, og sæt
   // en upload-plads' billede/alt-tekst.
   onGallerySlotModeChange: (index: number, mode: GallerySlotMode) => void;
@@ -271,8 +307,9 @@ interface BlockContentProps {
   // billedet ud fra et produkt valgt via den søgbare vælger (se
   // handleImageProductSelect i EditorBlockList).
   onImageProductSelect: (productId: string) => void;
-  // Kun relevant for "produktvisning"-blokken.
-  onProductDisplayIdsChange: (productIds: string[]) => void;
+  // Billede-/Galleri-blokkens "Vis billede"-kontakt og produktkortenes
+  // kant-form/tæthed.
+  onShowImageChange: (showImage: boolean) => void;
   onProductBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
   onProductDensityChange: (density: ProductListDensity) => void;
   products: ShopifyProduct[];
@@ -283,6 +320,8 @@ interface BlockContentProps {
   // "billede"/"img"/"galleri" herunder); selve produktlisten kommer fortsat
   // fra `products` ovenfor.
   topicMatchedProductIds: string[] | null;
+  // Nyhedsbrevets målgruppe – til produkternes pris i produktvælgerne.
+  customerType: CustomerType;
 }
 
 function BlockContent({
@@ -292,6 +331,8 @@ function BlockContent({
   onProductIdChange,
   onImageChange,
   onAltTextChange,
+  onImageTitleChange,
+  onImagePriceChange,
   onAlignmentChange,
   onSizeChange,
   onBgColorChange,
@@ -303,14 +344,16 @@ function BlockContent({
   onCtaStyleChange,
   onGalleryProductIdsChange,
   onGalleryColumnsChange,
+  onGalleryArrangementChange,
   onGallerySlotModeChange,
   onGallerySlotUploadChange,
   onImageProductSelect,
-  onProductDisplayIdsChange,
+  onShowImageChange,
   onProductBorderRadiusChange,
   onProductDensityChange,
   products,
   topicMatchedProductIds,
+  customerType,
 }: BlockContentProps) {
   switch (block.type) {
     case "header":
@@ -318,6 +361,7 @@ function BlockContent({
         <div className="flex flex-col gap-2">
           <p className="text-xs text-ink-muted">Logo og butiksnavn – vises fast øverst i nyhedsbrevet.</p>
           <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
+          <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
         </div>
       );
 
@@ -384,10 +428,45 @@ function BlockContent({
     case "galleri": {
       const layout: MediaLayout = block.galleryColumns ?? 1;
       const showProductSearch = topicMatchedProductIds !== null;
+      const showImage = block.showImage ?? true;
       return (
         <div className="flex flex-col gap-3">
+          <p className="text-xs text-ink-muted">
+            Vis billeder og produkter – vælg produkter (med navn, pris og link til produktets side) eller upload
+            egne billeder.
+          </p>
+          <label className="relative flex cursor-pointer items-center justify-between gap-3 rounded-md border border-border px-2.5 py-2">
+            <span className="flex flex-col">
+              <span className="text-xs font-medium text-ink">Vis billede</span>
+              <span className="text-[11px] text-ink-muted">
+                {showImage
+                  ? "Produktkort med billede, navn og pris – billedet linker til produktets side."
+                  : "Tekstliste med navn og pris – produktnavnet linker til produktets side."}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={showImage}
+              onChange={(event) => onShowImageChange(event.target.checked)}
+              className="peer sr-only"
+            />
+            <span
+              aria-hidden
+              className={`relative h-5 w-9 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ink-faintest ${
+                showImage ? "bg-ink" : "bg-border"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                  showImage ? "translate-x-4" : ""
+                }`}
+              />
+            </span>
+          </label>
+
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-ink-muted">Layout</span>
+            <span className="text-[11px] text-ink-muted">Antal billeder</span>
             <div className="flex gap-1">
               {MEDIA_LAYOUT_OPTIONS.map((option) => (
                 <button
@@ -395,15 +474,45 @@ function BlockContent({
                   type="button"
                   onClick={() => onGalleryColumnsChange(option)}
                   aria-pressed={layout === option}
+                  aria-label={option === 1 ? "1 billede" : `${option} billeder`}
                   className={`flex-1 rounded-md px-2 py-1.5 text-[11px] ${
                     layout === option ? "bg-surface-active text-ink" : "text-ink-muted hover:bg-surface-active"
                   }`}
                 >
-                  {MEDIA_LAYOUT_LABELS[option]}
+                  {option}
                 </button>
               ))}
             </div>
           </div>
+
+          {/* Kun relevant, når billederne står side om side (Vis billede
+              slået til) – tekstlisten er altid lodret. */}
+          {isGalleryLayout(layout) && showImage && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] text-ink-muted">Placering</span>
+              <SegmentedButtons
+                value={getGalleryArrangement(block)}
+                onChange={onGalleryArrangementChange}
+                options={[
+                  {
+                    value: "row",
+                    label: `Alle på én række (${layout})`,
+                    preview: <ArrangementPreview count={layout} perRow={layout} />,
+                  },
+                  {
+                    value: "grid",
+                    label: `Flere rækker (${describeGridRows(layout)})`,
+                    preview: (
+                      <ArrangementPreview
+                        count={layout}
+                        perRow={getMediaRowSize({ galleryColumns: layout, galleryArrangement: "grid" })}
+                      />
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )}
 
           {isGalleryLayout(layout) ? (
             <GalleryBlockControls
@@ -415,11 +524,12 @@ function BlockContent({
               onSlotModeChange={onGallerySlotModeChange}
               onSlotUploadChange={onGallerySlotUploadChange}
               showProductSearch={showProductSearch}
+              customerType={customerType}
             />
           ) : (
             <div className="flex flex-col gap-3">
               <ImageBlockControls
-                imageUrl={block.imageUrl}
+                imageUrl={resolveSingleImageUrl(block, products)}
                 altText={block.altText}
                 alignment={block.alignment ?? "center"}
                 size={block.size ?? "fuld"}
@@ -427,6 +537,18 @@ function BlockContent({
                 onAltTextChange={onAltTextChange}
                 onAlignmentChange={onAlignmentChange}
                 onSizeChange={onSizeChange}
+                caption={
+                  // Et valgt produkts billede viser produktets eget navn/pris –
+                  // kun et uploadet billede får egne felter.
+                  block.imageUrl && !getSingleImageProduct(block, products)
+                    ? {
+                        title: block.imageTitle,
+                        price: block.imagePrice,
+                        onTitleChange: onImageTitleChange,
+                        onPriceChange: onImagePriceChange,
+                      }
+                    : undefined
+                }
               />
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] text-ink-muted">Eller vælg billede fra et produkt</span>
@@ -436,67 +558,31 @@ function BlockContent({
                   onToggle={onImageProductSelect}
                   showSearch={showProductSearch}
                   searchPlaceholder={`Søg blandt de ${products.length} produkter...`}
+                  customerType={customerType}
                 />
               </div>
             </div>
           )}
-        </div>
-      );
-    }
 
-    case "produktvisning": {
-      // block.productDisplayIds === undefined betyder "vis alle
-      // tilgængelige produkter" – den oprindelige, uændrede opførsel for
-      // enhver blok, dette valg endnu ikke er brugt på (se
-      // NewsletterBlock.productDisplayIds i newsletterBlocks.ts).
-      //
-      // Selve VÆLGERENS afkrydsninger starter derfor bevidst TOMME (ligesom
-      // GalleryBlockControls' ?? []), IKKE forudmarkeret med alle 100+
-      // produkter – ellers ville "vælg 4-5 specifikke" kræve at fravælge
-      // alle de andre først. Første klik opretter et helt NYT, eksplicit
-      // sæt med kun dét produkt; alle senere klik lægger til/fjerner fra
-      // dette sæt som normalt multi-select.
-      const hasExplicitSelection = block.productDisplayIds !== undefined;
-      const displayIds = block.productDisplayIds ?? [];
-      function handleToggleDisplay(productId: string) {
-        const next = displayIds.includes(productId)
-          ? displayIds.filter((id) => id !== productId)
-          : [...displayIds, productId];
-        onProductDisplayIdsChange(next);
-      }
-      return (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-ink-muted">
-              {hasExplicitSelection
-                ? `Produkter i visningen (${displayIds.length} valgt)`
-                : `Alle ${products.length} produkter vises – markér specifikke herunder for kun at vise dem`}
-            </span>
-            <SearchableProductChecklist
-              products={products}
-              selectedProductIds={displayIds}
-              onToggle={handleToggleDisplay}
-              showSearch
-              searchPlaceholder={`Søg blandt de ${products.length} produkter...`}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-ink-muted">Kant-form</span>
-            <SegmentedButtons
-              value={block.productBorderRadius ?? "afrundet"}
-              onChange={onProductBorderRadiusChange}
-              options={CTA_BORDER_RADIUS_OPTIONS.map((option) => ({
-                ...option,
-                preview: (
-                  <span
-                    className="h-3 w-6 border border-current"
-                    style={{ borderRadius: CTA_BORDER_RADIUS_PX[option.value] }}
-                  />
-                ),
-              }))}
-            />
-          </div>
+          {/* Kant-form gælder kun kortene – tekstlisten har ingen kort. */}
+          {showImage && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] text-ink-muted">Kant-form</span>
+              <SegmentedButtons
+                value={block.productBorderRadius ?? "afrundet"}
+                onChange={onProductBorderRadiusChange}
+                options={CTA_BORDER_RADIUS_OPTIONS.map((option) => ({
+                  ...option,
+                  preview: (
+                    <span
+                      className="h-3 w-6 border border-current"
+                      style={{ borderRadius: CTA_BORDER_RADIUS_PX[option.value] }}
+                    />
+                  ),
+                }))}
+              />
+            </div>
+          )}
 
           <div className="flex flex-col gap-1">
             <span className="text-[11px] text-ink-muted">Tæthed</span>
@@ -569,6 +655,7 @@ function BlockContent({
         <div className="flex flex-col gap-2">
           <p className="text-xs text-ink-muted">Adresse, CVR og afmeldingslink – vises fast nederst.</p>
           <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
+          <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
         </div>
       );
   }
@@ -699,15 +786,18 @@ function AddBlockMenu({ onAdd }: { onAdd: (kind: AddableBlockKind) => void }) {
 
       {open && (
         <div className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-          {ADD_BLOCK_OPTIONS.map(({ kind, label, icon: Icon }) => (
+          {ADD_BLOCK_OPTIONS.map(({ kind, label, description, icon: Icon }) => (
             <button
               key={kind}
               type="button"
               onClick={() => handleSelect(kind)}
               className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-ink hover:bg-surface-active"
             >
-              <Icon className="h-4 w-4 text-ink-muted" />
-              {label}
+              <Icon className="h-4 w-4 shrink-0 text-ink-muted" />
+              <span className="flex flex-col">
+                <span>{label}</span>
+                {description && <span className="text-[11px] text-ink-muted">{description}</span>}
+              </span>
             </button>
           ))}
         </div>
@@ -716,48 +806,26 @@ function AddBlockMenu({ onAdd }: { onAdd: (kind: AddableBlockKind) => void }) {
   );
 }
 
-// Samler UNIONEN af alle produkter, der aktuelt vises på tværs af BEGGE
-// blok-typer, CTA-linket skal afspejle – Produktvisning OG (alle) Billede/
-// Galleri-blokke – i stedet for kun den blok, brugeren senest redigerede.
-// Uden dette ville CTA-linket blive et rent "sidst redigerede blok vinder"-
-// kapløb: at ændre galleriets valg ville usynligt overskrive et link, der
-// egentlig burde afspejle et helt andet valg i Produktvisning (eller omvendt).
+// Samler UNIONEN af alle produkter, der aktuelt vises på tværs af ALLE
+// Billede-/Galleri-blokke (den ene, samlede blok-type med produkter), som
+// CTA-linket skal afspejle – i stedet for kun den blok, brugeren senest
+// redigerede. Uden dette ville CTA-linket blive et rent "sidst redigerede blok
+// vinder"-kapløb, når nyhedsbrevet har flere billede-/galleri-blokke.
 //
-// - "produktvisning": productDisplayIds === undefined betyder "vis ALLE
-//   tilgængelige produkter" (samme regel som selve renderingen, se
-//   NewsletterCard.tsx/newsletterExport.ts) – alle `products` tælles da med.
-// - "billede"/"img"/"galleri": galleryProductIds er, ved BEGGE layout-typer
-//   (se newsletterBlocks.ts), de(t) produkt(er), blokken rent faktisk viser
-//   et billede af – ved layout "1" enten 0 eller 1 id (fra søgevalg; et
-//   manuelt UPLOADET billede har intet bagvedliggende produkt-id og bidrager
-//   derfor bevidst intet til unionen, der er jo ingen produkt-URL at hente).
+// "Vis billede" (showImage) påvirker BEVIDST ikke unionen: slået fra vises de
+// samme produkter blot som tekstliste med klikbare navne – de er stadig en
+// del af nyhedsbrevet.
+//
+// galleryProductIds er, ved ALLE layouts (se newsletterBlocks.ts), de(t)
+// produkt(er), blokken rent faktisk viser – ved layout "1" enten 0 eller 1 id
+// (fra søgevalg). Et manuelt UPLOADET billede har intet bagvedliggende
+// produkt-id og bidrager derfor bevidst intet til unionen (der er ingen
+// produkt-URL at hente). Et urørt/tomt galleryProductIds bidrager ligeledes
+// naturligt intet – der er ingen "tom = vis alle"-tilstand.
 function collectCtaRelevantProducts(blocks: NewsletterBlock[], products: ShopifyProduct[]): ShopifyProduct[] {
   const relevantIds = new Set<string>();
   for (const block of blocks) {
-    if (block.type === "produktvisning") {
-      // productDisplayIds === undefined betyder "urørt, stadig på standard
-      // 'vis alle tilgængelige produkter'" (se NewsletterBlock i
-      // newsletterBlocks.ts) – IKKE det samme som brugeren AKTIVT har valgt
-      // alle produkter. En urørt Produktvisning bidrager derfor BEVIDST
-      // INTET til CTA-unionen her: ellers ville den, ved ethvert nyhedsbrev
-      // med mere end én collection i det oprindelige produktvalg, permanent
-      // "overdøve" et bevidst valg i Billede/Galleri (unionen ville altid
-      // indeholde ALLE oprindeligt valgte produkter, uanset collection, og
-      // dermed aldrig kunne opfattes som "samme collection") – præcis den
-      // opførsel, der blev observeret og bekræftet i undersøgelsen forud for
-      // denne rettelse. Kun når brugeren EKSPLICIT har indsnævret
-      // Produktvisning (en sat, om end evt. tom, liste), tæller dens
-      // produkter med.
-      if (block.productDisplayIds !== undefined) {
-        for (const id of block.productDisplayIds) relevantIds.add(id);
-      }
-    } else if (block.type === "billede" || block.type === "img" || block.type === "galleri") {
-      // Ingen tilsvarende "urørt = vis alle"-tilstand her – galleryProductIds
-      // betyder ALTID "præcis disse valgte produkter" i selve renderingen
-      // (NewsletterCard.tsx/newsletterExport.ts bruger konsekvent
-      // `galleryProductIds ?? []`, aldrig "alle tilgængelige"), så et urørt/
-      // tomt galleryProductIds bidrager allerede naturligt intet til
-      // unionen her – ingen særskilt undtagelse nødvendig.
+    if (block.type === "billede" || block.type === "img" || block.type === "galleri") {
       for (const id of block.galleryProductIds ?? []) relevantIds.add(id);
     }
   }
@@ -771,14 +839,14 @@ function collectCtaRelevantProducts(blocks: NewsletterBlock[], products: Shopify
 const SINGLE_PRODUCT_CTA_TEXT = "Se produktet her";
 
 // CTA-linket OG -teksten genberegnes LØBENDE (ikke kun ved selve
-// genereringen), hver gang produktvalget i Produktvisnings- eller billede-/
-// galleri-blokken ændres i Edit-mode – samme centrale resolveCtaLink()-
+// genereringen), hver gang produktvalget i en billede-/
+// galleri-blok ændres i Edit-mode – samme centrale resolveCtaLink()-
 // funktion som generate-newsletter/route.ts selv bruger ved den initiale
 // generering (se src/lib/ctaLink.ts), men nu udregnet ud fra UNIONEN af alle
 // relevante blokkes produktvalg (se collectCtaRelevantProducts ovenfor),
 // ikke kun den blok, der udløste selve ændringen. Opdaterer ALLE cta-blokke
 // i nyhedsbrevet (typisk kun én). Er unionen tom (fx brugeren har fravalgt
-// alt i Produktvisning OG billede/galleri), er der intet meningsfuldt at
+// alt i alle billede-/galleri-blokke), er der intet meningsfuldt at
 // pege på – CTA-blokken røres da slet ikke, i stedet for at pege på/omtale
 // et tomt/ugyldigt produkt.
 //
@@ -854,7 +922,7 @@ export function EditorBlockList({
   // Samme union af "aktuelt viste" produkter, CTA-linket allerede
   // genberegnes ud fra (se collectCtaRelevantProducts/applyCtaLinkUpdate
   // ovenfor) – IKKE de oprindelige seed-produkter fra selve genereringen.
-  // Tom, hvis brugeren har fravalgt alt i både Produktvisning og Billede/
+  // Tom, hvis brugeren har fravalgt alt i alle Billede/
   // Galleri – "Regenerér tekst"-knappen deaktiveres da (se JSX herunder),
   // ligesom CTA-linket i så fald heller ikke opdateres.
   const regenerateTextProducts = collectCtaRelevantProducts(blocks, products);
@@ -950,6 +1018,14 @@ export function EditorBlockList({
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, altText } : block)));
   }
 
+  function handleImageTitleChange(id: string, imageTitle: string) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, imageTitle } : block)));
+  }
+
+  function handleImagePriceChange(id: string, imagePrice: string) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, imagePrice } : block)));
+  }
+
   function handleAlignmentChange(id: string, alignment: ImageAlignment) {
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, alignment } : block)));
   }
@@ -1018,6 +1094,10 @@ export function EditorBlockList({
   // billed-forhåndsvisningen ikke bliver tom, mens produktvælgeren stadig
   // viser produktet som valgt. Har blokken allerede sin egen imageUrl (fra
   // upload ELLER et tidligere produktvalg), røres den slet ikke.
+  function handleGalleryArrangementChange(id: string, galleryArrangement: GalleryArrangement) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, galleryArrangement } : block)));
+  }
+
   function handleGalleryColumnsChange(id: string, layout: MediaLayout) {
     const next = blocks.map((block) => {
       if (block.id !== id) return block;
@@ -1118,14 +1198,10 @@ export function EditorBlockList({
     onBlocksChange(applyCtaLinkUpdate(next, products, topicSearchTerm));
   }
 
-  function handleProductDisplayIdsChange(id: string, productDisplayIds: string[]) {
-    onBlocksChange(
-      applyCtaLinkUpdate(
-        blocks.map((block) => (block.id === id ? { ...block, productDisplayIds } : block)),
-        products,
-        topicSearchTerm,
-      ),
-    );
+  // Slår "Vis billede" til/fra – skifter kun visningen (kort vs. tekstliste),
+  // ikke produktvalget, så CTA-linket er uændret.
+  function handleShowImageChange(id: string, showImage: boolean) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, showImage } : block)));
   }
 
   function handleProductBorderRadiusChange(id: string, productBorderRadius: CtaBorderRadius) {
@@ -1185,7 +1261,7 @@ export function EditorBlockList({
   }
 
   function handleAddBlock(kind: AddableBlockKind) {
-    onBlocksChange([...blocks, createNewBlock(kind, products[0]?.id)]);
+    onBlocksChange([...blocks, createNewBlock(kind)]);
   }
 
   // Alle tekst-blokke sættes altid samlet af handleGlobalFontChange/
@@ -1238,7 +1314,7 @@ export function EditorBlockList({
           type="button"
           onClick={handleRegenerateText}
           disabled={regenerateTextProducts.length === 0 || isRegeneratingText}
-          title="Genererer Overskrift og Brødtekst på ny, ud fra det/de produkter, der aktuelt er valgt i Produktvisning og Billede/Galleri herunder – rører ikke ved blok-struktur, styling, billeder eller CTA-knappen."
+          title="Genererer Overskrift og Brødtekst på ny, ud fra det/de produkter, der aktuelt er valgt i Billede & produktvisning-blokkene herunder – rører ikke ved blok-struktur, styling, billeder eller CTA-knappen."
           className="inline-flex h-9 w-fit items-center gap-2 self-start rounded-full border border-border bg-surface px-3.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-active disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isRegeneratingText ? (
@@ -1273,6 +1349,8 @@ export function EditorBlockList({
                     onProductIdChange={(productId) => handleProductIdChange(block.id, productId)}
                     onImageChange={(imageUrl) => handleImageChange(block.id, imageUrl)}
                     onAltTextChange={(altText) => handleAltTextChange(block.id, altText)}
+                    onImageTitleChange={(imageTitle) => handleImageTitleChange(block.id, imageTitle)}
+                    onImagePriceChange={(imagePrice) => handleImagePriceChange(block.id, imagePrice)}
                     onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
                     onSizeChange={(size) => handleSizeChange(block.id, size)}
                     onBgColorChange={(color) => handleBgColorChange(block.id, color)}
@@ -1284,14 +1362,16 @@ export function EditorBlockList({
                     onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}
                     onGalleryProductIdsChange={(productIds) => handleGalleryProductIdsChange(block.id, productIds)}
                     onGalleryColumnsChange={(layout) => handleGalleryColumnsChange(block.id, layout)}
+                    onGalleryArrangementChange={(arrangement) => handleGalleryArrangementChange(block.id, arrangement)}
                     onGallerySlotModeChange={(index, mode) => handleGallerySlotModeChange(block.id, index, mode)}
                     onGallerySlotUploadChange={(index, upload) => handleGallerySlotUploadChange(block.id, index, upload)}
                     onImageProductSelect={(productId) => handleImageProductSelect(block.id, productId)}
-                    onProductDisplayIdsChange={(productIds) => handleProductDisplayIdsChange(block.id, productIds)}
+                    onShowImageChange={(showImage) => handleShowImageChange(block.id, showImage)}
                     onProductBorderRadiusChange={(borderRadius) => handleProductBorderRadiusChange(block.id, borderRadius)}
                     onProductDensityChange={(density) => handleProductDensityChange(block.id, density)}
                     products={products}
                     topicMatchedProductIds={topicMatchedProductIds}
+                    customerType={customerType}
                   />
                 </SortableBlockRow>
               );

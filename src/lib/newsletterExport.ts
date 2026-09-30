@@ -4,15 +4,19 @@ import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
   CTA_BORDER_RADIUS_PX,
   CTA_PADDING_PX,
-  GALLERY_IMAGE_WIDTH_PX,
-  GALLERY_ROW_SIZE,
   IMAGE_ALIGN_CSS,
-  IMAGE_SIZE_PX,
+  PRODUCT_CARD_GAP_PX,
+  PRODUCT_CARD_RADIUS_PX,
   PRODUCT_ROW_PADDING_PX,
+  SINGLE_CARD_WIDTH_PX,
+  getGalleryCardWidth,
+  getMediaRowSize,
+  isCompactCardWidth,
   isGalleryLayout,
-  resolveGalleryImages,
-  type GalleryImage,
-  type GalleryColumns,
+  getMediaCardText,
+  resolveMediaCards,
+  resolveMediaListItems,
+  type MediaCard,
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
@@ -69,6 +73,187 @@ function audienceFor(customerType: CustomerType): string {
   return customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
 }
 
+// Shopify-hostede produktbilleder har vidt forskellige proportioner (fx
+// 3024×4032). Preview beskærer dem kvadratisk med CSS (object-fit), men det
+// understøtter mail-klienterne ikke pålideligt – i stedet bedes Shopifys CDN
+// om et færdigt udsnit i præcis den ønskede størrelse (width/height/crop), så
+// alle billeder i en række er lige store i enhver mail-klient. 2× opløsning
+// for skarphed på retina-skærme – og langt mindre filer end originalen.
+// Andre billeder (fx uploadede data-URI'er) returneres uændret.
+function sizedImageSrc(src: string, width: number, square: boolean): string {
+  let url: URL;
+  try {
+    url = new URL(src);
+  } catch {
+    return src;
+  }
+  if (url.hostname !== "cdn.shopify.com") return src;
+  url.searchParams.set("width", String(width * 2));
+  if (square) {
+    url.searchParams.set("height", String(width * 2));
+    url.searchParams.set("crop", "center");
+  }
+  return url.toString();
+}
+
+// Billede-/Galleri-blokken med "Vis billede" slået til (standard): hvert
+// billede er sit eget kort (billede øverst, navn + pris tæt under) – kant-form
+// og tæthed gælder HVERT kort for sig. Outlooks Word-baserede motor
+// understøtter ikke CSS grid/flexbox, så kortene sættes side om side i
+// <table>-rækker (MEDIA_CARDS_PER_ROW pr. række), og det klikbare billede er
+// et <a> omkring et <img> inde i en <td> – det eneste mønster, der er
+// klikbart pålideligt i alle mail-klienter. Et uploadet billede (intet
+// produkt) bliver et kort uden link – med sin egen overskrift/pris under,
+// hvis de er udfyldt. Outlook ignorerer border-radius og viser skarpe hjørner
+// (accepteret, samme som CTA-knappen).
+//
+// Så kortene i en række ALTID er lige store i den indsatte mail (som i
+// Preview):
+// - galleri-billederne beskæres kvadratisk i fast størrelse (sizedImageSrc,
+//   plus width/height-attributter),
+// - hvert kort er selve <td>'en med kanten (ikke en selvstændig tabel inde i
+//   en celle), så alle kort i samme <tr> får samme højde, uanset hvor mange
+//   linjer produktnavnet fylder,
+// - kanten regnes MED i kortets bredde, så en fuld række fylder præcis de
+//   534px, der er plads til – ellers klemmer mail-klienten kortene.
+function renderMediaCardsHtml(
+  block: NewsletterBlock,
+  image: GeneratedNewsletter["image"],
+  customerType: CustomerType,
+  products: ShopifyProduct[],
+): string {
+  const cards = resolveMediaCards(block, products);
+  if (cards.length === 0) return renderEmptyMediaHtml(block, image);
+  const layout = block.galleryColumns ?? 1;
+  const isGallery = isGalleryLayout(layout);
+  // Galleri: kort pr. række efter blokkens fordeling (én række / flere
+  // rækker, se getMediaRowSize), og kortbredden så rækken passer præcis.
+  // "1 billede": ét kort i blokkens størrelse (Lille/Mellem/Fuld bredde).
+  const cardsPerRow = isGallery ? getMediaRowSize(block) : 1;
+  const cardWidth = isGallery ? getGalleryCardWidth(cardsPerRow) : SINGLE_CARD_WIDTH_PX[block.size ?? "fuld"];
+  // Kortets indhold (billedet) er kortet minus 1px kant i hver side.
+  const innerWidth = cardWidth - 2;
+  const compact = isCompactCardWidth(cardWidth);
+  const textSize = compact ? 11 : 13;
+  const textPaddingX = compact ? 6 : 12;
+  const cardRadius = PRODUCT_CARD_RADIUS_PX[block.productBorderRadius ?? "afrundet"];
+  const cardPadding = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
+  // Et kort uden tekst har billedet helt ned til bunden – da skal alle fire
+  // hjørner afrundes, ellers kun de to øverste. Kortets egen radius minus
+  // kanten, så billedets hjørne følger kantens indre bue.
+  function imageRadius(hasText: boolean): string {
+    const radius = Math.max(cardRadius - 1, 0);
+    if (radius === 0) return "";
+    return hasText ? `border-radius:${radius}px ${radius}px 0 0;` : `border-radius:${radius}px;`;
+  }
+
+  // Mail-klienter gengiver typisk kun to skrift-vægte pålideligt
+  // (normal/bold) – derfor normal til navnet og bold til prisen.
+  function cardCell(card: MediaCard): string {
+    const cardText = getMediaCardText(card, customerType);
+    const hasText = Boolean(cardText.title || cardText.price);
+    // Galleri: fast kvadrat (samme som Preview's aspect-square). "1 billede":
+    // billedets egne proportioner, som i Preview.
+    const imageHeight = isGallery ? innerWidth : undefined;
+    const heightAttr = imageHeight ? ` height="${imageHeight}"` : "";
+    const heightStyle = imageHeight ? `height:${imageHeight}px;object-fit:cover;` : "height:auto;";
+    const img = card.src
+      ? `<img src="${escapeAttr(sizedImageSrc(card.src, innerWidth, isGallery))}" alt="${escapeAttr(card.alt)}" width="${innerWidth}"${heightAttr} style="width:${innerWidth}px;max-width:100%;${heightStyle}display:block;border:0;${imageRadius(hasText)}" />`
+      : "";
+    const placeholderHeight = imageHeight ?? innerWidth;
+    const imageHtml = !card.src
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td bgcolor="#f1f1f1" height="${placeholderHeight}" style="background:#f1f1f1;height:${placeholderHeight}px;text-align:center;color:#888888;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">Intet billede</td></tr></table>`
+      : cardText.href
+        ? `<a href="${escapeAttr(cardText.href)}" target="_blank" style="display:block;text-decoration:none;">${img}</a>`
+        : img;
+    const titleHtml = cardText.title
+      ? `<div style="font-weight:normal;color:#1a1a1a;font-size:${textSize}px;line-height:1.35;">${escapeHtml(cardText.title)}</div>`
+      : "";
+    const priceHtml = cardText.price
+      ? `<div style="font-weight:bold;color:#1a1a1a;font-size:${textSize}px;${cardText.title ? "padding-top:2px;" : ""}">${escapeHtml(cardText.price)}</div>`
+      : "";
+    const textRow = hasText
+      ? `<tr><td align="center" style="padding:${cardPadding}px ${textPaddingX}px;text-align:center;font-family:${DEFAULT_FONT_FAMILY};">${titleHtml}${priceHtml}</td></tr>`
+      : "";
+    return `<td valign="top" width="${innerWidth}" bgcolor="#ffffff" style="width:${innerWidth}px;padding:0;border:1px solid #1a1a1a;border-radius:${cardRadius}px;background:#ffffff;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr><td style="padding:0;">${imageHtml}</td></tr>
+                ${textRow}
+              </table>
+            </td>`;
+  }
+
+  const gapCell = `<td width="${PRODUCT_CARD_GAP_PX}" style="width:${PRODUCT_CARD_GAP_PX}px;font-size:0;line-height:0;">&nbsp;</td>`;
+  const rows: MediaCard[][] = [];
+  for (let i = 0; i < cards.length; i += cardsPerRow) {
+    rows.push(cards.slice(i, i + cardsPerRow));
+  }
+  // "1 billede" følger blokkens justering; galleri-layouts centreres.
+  const tableAlign = isGallery ? "center" : IMAGE_ALIGN_CSS[block.alignment ?? "center"];
+  const marginRight = tableAlign === "right" ? "0" : "auto";
+  const marginLeft = tableAlign === "left" ? "0" : "auto";
+  const tables = rows
+    .map((rowCards, rowIndex) => {
+      const cells = rowCards.map(cardCell).join(gapCell);
+      const marginTop = rowIndex === 0 ? "0" : `${PRODUCT_CARD_GAP_PX}px`;
+      // border-collapse:separate, så hver celles egen kant og border-radius
+      // bevares (collapse ville slå kanterne sammen og fjerne radius).
+      return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${tableAlign}" style="margin:${marginTop} ${marginRight} 0 ${marginLeft};border-collapse:separate;border-spacing:0;">
+            <tr>${cells}</tr>
+          </table>`;
+    })
+    .join("");
+  return `<tr><td style="padding:12px 32px;">
+        ${tables}
+      </td></tr>`;
+}
+
+// "Vis billede" slået fra: billederne skjules, og indholdet vises som en ren,
+// lodret tekstliste – én tabel-række pr. kort, uanset layout-valget. Et
+// produktnavn er et klikbart <a> til produktets egen side (i stedet for
+// billedet), så listen stadig er navigerbar. Et uploadet billede med egen
+// overskrift/pris bliver en linje uden link; helt uden tekst udelades det.
+function renderMediaListHtml(
+  block: NewsletterBlock,
+  image: GeneratedNewsletter["image"],
+  customerType: CustomerType,
+  products: ShopifyProduct[],
+): string {
+  const listItems = resolveMediaListItems(block, products, customerType);
+  if (listItems.length === 0) return renderEmptyMediaHtml(block, image);
+  const rowPadding = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
+  const rows = listItems
+    .map((item) => {
+      const title = item.title ? escapeHtml(item.title) : "";
+      const titleHtml = item.href
+        ? `<a href="${escapeAttr(item.href)}" target="_blank" style="color:#1a1a1a;text-decoration:underline;font-family:${DEFAULT_FONT_FAMILY};">${title}</a>`
+        : `<span style="color:#1a1a1a;font-family:${DEFAULT_FONT_FAMILY};">${title}</span>`;
+      return `<tr>
+            <td style="padding:${rowPadding}px 0;border-bottom:1px solid #e5e5e5;font-family:${DEFAULT_FONT_FAMILY};font-size:13px;">
+              ${titleHtml}
+            </td>
+            <td align="right" style="padding:${rowPadding}px 0 ${rowPadding}px 16px;border-bottom:1px solid #e5e5e5;font-family:${DEFAULT_FONT_FAMILY};font-size:13px;font-weight:bold;color:#1a1a1a;white-space:nowrap;text-align:right;">${item.price ? escapeHtml(item.price) : ""}</td>
+          </tr>`;
+    })
+    .join("");
+  return `<tr><td style="padding:12px 32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #e5e5e5;">
+          ${rows}
+        </table>
+      </td></tr>`;
+}
+
+// Tom Billede-/Galleri-blok: "1 billede" viser sin pladsholder, et tomt
+// galleri udelades helt.
+function renderEmptyMediaHtml(block: NewsletterBlock, image: GeneratedNewsletter["image"]): string {
+  if (isGalleryLayout(block.galleryColumns)) return "";
+  return `<tr><td style="padding:12px 32px;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr><td bgcolor="#e8efe7" style="background:#e8efe7;border-radius:12px;padding:32px;color:#87a084;font-size:11px;text-align:center;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(image.altText)}</td></tr>
+        </table>
+      </td></tr>`;
+}
+
 // Outlooks Word-baserede rendering-motor understøtter ikke CSS background-color
 // på <div>- eller <a>-elementer pålideligt – kun bgcolor-attributten på <td>.
 // Hele layoutet er derfor bygget af tabel-rækker (én <tr><td> pr. blok), og
@@ -87,7 +272,8 @@ function renderBlockHtml(
   switch (block.type) {
     case "header": {
       const bgColor = block.bgColor || brand.colors[0] || staticBrand.colors[0];
-      const textColor = getContrastTextColor(bgColor);
+      // Valgt tekstfarve – ellers automatisk sort/hvid efter baggrunden.
+      const textColor = block.textColor || getContrastTextColor(bgColor);
       // Intet statisk leaf-logo her – det er en CSS-maske i selve appen
       // (Logo.tsx), som ikke oversætter til rå, kopieret e-mail-HTML.
       // Uden et uploadet logo viser den kopierede header derfor kun
@@ -122,149 +308,13 @@ function renderBlockHtml(
     // "billede" er den eneste type, ny kode fra nu af producerer; "img" og
     // "galleri" er kun stadig anerkendte type-strenge, så allerede gemte
     // nyhedsbrev-udkast/skabeloner fra FØR Billede og Galleri blev
-    // konsolideret til én blok-type stadig eksporteres korrekt. Selve
-    // layout-valget (enkelt billede vs. galleri) afgøres udelukkende af
-    // block.galleryColumns, ikke af hvilken af de tre typer det er.
+    // konsolideret til én blok-type stadig eksporteres korrekt.
     case "billede":
     case "img":
-    case "galleri": {
-      if (isGalleryLayout(block.galleryColumns)) {
-        const columns = block.galleryColumns as GalleryColumns;
-        // Produkt- og upload-pladser i rækkefølge (se getGallerySlots) – begge
-        // bliver til PRÆCIS samme <td>/<img>-markup, så de ser ens ud.
-        const galleryImages = resolveGalleryImages(block, products);
-        if (galleryImages.length === 0) return "";
-        // Outlooks Word-baserede rendering-motor understøtter ikke CSS
-        // flexbox/grid pålideligt – billederne sættes derfor side om side via
-        // <table>'er (samme teknik som CTA-knappen), med en fast bredde pr.
-        // billede afhængig af layoutet, i stedet for CSS-layout. "6
-        // billeder"-layoutet brydes bevidst op i TO EFTERFØLGENDE 3-kolonne-
-        // tabeller (én pr. række) i stedet for én stor 6-cellers tabel, så
-        // strukturen forbliver simpel og forudsigelig i kopieret HTML.
-        const imageWidth = GALLERY_IMAGE_WIDTH_PX[columns];
-        const rowSize = GALLERY_ROW_SIZE[columns];
-        const rows: GalleryImage[][] = [];
-        for (let i = 0; i < galleryImages.length; i += rowSize) {
-          rows.push(galleryImages.slice(i, i + rowSize));
-        }
-        const tables = rows
-          .map((rowImages, rowIndex) => {
-            const cells = rowImages
-              .map((galleryImage, index) => {
-                const isLast = index === rowImages.length - 1;
-                return `<td style="width:${imageWidth}px;${isLast ? "" : "padding-right:8px;"}" valign="top">
-                <img src="${escapeAttr(galleryImage.src)}" alt="${escapeAttr(galleryImage.alt)}" width="${imageWidth}" style="width:${imageWidth}px;max-width:100%;border-radius:8px;display:block;" />
-              </td>`;
-              })
-              .join("");
-            const marginTop = rowIndex === 0 ? "0" : "8px";
-            return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:${marginTop} auto 0;">
-            <tr>${cells}</tr>
-          </table>`;
-          })
-          .join("");
-        return `<tr><td style="padding:12px 32px;">
-        ${tables}
-      </td></tr>`;
-      }
-
-      if (block.imageUrl) {
-        const align = IMAGE_ALIGN_CSS[block.alignment ?? "center"];
-        const width = IMAGE_SIZE_PX[block.size ?? "fuld"];
-        return `<tr><td style="padding:12px 32px;text-align:${align};">
-          <img src="${escapeAttr(block.imageUrl)}" alt="${escapeAttr(block.altText || image.altText)}" style="width:${width};max-width:100%;border-radius:12px;" />
-        </td></tr>`;
-      }
-      return `<tr><td style="padding:12px 32px;text-align:center;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr><td bgcolor="#e8efe7" style="background:#e8efe7;border-radius:12px;padding:32px;color:#87a084;font-size:11px;text-align:center;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(image.altText)}</td></tr>
-        </table>
-      </td></tr>`;
-    }
-
-    case "produktvisning": {
-      // undefined betyder "vis alle tilgængelige produkter" – den
-      // oprindelige, uændrede opførsel, før dette valg fandtes (se
-      // NewsletterBlock.productDisplayIds i newsletterBlocks.ts).
-      const displayProducts = block.productDisplayIds
-        ? products.filter((product) => block.productDisplayIds!.includes(product.id))
-        : products;
-      const productBorderRadius = block.productBorderRadius ?? "afrundet";
-      const borderRadius = CTA_BORDER_RADIUS_PX[productBorderRadius];
-      const rowPaddingY = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
-      // 16px – samme værdi som Preview-rækkens px-4 (Tailwind), den
-      // vandrette afstand fra selve den YDRE border til teksten. Sat kun på
-      // den side, der reelt vender ud mod borderen (venstre for titel-
-      // cellen, højre for pris-cellen) – siden mellem de to celler skal
-      // fortsat sidde tæt, som i Preview's flex-række.
-      const rowSidePaddingPx = 16;
-      // Mail-klienter (og den hardcodede Arial/Helvetica-skrifttype herunder)
-      // understøtter typisk KUN to reelle skrift-vægte (normal/bold) – en
-      // mellemliggende værdi som 500/600 (Preview's font-medium/
-      // font-semibold, som kun rigtige browsere med en variabel webfont kan
-      // gengive nuanceret) rundes upålideligt op/ned af mail-klienter, hvilket
-      // gav et langt federe/mere markant spring mellem titel og pris i mail,
-      // end i Preview. "normal"/"bold" er de eneste to værdier, alle
-      // mail-klienter reelt kan gengive konsekvent.
-      function productRow(product: ShopifyProduct, showTopBorder: boolean): string {
-        return `
-        <tr>
-          <td style="padding:${rowPaddingY}px 0 ${rowPaddingY}px ${rowSidePaddingPx}px;${showTopBorder ? "border-top:1px solid #1a1a1a;" : ""}font-family:${DEFAULT_FONT_FAMILY};">
-            <div style="font-weight:normal;color:#1a1a1a;font-size:13px;">${escapeHtml(product.title)}</div>
-          </td>
-          <td style="padding:${rowPaddingY}px ${rowSidePaddingPx}px ${rowPaddingY}px 0;${showTopBorder ? "border-top:1px solid #1a1a1a;" : ""}text-align:right;font-weight:bold;color:#1a1a1a;font-size:13px;white-space:nowrap;font-family:${DEFAULT_FONT_FAMILY};">
-            ${escapeHtml(formatPriceForCustomer(product.price, customerType))}
-          </td>
-        </tr>`;
-      }
-      // To indlejrede tabeller (i stedet for border-radius direkte på tabellen
-      // med border-collapse:collapse) – den kombination gengives upålideligt
-      // af flere mail-klienter. Outlook ignorerer border-radius og falder
-      // pænt tilbage til skarpe hjørner, samme accepterede teknik som
-      // CTA-knappen allerede bruger.
-      //
-      // Den inderste tabel har BEVIDST ingen border-collapse:collapse –
-      // Outlook (Words rendering-motor) er kendt for at ignorere/kollapse
-      // cellernes egen padding, når det kombineres med border-collapse,
-      // selvom paddingen er korrekt sat inline på hver <td> (se rows
-      // ovenfor). cellpadding="0" cellspacing="0" på selve table-elementet
-      // er den mail-sikre erstatning – nulstiller browserens/mail-klientens
-      // standard-cellepadding uden at bruge border-collapse.
-      //
-      // "Fuld rund" (pille, 999px) ser kun rigtig ud på et enkelt, kort
-      // element – ÉN delt kant omkring en høj stak af flere produkter giver
-      // et akavet resultat (samme begrundelse som NewsletterCard.tsx). Kun
-      // for DENNE kant-form får hvert produkt derfor sin EGEN, separate
-      // indlejrede tabel (med et lille luft-mellemrum imellem, i stedet for
-      // en top-kant) – "skarp"/"let afrundet" beholder uændret ét samlet
-      // kort med alle produkter i samme indre tabel.
-      if (productBorderRadius === "pille") {
-        const items = displayProducts
-          .map((product, index) => {
-            const topPadding = index === 0 ? 12 : 8;
-            const bottomPadding = index === displayProducts.length - 1 ? 12 : 0;
-            return `
-        <tr><td style="padding:${topPadding}px 32px ${bottomPadding}px 32px;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #1a1a1a;border-radius:${borderRadius}px;">
-            <tr><td style="padding:0;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${productRow(product, false)}</table>
-            </td></tr>
-          </table>
-        </td></tr>`;
-          })
-          .join("");
-        return items;
-      }
-
-      const rows = displayProducts.map((product, index) => productRow(product, index > 0)).join("");
-      return `<tr><td style="padding:12px 32px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #1a1a1a;border-radius:${borderRadius}px;">
-          <tr><td style="padding:0;">
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table>
-          </td></tr>
-        </table>
-      </td></tr>`;
-    }
+    case "galleri":
+      return block.showImage === false
+        ? renderMediaListHtml(block, image, customerType, products)
+        : renderMediaCardsHtml(block, image, customerType, products);
 
     case "skillelinje":
       return `<tr><td style="padding:12px 32px;"><hr style="border:none;border-top:1px solid #d2ddd1;margin:0;" /></td></tr>`;
@@ -353,7 +403,8 @@ function renderBlockHtml(
 
     case "footer": {
       const bgColor = block.bgColor || "#f5f7f4";
-      const textColor = getContrastTextColor(bgColor);
+      // Valgt tekstfarve – ellers automatisk sort/hvid efter baggrunden.
+      const textColor = block.textColor || getContrastTextColor(bgColor);
       return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">
         ${escapeHtml(formatFooterAddressLine(brand))}<br/>
         Du modtager dette nyhedsbrev, fordi du er ${escapeHtml(audienceFor(customerType))}.<br/>
@@ -383,21 +434,22 @@ function renderBlockText(
     case "billede":
     case "img":
     case "galleri": {
-      if (isGalleryLayout(block.galleryColumns)) {
-        return resolveGalleryImages(block, products)
-          .map((galleryImage) => `[Billede: ${galleryImage.alt || "Billede"}]`)
-          .join("  ");
-      }
-      return block.imageUrl ? `[Billede: ${block.altText || image.altText}]` : `[Billede: ${image.altText}]`;
+      // Samme indhold i begge "Vis billede"-tilstande: én linje pr. produkt
+      // med link; et uploadet billede med sin overskrift/pris (eller som
+      // [Billede: ...], når det er synligt, men uden tekst).
+      const lines = resolveMediaCards(block, products).flatMap((card) => {
+        if (card.product) {
+          return [
+            `- ${card.product.title} (${card.product.productType}): ${formatPriceForCustomer(card.product.price, customerType)} – ${card.product.url}`,
+          ];
+        }
+        const { title, price } = getMediaCardText(card, customerType);
+        if (title || price) return [`- ${[title, price].filter(Boolean).join(": ")}`];
+        return block.showImage === false ? [] : [`[Billede: ${card.alt || "Billede"}]`];
+      });
+      if (lines.length > 0) return lines.join("\n");
+      return isGalleryLayout(block.galleryColumns) ? "" : `[Billede: ${image.altText}]`;
     }
-
-    case "produktvisning":
-      return products
-        .map(
-          (product) =>
-            `- ${product.title} (${product.productType}): ${formatPriceForCustomer(product.price, customerType)}`,
-        )
-        .join("\n");
 
     case "skillelinje":
       return "—————————";

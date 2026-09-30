@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
+import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 
-// Delt af GalleryBlockControls.tsx (billede-/galleri-blokken, med et fast
-// loft på antal valgte) og Produktvisnings-blokkens egen kontrolpanel
-// (EditorBlockList.tsx, INGEN loft) – selve søgefelt+afkrydsnings-listen er
-// identisk begge steder, kun hvad der sker ved klik (onToggle) og evt.
+// Delt af GalleryBlockControls.tsx (galleri-layout, med et fast loft på
+// antal valgte) og "1 billede"-layoutets produktvalg (EditorBlockList.tsx) –
+// selve søgefelt+afkrydsnings-listen er identisk begge steder, kun hvad der sker ved klik (onToggle) og evt.
 // disabled-logik afgøres af kalderen.
 interface SearchableProductChecklistProps {
   products: ShopifyProduct[];
@@ -18,6 +18,9 @@ interface SearchableProductChecklistProps {
   isDisabled?: (product: ShopifyProduct) => boolean;
   showSearch: boolean;
   searchPlaceholder: string;
+  // Nyhedsbrevets målgruppe – prisen i hver række vises som i selve
+  // nyhedsbrevet (inkl. moms for privat, ekskl. moms for erhverv).
+  customerType: CustomerType;
 }
 
 export function SearchableProductChecklist({
@@ -27,6 +30,7 @@ export function SearchableProductChecklist({
   isDisabled,
   showSearch,
   searchPlaceholder,
+  customerType,
 }: SearchableProductChecklistProps) {
   // Rent lokal UI-filtrering af selve VISNINGEN – påvirker ikke selve valget
   // (selectedProductIds), kun hvilke rækker der vises i listen, mens
@@ -61,7 +65,10 @@ export function SearchableProductChecklist({
               }`}
             >
               <input type="checkbox" checked={checked} disabled={disabled} onChange={() => onToggle(product.id)} />
-              {product.title}
+              <span className="min-w-0 flex-1">{product.title}</span>
+              <span className="shrink-0 font-medium whitespace-nowrap tabular-nums">
+                {formatPriceForCustomer(product.price, customerType)}
+              </span>
             </label>
           );
         })}

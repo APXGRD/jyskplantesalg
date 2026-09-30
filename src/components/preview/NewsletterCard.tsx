@@ -9,12 +9,18 @@ import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
   CTA_BORDER_RADIUS_PX,
   CTA_PADDING_PX,
-  GALLERY_ROW_SIZE,
   IMAGE_SIZE_PX,
+  PRODUCT_CARD_RADIUS_PX,
+  PRODUCT_CARD_GAP_PX,
   PRODUCT_ROW_PADDING_PX,
+  getGalleryCardWidth,
+  getMediaRowSize,
+  isCompactCardWidth,
   isGalleryLayout,
-  resolveGalleryImages,
-  type GalleryColumns,
+  getMediaCardText,
+  resolveMediaCards,
+  resolveMediaListItems,
+  type MediaCard,
   type NewsletterBlock,
 } from "@/lib/newsletterBlocks";
 import { getContrastTextColor } from "@/lib/brandColors";
@@ -39,11 +45,182 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
   const brand = useBrandSettings();
   const audience = customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
 
+  // Tom Billede-/Galleri-blok (intet produkt valgt / intet billede uploadet).
+  function renderEmptyMedia(block: NewsletterBlock): ReactNode {
+    if (!isGalleryLayout(block.galleryColumns)) {
+      return (
+        <div className="px-8 py-3">
+          <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-xl bg-surface-active">
+            <ImagePlaceholderIcon className="h-9 w-9 text-ink-faint" />
+            <p className="text-xs text-ink-faint">{image.altText}</p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="px-8 py-3">
+        <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-surface-active text-xs text-ink-faint">
+          Vælg produkter til galleriet
+        </div>
+      </div>
+    );
+  }
+
+  // Billede-/Galleri-blokken ("billede", og de legacy-typer "img"/"galleri")
+  // med "Vis billede" slået til (standard): hvert billede er sit eget kort
+  // (billede øverst, navn + pris tæt under) – kant-form og tæthed gælder HVERT
+  // kort for sig. Kun billedet er klikbart og fører til produktets egen side.
+  // Et uploadet billede (intet produkt) vises som et kort med kun billedet.
+  function renderMediaCards(block: NewsletterBlock): ReactNode {
+    const cards = resolveMediaCards(block, products);
+    if (cards.length === 0) return renderEmptyMedia(block);
+    const cardRadius = PRODUCT_CARD_RADIUS_PX[block.productBorderRadius ?? "afrundet"];
+    const cardPadding = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
+    const layout = block.galleryColumns ?? 1;
+    // "1 billede" beholder billedets egne proportioner (som det enkelte
+    // billede altid har haft); galleri-kortene beskæres kvadratisk, så de
+    // står ens side om side.
+    const imageClassName = isGalleryLayout(layout) ? "aspect-square w-full object-cover" : "h-auto w-full";
+    // Kort pr. række efter blokkens fordeling (én række / flere rækker, se
+    // getMediaRowSize) – samme tal og kortbredde som den kopierede HTML. Den
+    // smalle mobil-visning viser højst 2 pr. række.
+    const perRow = isGalleryLayout(layout) ? getMediaRowSize(block) : 1;
+    const visiblePerRow = viewport === "mobil" ? Math.min(perRow, 2) : perRow;
+    const compact = viewport !== "mobil" && isCompactCardWidth(getGalleryCardWidth(perRow));
+    const textClassName = compact ? "text-[10px]" : "text-xs";
+
+    function renderCard(card: MediaCard) {
+      const text = getMediaCardText(card, customerType);
+      const imageElement = card.src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Shopify-hostet billede-URL eller lokal data-URI
+        <img src={card.src} alt={card.alt} className={imageClassName} />
+      ) : (
+        <div className="flex aspect-square w-full items-center justify-center bg-surface-active text-[10px] text-ink-faint">
+          Intet billede
+        </div>
+      );
+      return (
+        <div
+          key={card.key}
+          className="flex flex-col overflow-hidden border bg-white"
+          style={{ borderColor: "#1a1a1a", borderRadius: cardRadius }}
+        >
+          {text.href && card.src ? (
+            <a
+              href={text.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Se ${text.title}`}
+              className="block"
+            >
+              {imageElement}
+            </a>
+          ) : (
+            imageElement
+          )}
+          {(text.title || text.price) && (
+            <div
+              className={`flex flex-col items-center gap-0.5 text-center ${compact ? "px-1.5" : "px-3"}`}
+              style={{ paddingTop: cardPadding, paddingBottom: cardPadding }}
+            >
+              {text.title && (
+                <p className={`${textClassName} leading-snug font-medium`} style={{ color: "#1a1a1a" }}>
+                  {text.title}
+                </p>
+              )}
+              {text.price && (
+                <p className={`${textClassName} font-semibold`} style={{ color: "#1a1a1a" }}>
+                  {text.price}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (!isGalleryLayout(layout)) {
+      // "1 billede": ét kort, med blokkens justering og størrelse.
+      return (
+        <div className={`flex px-8 py-3 ${JUSTIFY_CLASS[block.alignment ?? "center"]}`}>
+          <div className="max-w-full" style={{ width: IMAGE_SIZE_PX[block.size ?? "fuld"] }}>
+            {cards.map(renderCard)}
+          </div>
+        </div>
+      );
+    }
+    // Flexbox med ombrydning (i stedet for CSS grid), så en ufuldstændig
+    // sidste række (fx 5 billeder som 3 + 2) centreres – præcis som i den
+    // kopierede HTML. Containeren er præcis én fuld rækkes bredde (samme
+    // kortbredde som mailen), så linjeskiftet altid falder efter `perRow`
+    // kort – også når kortene er smalle nok til, at flere ville kunne stå
+    // side om side (fx 2 billeder under hinanden). Kortene i samme række
+    // strækkes til samme højde.
+    const gapTotal = (visiblePerRow - 1) * PRODUCT_CARD_GAP_PX;
+    const rowWidth = visiblePerRow * getGalleryCardWidth(visiblePerRow) + gapTotal;
+    return (
+      <div className="px-8 py-3">
+        <div className="mx-auto flex flex-wrap justify-center" style={{ gap: PRODUCT_CARD_GAP_PX, maxWidth: rowWidth }}>
+          {cards.map((card) => (
+            <div
+              key={card.key}
+              className="flex *:w-full"
+              style={{ width: `calc((100% - ${gapTotal}px) / ${visiblePerRow})` }}
+            >
+              {renderCard(card)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // "Vis billede" slået fra: billederne skjules, og indholdet vises som en
+  // ren, lodret tekstliste – én linje pr. kort, uanset layout-valget (som da
+  // kun bestemmer antallet). Et produktnavn er klikbart til produktets egen
+  // side, så listen stadig er navigerbar uden billeder. Et uploadet billede
+  // med egen overskrift/pris vises som en linje uden link; helt uden tekst
+  // udelades det.
+  function renderMediaList(block: NewsletterBlock): ReactNode {
+    const listItems = resolveMediaListItems(block, products, customerType);
+    if (listItems.length === 0) return renderEmptyMedia(block);
+    const rowPadding = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
+    return (
+      <div className="px-8 py-3">
+        <ul className="border-t border-[#e5e5e5]">
+          {listItems.map((item) => (
+            <li
+              key={item.key}
+              className="flex items-baseline justify-between gap-4 border-b border-[#e5e5e5] text-[13px]"
+              style={{ paddingTop: rowPadding, paddingBottom: rowPadding, color: "#1a1a1a" }}
+            >
+              {item.href ? (
+                <a
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline underline-offset-2"
+                  style={{ color: "#1a1a1a" }}
+                >
+                  {item.title}
+                </a>
+              ) : (
+                <span className="font-medium">{item.title}</span>
+              )}
+              {item.price && <span className="shrink-0 font-semibold whitespace-nowrap">{item.price}</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   function renderBlock(block: NewsletterBlock): ReactNode {
     switch (block.type) {
       case "header": {
         const bgColor = block.bgColor || brand.colors[0] || staticBrand.colors[0];
-        const textColor = getContrastTextColor(bgColor);
+        // Valgt tekstfarve – ellers automatisk sort/hvid efter baggrunden.
+        const textColor = block.textColor || getContrastTextColor(bgColor);
         return (
           <div
             className="flex items-center justify-center gap-3 px-8 py-5"
@@ -90,130 +267,8 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
       // block.galleryColumns, ikke af hvilken af de tre typer det er.
       case "billede":
       case "img":
-      case "galleri": {
-        if (isGalleryLayout(block.galleryColumns)) {
-          const columns = block.galleryColumns as GalleryColumns;
-          // Produkt- og upload-pladser i rækkefølge (se getGallerySlots) –
-          // begge render'es med PRÆCIS samme <img>, så de ser ens ud.
-          const galleryImages = resolveGalleryImages(block, products);
-          if (galleryImages.length === 0) {
-            return (
-              <div className="px-8 py-3">
-                <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-surface-active text-xs text-ink-faint">
-                  Vælg produkter til galleriet
-                </div>
-              </div>
-            );
-          }
-          return (
-            <div className="px-8 py-3">
-              <div className={`grid gap-3 ${GALLERY_ROW_SIZE[columns] === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-                {/* CSS grid ombryder automatisk til en ny række, når der er flere
-                    billeder end kolonner – "6 billeder"-layoutet (3 kolonner) giver
-                    derfor 2 pæne rækker af 3 helt af sig selv, uden ekstra markup. */}
-                {galleryImages.map((galleryImage) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- Shopify-hostet billede-URL eller lokal data-URI
-                  <img
-                    key={galleryImage.key}
-                    src={galleryImage.src}
-                    alt={galleryImage.alt}
-                    className="aspect-square w-full rounded-lg object-cover"
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        }
-
-        const alignment = block.alignment ?? "center";
-        const size = block.size ?? "fuld";
-        if (block.imageUrl) {
-          return (
-            <div className={`flex px-8 py-3 ${JUSTIFY_CLASS[alignment]}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- lokal blob:-object-URL, next/image kan ikke optimere den */}
-              <img
-                src={block.imageUrl}
-                alt={block.altText || image.altText}
-                style={{ width: IMAGE_SIZE_PX[size] }}
-                className="max-w-full rounded-xl object-cover"
-              />
-            </div>
-          );
-        }
-        return (
-          <div className="px-8 py-3">
-            <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-xl bg-surface-active">
-              <ImagePlaceholderIcon className="h-9 w-9 text-ink-faint" />
-              <p className="text-xs text-ink-faint">{image.altText}</p>
-            </div>
-          </div>
-        );
-      }
-
-      case "produktvisning": {
-        // undefined betyder "vis alle tilgængelige produkter" – den
-        // oprindelige, uændrede opførsel, før dette valg fandtes (se
-        // NewsletterBlock.productDisplayIds i newsletterBlocks.ts).
-        const displayProducts = block.productDisplayIds
-          ? products.filter((product) => block.productDisplayIds!.includes(product.id))
-          : products;
-        const productBorderRadius = block.productBorderRadius ?? "afrundet";
-        const borderRadius = CTA_BORDER_RADIUS_PX[productBorderRadius];
-        const rowPaddingY = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
-
-        // "Fuld rund" (pille, 999px) ser kun rigtig ud på et enkelt,
-        // kort element – anvendt på ÉN delt kant omkring en høj stak af
-        // flere produkter giver et akavet resultat (kun de yderste hjørner
-        // rundes kraftigt, resten af stakken forbliver skarp). Kun for
-        // DENNE ene kant-form vises hvert produkt derfor i stedet som sin
-        // EGEN, separate pille-formede boks – "skarp"/"let afrundet"
-        // beholder uændret ét samlet, delt kort (se nedenfor).
-        if (productBorderRadius === "pille") {
-          return (
-            <div className="flex flex-col gap-2 px-8 py-3">
-              {displayProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="flex items-center justify-between overflow-hidden border px-4"
-                  style={{ borderColor: "#1a1a1a", borderRadius, paddingTop: rowPaddingY, paddingBottom: rowPaddingY }}
-                >
-                  <p className="text-xs font-medium" style={{ color: "#1a1a1a" }}>
-                    {product.title}
-                  </p>
-                  <p className="text-xs font-semibold" style={{ color: "#1a1a1a" }}>
-                    {formatPriceForCustomer(product.price, customerType)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          );
-        }
-
-        return (
-          <div className="px-8 py-3">
-            <div className="overflow-hidden border" style={{ borderColor: "#1a1a1a", borderRadius }}>
-              {displayProducts.map((product, index) => (
-                <div
-                  key={product.id}
-                  className="flex items-center justify-between px-4"
-                  style={{
-                    paddingTop: rowPaddingY,
-                    paddingBottom: rowPaddingY,
-                    ...(index > 0 ? { borderTop: "1px solid #1a1a1a" } : {}),
-                  }}
-                >
-                  <p className="text-xs font-medium" style={{ color: "#1a1a1a" }}>
-                    {product.title}
-                  </p>
-                  <p className="text-xs font-semibold" style={{ color: "#1a1a1a" }}>
-                    {formatPriceForCustomer(product.price, customerType)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      }
+      case "galleri":
+        return block.showImage === false ? renderMediaList(block) : renderMediaCards(block);
 
       case "skillelinje":
         return (
@@ -291,7 +346,8 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
 
       case "footer": {
         const bgColor = block.bgColor || "#f5f7f4";
-        const textColor = getContrastTextColor(bgColor);
+        // Valgt tekstfarve – ellers automatisk sort/hvid efter baggrunden.
+        const textColor = block.textColor || getContrastTextColor(bgColor);
         return (
           <div
             className="flex flex-col items-center gap-1.5 border-t border-border px-8 py-5 text-center"

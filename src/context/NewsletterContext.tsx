@@ -13,7 +13,7 @@ import {
 } from "react";
 import type { CustomerType } from "@/lib/format";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
-import { createDefaultBlocks, type NewsletterBlock } from "@/lib/newsletterBlocks";
+import { createDefaultBlocks, migrateLegacyBlocks, type NewsletterBlock } from "@/lib/newsletterBlocks";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
 
 export type { CustomerType };
@@ -198,7 +198,9 @@ function loadPersistedState(): PersistedState {
       result: parsed.result ?? null,
       topicMatchedProductIds: Array.isArray(parsed.topicMatchedProductIds) ? parsed.topicMatchedProductIds : null,
       topicSearchTerm: typeof parsed.topicSearchTerm === "string" ? parsed.topicSearchTerm : null,
-      blocks: Array.isArray(parsed.blocks) ? parsed.blocks : [],
+      // Et gemt udkast med en blok af en fjernet type omdannes her til den
+      // samlede Billede-/Galleri-blok (se migrateLegacyBlocks).
+      blocks: Array.isArray(parsed.blocks) ? migrateLegacyBlocks(parsed.blocks) : [],
     };
   } catch {
     return DEFAULT_PERSISTED_STATE;
@@ -272,9 +274,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
       setResultState(newResult);
       // Sat af generate-newsletter/route.ts – enhver generering er nu en
       // fritekst-søgning, så matchedProductIds er altid HELE det matchede
-      // sæt, ikke kun de(t) produkt(er) billede-/produktvisnings-blokken
-      // initialt viser (se Edit-mode's billede-/galleri- og produktvisnings-
-      // blok-kontroller, som bruger denne til at tilbyde hele udvalget).
+      // sæt, ikke kun de(t) produkt(er) billede-/galleri-blokken
+      // initialt viser (se Edit-mode's billede-/galleri-blok-kontroller, som
+      // bruger denne til at tilbyde hele udvalget).
       setTopicMatchedProductIds(matchedProductIds ?? null);
       // Samme mønster som topicMatchedProductIds ovenfor, men de(t)
       // bekræftet-matchende søgeord – bruges af resolveCtaLink()'s
@@ -286,7 +288,7 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (presetBlocks) {
-        setBlocks(presetBlocks);
+        setBlocks(migrateLegacyBlocks(presetBlocks));
         return;
       }
       let selectedProducts: ShopifyProduct[] = [];
@@ -303,10 +305,9 @@ export function NewsletterProvider({ children }: { children: ReactNode }) {
         // fulde matchede sæt, N = "Maks. antal produkter"-grænsen, se
         // seedProductIds fra generate-newsletter/route.ts) – IKKE hele
         // matchedProducts. Rækkefølgen fra seedProductIds bevares (allerede
-        // alfabetisk fra selve søgningen), så billede-blokkens repræsentant-
-        // valg (matcher stadig newResult.image.productId, se
-        // createDefaultBlocks) og produktvisnings-blokkens initiale
-        // productDisplayIds begge kun trækker fra denne afgrænsede pulje.
+        // alfabetisk fra selve søgningen), så billede-/galleri-blokkens
+        // initiale produkter (se createDefaultBlocks) kun trækkes fra denne
+        // afgrænsede pulje.
         const seedProducts = (seedProductIds ?? [])
           .map((id) => allProducts.find((product) => product.id === id))
           .filter((product): product is ShopifyProduct => Boolean(product));

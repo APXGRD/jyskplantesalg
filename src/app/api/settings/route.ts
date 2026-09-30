@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
-import { getBrandSettings } from "@/lib/brandSettings";
+import { getBrandSettingsWithStatus } from "@/lib/brandSettings";
 import { FONT_FAMILIES } from "@/lib/fontFamilies";
 import { requireUser } from "@/lib/supabase/requireUser";
 
@@ -24,8 +24,18 @@ export async function GET() {
   const { user, response } = await requireUser();
   if (!user) return response;
 
-  const settings = await getBrandSettings();
-  return NextResponse.json(settings);
+  // `configured: false` = intet er gemt endnu; værdierne er da blot brand.ts's
+  // standardværdier (som resten af appen fortsat bruger som fallback), og
+  // Indstillinger-siden viser i stedet tomme felter med placeholders.
+  // Kunne Supabase ikke svare, returneres en fejl – så Indstillinger-siden
+  // viser "Prøv igen" i stedet for en tom formular, der ved et uheld kunne
+  // overskrive de rigtige indstillinger. (BrandSettingsContext beholder da
+  // bare sine nuværende værdier.)
+  const { settings, status } = await getBrandSettingsWithStatus();
+  if (status === "error") {
+    return NextResponse.json({ error: "Kunne ikke hente indstillingerne. Prøv igen." }, { status: 502 });
+  }
+  return NextResponse.json({ ...settings, configured: status === "configured" });
 }
 
 interface UpdateSettingsBody {

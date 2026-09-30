@@ -26,10 +26,28 @@ interface BrandSettingsForm {
 
 const MIN_BRAND_COLORS = 2;
 const MAX_BRAND_COLORS = 5;
-// Ny farve tilføjet via "+ Tilføj farve" – bevidst neutral/tydeligt en
-// pladsholder, som brugeren forventes at ændre med det samme via
-// farve-vælgeren.
-const NEW_COLOR_PLACEHOLDER = "#000000";
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+// Ny farve tilføjet via "+ Tilføj farve" starter TOM (kun en eksempel-
+// placeholder) – ingen hardcodet farve, brugeren vælger selv.
+const NEW_COLOR_PLACEHOLDER = "";
+// Eksempel-placeholders til hex-felterne pr. plads (ikke gemte værdier).
+const COLOR_EXAMPLES = ["#2F5233", "#9CAF88", "#E8EFE7", "#C47A3A", "#1A1A1A"];
+
+// Når der endnu ikke er gemt nogen indstillinger (se configured i
+// api/settings), starter formularen helt tom – kun placeholders med eksempler
+// – i stedet for at vise appens hardcodede standardværdier (brand.ts), som om
+// de var kundens egne. To tomme farvepladser, da mindst 2 farver kræves.
+const EMPTY_FORM: BrandSettingsForm = {
+  company_name: "",
+  brand_colors: ["", ""],
+  brand_tone: "",
+  primary_font: "",
+  logo_data: null,
+  street_address: "",
+  postal_code: "",
+  city: "",
+  business_registration_number: "",
+};
 
 // .svg tillades bevidst ikke – en SVG kan indeholde script og er derfor en
 // reel sikkerhedsrisiko at gemme og senere rendere direkte i browseren
@@ -118,7 +136,10 @@ export default function IndstillingerPage() {
         if (!response.ok) {
           throw new Error(data?.error ?? "Kunne ikke hente indstillingerne.");
         }
-        if (!cancelled) {
+        if (!cancelled && data.configured === false) {
+          setSavedText({ company_name: "", brand_tone: "" });
+          setForm(EMPTY_FORM);
+        } else if (!cancelled) {
           setSavedText({ company_name: data.company_name ?? "", brand_tone: data.brand_tone ?? "" });
           setForm({
             company_name: data.company_name ?? "",
@@ -226,6 +247,24 @@ export default function IndstillingerPage() {
 
     const company_name = form.company_name.trim() || savedText.company_name;
     const brand_tone = form.brand_tone.trim() || savedText.brand_tone;
+
+    // Venlig besked om præcis hvad der mangler (fx første gang, hvor alle
+    // felter starter tomme), i stedet for API'ets tekniske valideringsfejl.
+    const missing: string[] = [];
+    if (!company_name) missing.push("firmanavn");
+    const filledColors = form.brand_colors.filter((color) => color.trim());
+    if (filledColors.length < MIN_BRAND_COLORS) {
+      missing.push(`mindst ${MIN_BRAND_COLORS} brandfarver`);
+    } else if (form.brand_colors.some((color) => !HEX_COLOR_PATTERN.test(color))) {
+      missing.push("gyldige hex-koder for alle farver (fx #2F5233) – eller slet de tomme");
+    }
+    if (!form.primary_font) missing.push("skrifttype");
+    if (!brand_tone) missing.push("tone-of-voice");
+    if (missing.length > 0) {
+      setSaveError(`Udfyld ${missing.join(", ")} før du gemmer.`);
+      setIsSaving(false);
+      return;
+    }
 
     try {
       const response = await fetch("/api/settings", {
@@ -336,7 +375,7 @@ export default function IndstillingerPage() {
                     <input
                       value={form.postal_code}
                       onChange={(event) => updateField("postal_code", event.target.value)}
-                      placeholder="8000"
+                      placeholder="F.eks. 8000"
                       className={`${fieldClassName} font-jetbrains`}
                     />
                   </label>
@@ -345,7 +384,7 @@ export default function IndstillingerPage() {
                     <input
                       value={form.city}
                       onChange={(event) => updateField("city", event.target.value)}
-                      placeholder="Aarhus C"
+                      placeholder="F.eks. Aarhus C"
                       className={fieldClassName}
                     />
                   </label>
@@ -355,7 +394,7 @@ export default function IndstillingerPage() {
                   <input
                     value={form.business_registration_number}
                     onChange={(event) => updateField("business_registration_number", event.target.value)}
-                    placeholder="34 567 890"
+                    placeholder="F.eks. 12 34 56 78"
                     className={`${fieldClassName} font-jetbrains`}
                   />
                 </label>
@@ -399,25 +438,36 @@ export default function IndstillingerPage() {
             <FieldBlock
               number="04"
               title="Brandfarver"
-              meta={`${form.brand_colors.length}/${MAX_BRAND_COLORS} valgt`}
+              meta={`${form.brand_colors.filter((color) => HEX_COLOR_PATTERN.test(color)).length}/${MAX_BRAND_COLORS} valgt`}
               description={`${MIN_BRAND_COLORS}-${MAX_BRAND_COLORS} farver – bruges som farve-swatches i nyhedsbrevets Edit-mode, og de to første som appens egen primær-/sekundærfarve`}
             >
               <div className="max-w-xl space-y-2">
                 {form.brand_colors.map((color, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <div className="flex min-w-0 flex-1 items-center border border-[#cfcfcf] bg-white p-1.5 focus-within:border-black">
-                      <input
-                        type="color"
-                        value={color}
-                        onChange={(event) => updateColorAt(index, event.target.value)}
-                        aria-label={`Vælg farve ${index + 1}`}
-                        className="h-8 w-8 shrink-0 cursor-pointer border border-black/10 bg-transparent p-0"
-                      />
+                      {/* En tom farve (intet valgt endnu) vises som en stiplet
+                          boks – farve-vælgeren ligger usynligt ovenpå, så et
+                          klik stadig åbner den. */}
+                      <span className="relative h-8 w-8 shrink-0">
+                        {!HEX_COLOR_PATTERN.test(color) && (
+                          <span className="pointer-events-none absolute inset-0 border border-dashed border-[#bbbbbb] bg-[#fafafa]" />
+                        )}
+                        <input
+                          type="color"
+                          value={HEX_COLOR_PATTERN.test(color) ? color : "#ffffff"}
+                          onChange={(event) => updateColorAt(index, event.target.value)}
+                          aria-label={`Vælg farve ${index + 1}`}
+                          className={`h-8 w-8 cursor-pointer border border-black/10 bg-transparent p-0 ${
+                            HEX_COLOR_PATTERN.test(color) ? "" : "opacity-0"
+                          }`}
+                        />
+                      </span>
                       <input
                         value={color}
                         onChange={(event) => updateColorAt(index, event.target.value)}
                         aria-label={`Hex-kode for farve ${index + 1}`}
-                        className="w-full min-w-0 border-0 bg-transparent px-3 py-1 font-jetbrains text-xs text-[#222222] uppercase focus:outline-none"
+                        placeholder={`F.eks. ${COLOR_EXAMPLES[index] ?? COLOR_EXAMPLES[0]}`}
+                        className="w-full min-w-0 border-0 bg-transparent px-3 py-1 font-jetbrains text-xs text-[#222222] uppercase placeholder:normal-case placeholder:text-neutral-400 focus:outline-none"
                       />
                       <span className="mr-2 shrink-0 font-jetbrains text-[10px] text-[#999999] uppercase">
                         {colorRole(index)}
@@ -458,10 +508,15 @@ export default function IndstillingerPage() {
                   onChange={(event) => updateField("primary_font", event.target.value)}
                   aria-label="Skrifttype"
                   style={{ fontFamily: selectedFont?.value }}
-                  className={`${fieldClassName} cursor-pointer appearance-none bg-white pr-10`}
+                  className={`${fieldClassName} cursor-pointer appearance-none bg-white pr-10 ${
+                    form.primary_font ? "" : "text-neutral-400"
+                  }`}
                 >
+                  <option value="" disabled>
+                    Vælg skrifttype – f.eks. Georgia
+                  </option>
                   {FONT_FAMILIES.map((font) => (
-                    <option key={font.label} value={font.label}>
+                    <option key={font.label} value={font.label} className="text-[#111111]">
                       {font.label}
                     </option>
                   ))}
@@ -524,27 +579,37 @@ export default function IndstillingerPage() {
               </div>
             </InspectorCard>
 
-            <InspectorCard label="02. Farvepalet" tag={`${form.brand_colors.length} farver`}>
+            <InspectorCard
+              label="02. Farvepalet"
+              tag={`${form.brand_colors.filter((color) => HEX_COLOR_PATTERN.test(color)).length} farver`}
+            >
               <div className="flex items-center gap-1.5 pt-1">
-                {form.brand_colors.map((color, index) => (
-                  <div
-                    key={index}
-                    title={color}
-                    className="flex h-9 flex-1 items-end border border-black/10 p-1"
-                    style={{ backgroundColor: color }}
-                  >
-                    <span className="font-jetbrains text-[8px] uppercase" style={{ color: getContrastTextColor(color) }}>
-                      {color.slice(0, 3)}
-                    </span>
-                  </div>
-                ))}
+                {form.brand_colors.map((color, index) =>
+                  HEX_COLOR_PATTERN.test(color) ? (
+                    <div
+                      key={index}
+                      title={color}
+                      className="flex h-9 flex-1 items-end border border-black/10 p-1"
+                      style={{ backgroundColor: color }}
+                    >
+                      <span className="font-jetbrains text-[8px] uppercase" style={{ color: getContrastTextColor(color) }}>
+                        {color.slice(0, 3)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div key={index} title="Ikke valgt" className="h-9 flex-1 border border-dashed border-[#c0c0c0] bg-[#fafafa]" />
+                  ),
+                )}
               </div>
               <div className="font-jetbrains text-[10px] text-[#777777]">Primær / Sekundær = de to første</div>
             </InspectorCard>
 
             <InspectorCard label="03. Skrifttype">
-              <div className="text-base text-[#222222]" style={{ fontFamily: selectedFont?.value }}>
-                {form.primary_font}
+              <div
+                className={`text-base ${form.primary_font ? "text-[#222222]" : "text-black/30"}`}
+                style={{ fontFamily: selectedFont?.value }}
+              >
+                {form.primary_font || "Ingen skrifttype valgt"}
               </div>
               <div className="font-jetbrains text-[11px] text-[#666666]">
                 Forvalgt for nye nyhedsbreve – vist her i sin egen skrift.

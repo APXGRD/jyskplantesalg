@@ -127,9 +127,8 @@ export default function PreviewPage() {
   // route.ts) – topicMatchedProductIds (sat af NewsletterContext.setResult)
   // er derfor altid HELE det matchede produkt-sæt for det aktuelle
   // resultat, ikke kun det ene produkt, billede-blokken oprindeligt viste.
-  // Dette er dét, der gør hele udvalget tilgængeligt for både
-  // Produktvisnings-blokken og Edit-mode's billede-/galleri-blok-vælger (se
-  // EditorBlockList.tsx). Falder tilbage til en tom liste, hvis intet
+  // Dette er dét, der gør hele udvalget tilgængeligt for Edit-mode's
+  // billede-/galleri-blok-vælger (se EditorBlockList.tsx). Falder tilbage til en tom liste, hvis intet
   // resultat er genereret endnu.
   const effectiveProductIds = topicMatchedProductIds ?? EMPTY_PRODUCT_IDS;
   const selectedProducts = useMemo(

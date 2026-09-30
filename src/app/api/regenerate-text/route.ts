@@ -2,8 +2,8 @@
 //
 // POST: regenererer UDELUKKENDE nyhedsbrevets heading/bodyText, ud fra et
 // EKSPLICIT angivet produkt-sæt (productIds) – typisk UNIONEN af de
-// produkter, der aktuelt er valgt på tværs af Produktvisnings- og Billede/
-// Galleri-blokkene i Edit-mode (samme union-beregning som CTA-linket
+// produkter, der aktuelt er valgt på tværs af Billede/Galleri-
+// blokkene i Edit-mode (samme union-beregning som CTA-linket
 // allerede bruger, se collectCtaRelevantProducts i EditorBlockList.tsx),
 // IKKE de oprindelige seed-produkter fra selve genereringen (se
 // generate-newsletter/route.ts). Genbruger PRÆCIS samme prompt-opbygning
@@ -26,8 +26,8 @@ interface RegenerateTextBody {
   // kald brugte til tone/fokus (se NewsletterContext.instructions) –
   // udelukkende brugt til sprog/tone, ligesom ved den oprindelige generering.
   instructions?: string;
-  // Den AKTUELLE union af produkter, vist på tværs af Produktvisnings- og
-  // Billede/Galleri-blokkene i Edit-mode – IKKE de oprindelige seed-
+  // Den AKTUELLE union af produkter, vist på tværs af Billede/Galleri-
+  // blokkene i Edit-mode – IKKE de oprindelige seed-
   // produkter. Påkrævet, ellers er der intet at regenerere teksten ud fra.
   productIds?: string[];
   // Bruges KUN til samme "kategori-scenarie"-sprogregel i prompten som ved

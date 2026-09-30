@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
   // FULDE, ufiltrerede (af maks.-antal) resultat, EFTER alle øvrige filtre
   // (tekst, pris, planteform, billede). Dette er den pulje, der sendes til
   // klienten som matchedProductIds herunder, og som Edit-mode's søgbare
-  // produktvælgere (Produktvisning og Billede/Galleri) vælger imellem.
+  // produktvælgere (Billede/Galleri) vælger imellem.
   // maxResults-grænsen anvendes udelukkende LOKALT herunder (seedProducts),
   // til selve den INITIALE blok-opbygning – se seedProducts.
   let matchedProducts: ShopifyProduct[];
@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
   // De FØRSTE N (maks.-antal-grænsen) af det fulde, alfabetisk sorterede
   // matchedProducts – den ENESTE plads, maxResults har effekt. Bruges til
   // AI-promptens produktliste OG selve den initiale blok-opbygning
-  // (billede-/produktvisningsblok, CTA-link) herunder. Edit-mode's
+  // (billede-/galleri-blok, CTA-link) herunder. Edit-mode's
   // produktvælgere bruger DERIMOD det fulde matchedProducts (se
   // matchedProductIds), ikke denne afskårne liste.
   const seedProducts = matchedProducts.slice(0, maxResults);
@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
     // bruges til resolveCtaLink's søgeside-fallback i ctaLink.ts. Bruger
     // seedProducts (IKKE det fulde matchedProducts) – CTA-linket skal
     // afspejle det, der REELT vises i den initiale generering, samme
-    // afgrænsning som billede-/produktvisningsblokken herunder.
+    // afgrænsning som billede-/galleri-blokken herunder.
     newsletter.cta = {
       ...newsletter.cta,
       url: resolveCtaLink(seedProducts, matchedSearchWords.join(" ")),
@@ -264,13 +264,13 @@ export async function POST(req: NextRequest) {
       altText: representative.title,
     };
     // blockSeedProducts = seedProducts (op til maxResults produkter, IKKE
-    // kun ét) – createDefaultBlocks/createBlocksFromTemplate bygger selv et
-    // kurateret galleri (billede-blok) og sætter produktvisningsblokkens
-    // productDisplayIds ud fra denne pulje, se newsletterBlocks.ts. Dette er
+    // kun ét) – createDefaultBlocks/createBlocksFromTemplate fylder selv
+    // billede-/galleri-blokken (op til 6 produktkort) ud fra denne pulje, se
+    // newsletterBlocks.ts. Dette er
     // den ENESTE plads, maxResults påvirker den initiale blok-opbygning.
     // matchedProductIds er derimod det FULDE matchedProducts (før
     // maxResults-afskæring), sendt med i svaret til NewsletterContext (se
-    // setResult), så Edit-mode's billede-/galleri- og produktvisnings-
+    // setResult), så Edit-mode's billede-/galleri-
     // vælgere kan tilbyde ALLE søgnings-matches, ikke kun de(t) initialt
     // viste.
     const blockSeedProducts = seedProducts;
