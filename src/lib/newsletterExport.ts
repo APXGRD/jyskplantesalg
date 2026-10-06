@@ -6,6 +6,14 @@ import {
   CTA_PADDING_PX,
   IMAGE_ALIGN_CSS,
   PRODUCT_CARD_GAP_PX,
+  RICH_TEXT_BLOCK_TYPES,
+  computeMasonryGrid,
+  isBlankContent,
+  getMasonryColumns,
+  getMasonryGapPx,
+  getMasonryLayout,
+  getMasonryRadiusPx,
+  MEDIA_CONTENT_WIDTH_PX,
   PRODUCT_CARD_RADIUS_PX,
   PRODUCT_ROW_PADDING_PX,
   SINGLE_CARD_WIDTH_PX,
@@ -123,7 +131,7 @@ function renderMediaCardsHtml(
   products: ShopifyProduct[],
 ): string {
   const cards = resolveMediaCards(block, products);
-  if (cards.length === 0) return renderEmptyMediaHtml(block, image);
+  if (cards.length === 0) return ""; // Tom blok (intet billede/produkt valgt) – udelades af mailen.
   const layout = block.galleryColumns ?? 1;
   const isGallery = isGalleryLayout(layout);
   // Galleri: kort pr. række efter blokkens fordeling (én række / flere
@@ -220,7 +228,7 @@ function renderMediaListHtml(
   products: ShopifyProduct[],
 ): string {
   const listItems = resolveMediaListItems(block, products, customerType);
-  if (listItems.length === 0) return renderEmptyMediaHtml(block, image);
+  if (listItems.length === 0) return ""; // Tom blok (intet billede/produkt valgt) – udelades af mailen.
   const rowPadding = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
   const rows = listItems
     .map((item) => {
@@ -243,13 +251,55 @@ function renderMediaListHtml(
       </td></tr>`;
 }
 
-// Tom Billede-/Galleri-blok: "1 billede" viser sin pladsholder, et tomt
-// galleri udelades helt.
-function renderEmptyMediaHtml(block: NewsletterBlock, image: GeneratedNewsletter["image"]): string {
-  if (isGalleryLayout(block.galleryColumns)) return "";
-  return `<tr><td style="padding:12px 32px;text-align:center;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr><td bgcolor="#e8efe7" style="background:#e8efe7;border-radius:12px;padding:32px;color:#87a084;font-size:11px;text-align:center;font-family:${DEFAULT_FONT_FAMILY};">${escapeHtml(image.altText)}</td></tr>
+// Billedeblokken: masonry-gitter af egne uploadede billeder. Outlook
+// understøtter hverken CSS columns, grid eller flexbox – gitteret bygges
+// derfor som ÉN tabelrække med en celle pr. kolonne (fast bredde, valign
+// top), og billederne stables i hver celle i deres egne proportioner (fast
+// bredde, height/auto). Fordelingen er PRÆCIS den samme som i Preview (se
+// buildMasonryColumns). Tom blok (ingen billeder) udelades.
+function renderMasonryHtml(block: NewsletterBlock): string {
+  const images = block.masonryImages ?? [];
+  if (images.length === 0) return "";
+  // Afstand og hjørner gælder begge visninger (samme værdier som Preview).
+  const gap = getMasonryGapPx(block);
+  const radius = getMasonryRadiusPx(block);
+  const radiusStyle = radius > 0 ? `border-radius:${radius}px;` : "";
+  // Fuld bredde: hvert billede i hele indholdsbredden, under hinanden.
+  if (getMasonryLayout(block) === "fuld") {
+    const rows = images
+      .map((masonryImage, index) => {
+        const height = Math.round((masonryImage.height / masonryImage.width) * MEDIA_CONTENT_WIDTH_PX);
+        const paddingBottom = index === images.length - 1 ? 0 : gap;
+        return `<tr><td style="padding:0 0 ${paddingBottom}px 0;"><img src="${escapeAttr(masonryImage.src)}" alt="${escapeAttr(masonryImage.altText ?? "")}" width="${MEDIA_CONTENT_WIDTH_PX}" height="${height}" style="width:${MEDIA_CONTENT_WIDTH_PX}px;max-width:100%;height:auto;display:block;border:0;${radiusStyle}" /></td></tr>`;
+      })
+      .join("");
+    return `<tr><td style="padding:12px 32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table>
+      </td></tr>`;
+  }
+  // Masonry: alle kolonner flugter i top og bund (se computeMasonryGrid).
+  // Billederne er forinden beskåret til præcis deres plads af
+  // cropMasonryImagesForExport (masonryExport.ts) – width/height her er
+  // derfor billedets egne mål, og object-fit er kun en ekstra sikkerhed for
+  // klienter, der understøtter det.
+  const grid = computeMasonryGrid(images, getMasonryColumns(block), gap);
+  const cells = grid.columns
+    .map((column, columnIndex) => {
+      const isLast = columnIndex === grid.columns.length - 1;
+      const stack = column
+        .map((cell, index) => {
+          const paddingBottom = index === column.length - 1 ? 0 : gap;
+          return `<tr><td style="padding:0 0 ${paddingBottom}px 0;"><img src="${escapeAttr(cell.image.src)}" alt="${escapeAttr(cell.image.altText ?? "")}" width="${grid.columnWidth}" height="${cell.height}" style="width:${grid.columnWidth}px;height:${cell.height}px;object-fit:cover;display:block;border:0;${radiusStyle}" /></td></tr>`;
+        })
+        .join("");
+      return `<td valign="top" width="${grid.columnWidth}" style="width:${grid.columnWidth}px;${isLast || gap === 0 ? "" : `padding-right:${gap}px;`}">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${stack}</table>
+          </td>`;
+    })
+    .join("");
+  return `<tr><td style="padding:12px 32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
+          <tr>${cells}</tr>
         </table>
       </td></tr>`;
 }
@@ -316,8 +366,12 @@ function renderBlockHtml(
         ? renderMediaListHtml(block, image, customerType, products)
         : renderMediaCardsHtml(block, image, customerType, products);
 
+    case "billedeblok":
+      return renderMasonryHtml(block);
+
     case "skillelinje":
-      return `<tr><td style="padding:12px 32px;"><hr style="border:none;border-top:1px solid #d2ddd1;margin:0;" /></td></tr>`;
+      // Skillelinjen er altid sort (samme som Preview).
+      return `<tr><td style="padding:12px 32px;"><hr style="border:none;border-top:1px solid #000000;margin:0;" /></td></tr>`;
 
     case "tekst": {
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
@@ -447,9 +501,12 @@ function renderBlockText(
         if (title || price) return [`- ${[title, price].filter(Boolean).join(": ")}`];
         return block.showImage === false ? [] : [`[Billede: ${card.alt || "Billede"}]`];
       });
-      if (lines.length > 0) return lines.join("\n");
-      return isGalleryLayout(block.galleryColumns) ? "" : `[Billede: ${image.altText}]`;
+      // Tom blok (intet billede) – udelades, ligesom i HTML-udgaven.
+      return lines.join("\n");
     }
+
+    case "billedeblok":
+      return (block.masonryImages ?? []).map((masonryImage) => `[Billede: ${masonryImage.altText || "Billede"}]`).join("  ");
 
     case "skillelinje":
       return "—————————";
@@ -479,6 +536,15 @@ function renderBlockText(
 // Hele tabellen bruger border-collapse:separate (i stedet for collapse), fordi
 // WebKit ellers ikke tegner border-radius korrekt på en <table> – det ville
 // give firkantede hjørner i Gmail/browser-visningen, selvom stylen er der.
+// Blokke, der kommer med i den kopierede mail: synlige – og for tekst-blokke
+// (overskrift/brødtekst/tekst/knap) kun hvis de faktisk har indhold. En tom
+// tekst-blok (fx en endnu ikke udfyldt placeholder fra "Blank skabelon")
+// udelades, så hjælpeteksten aldrig ender i et udsendt nyhedsbrev.
+function isExportable(block: NewsletterBlock): boolean {
+  if (block.hidden) return false;
+  return !(RICH_TEXT_BLOCK_TYPES.includes(block.type) && isBlankContent(block.content));
+}
+
 export function buildNewsletterHtml(
   blocks: NewsletterBlock[],
   image: GeneratedNewsletter["image"],
@@ -487,7 +553,7 @@ export function buildNewsletterHtml(
   brand: BrandSettings,
 ): string {
   const rows = blocks
-    .filter((block) => !block.hidden)
+    .filter(isExportable)
     .map((block) => renderBlockHtml(block, image, customerType, products, brand))
     .join("\n");
 
@@ -506,7 +572,8 @@ export function buildNewsletterText(
   brand: BrandSettings,
 ): string {
   return blocks
-    .filter((block) => !block.hidden)
+    .filter(isExportable)
     .map((block) => renderBlockText(block, image, customerType, products, brand))
+    .filter((text) => text.trim() !== "")
     .join("\n\n");
 }

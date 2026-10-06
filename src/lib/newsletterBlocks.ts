@@ -47,7 +47,10 @@ export type BlockType =
   | "tekst"
   | "img"
   | "produkt"
-  | "galleri";
+  | "galleri"
+  // Selvstændig billedblok: egne uploadede billeder (INTET med produkterne at
+  // gøre) vist som masonry-gitter – se MasonryImage/buildMasonryColumns.
+  | "billedeblok";
 
 export type ImageAlignment = "venstre" | "center" | "hoejre";
 export type ImageSize = "lille" | "mellem" | "fuld";
@@ -331,6 +334,130 @@ export function resolveMediaListItems(
   });
 }
 
+// Ét uploadet billede i Billedeblokken. width/height er billedets pixel-
+// størrelse efter nedskalering (se prepareMasonryUpload i
+// MasonryBlockControls.tsx) – bruges til at fordele billederne i masonry-
+// kolonnerne uden først at skulle indlæse dem.
+export interface MasonryImage {
+  id: string;
+  src: string;
+  width: number;
+  height: number;
+  altText?: string;
+}
+
+// Billedeblokkens visning: "fuld" = hvert billede i fuld bredde under
+// hinanden; "masonry" = masonry-gitter i 2-5 kolonner (se
+// buildMasonryColumns/getMasonryColumns).
+export type MasonryLayout = "fuld" | "masonry";
+
+// undefined = "masonry" – billedblokke oprettet før valget fandtes var altid
+// masonry-gitre. Nye blokke starter i "fuld" (se createNewBlock).
+export function getMasonryLayout(block: Pick<NewsletterBlock, "masonryLayout">): MasonryLayout {
+  return block.masonryLayout ?? "masonry";
+}
+export const MAX_MASONRY_IMAGES = 12;
+
+// Masonry-gitterets antal kolonner. undefined = 3.
+export type MasonryColumns = 2 | 3 | 4 | 5;
+export const MASONRY_COLUMN_OPTIONS: MasonryColumns[] = [2, 3, 4, 5];
+export function getMasonryColumns(block: Pick<NewsletterBlock, "masonryColumns">): MasonryColumns {
+  return block.masonryColumns ?? 3;
+}
+
+// Afstand mellem billederne (vandret og lodret) – gælder både fuld bredde og
+// masonry, i både Preview og mail. undefined = "lille" (de oprindelige 8px).
+export type MasonryGap = "ingen" | "lille" | "stor";
+export const MASONRY_GAP_PX: Record<MasonryGap, number> = { ingen: 0, lille: 8, stor: 16 };
+export function getMasonryGapPx(block: Pick<NewsletterBlock, "masonryGap">): number {
+  return MASONRY_GAP_PX[block.masonryGap ?? "lille"];
+}
+
+// Billedernes hjørner – samme tre valg som knapper/produktkort.
+// undefined = "skarp" (som hidtil). Outlook ignorerer border-radius og viser
+// skarpe hjørner (accepteret, samme som CTA-knappen).
+export const MASONRY_RADIUS_PX: Record<CtaBorderRadius, number> = { skarp: 0, afrundet: 6, pille: 16 };
+export function getMasonryRadiusPx(block: Pick<NewsletterBlock, "masonryRadius">): number {
+  return MASONRY_RADIUS_PX[block.masonryRadius ?? "skarp"];
+}
+
+// Kolonnebredde i den kopierede HTML: så bredt som muligt, uden at rækken
+// overskrider nyhedsbrevets indholdsbredde (MEDIA_CONTENT_WIDTH_PX).
+export function getMasonryColumnWidth(columns: number, gapPx: number): number {
+  return Math.floor((MEDIA_CONTENT_WIDTH_PX - (columns - 1) * gapPx) / columns);
+}
+
+// Fordeler billederne i masonry-kolonner: hvert billede lægges i den
+// kolonne, der PT. er kortest (målt i billedernes højde/bredde-forhold, da
+// alle kolonner er lige brede) – så kolonnerne ender så lige lange som
+// muligt. Rækkefølgen bevares inden for hver kolonne. Den ENESTE udregning,
+// så Preview og den kopierede HTML altid viser præcis samme gitter.
+export function buildMasonryColumns(images: MasonryImage[], columns: number): MasonryImage[][] {
+  const result: MasonryImage[][] = Array.from({ length: columns }, () => []);
+  const heights = new Array<number>(columns).fill(0);
+  for (const image of images) {
+    let shortest = 0;
+    for (let index = 1; index < columns; index++) {
+      if (heights[index] < heights[shortest]) shortest = index;
+    }
+    result[shortest].push(image);
+    heights[shortest] += image.width > 0 ? image.height / image.width : 1;
+  }
+  return result;
+}
+
+// Et billede placeret i masonry-gitteret med sin færdige visningshøjde (i
+// mailens pixel-mål, se getMasonryColumnWidth).
+export interface MasonryCell {
+  image: MasonryImage;
+  height: number;
+}
+
+export interface MasonryGrid {
+  columnWidth: number;
+  // Hele gitterets højde – ALLE kolonner ender præcis her.
+  height: number;
+  columns: MasonryCell[][];
+}
+
+// Masonry-gitter, hvor alle kolonner flugter i både top OG bund: billederne
+// fordeles som i buildMasonryColumns, og hver kolonne tilpasses derefter den
+// fælles højde (gennemsnittet af kolonnernes naturlige højder), ved at hvert
+// billede i kolonnen gøres en anelse højere/lavere. Billedet beskæres så
+// centreret til sin nye plads (i Preview via object-fit, i mailen via
+// cropMasonryImagesForExport) – aldrig forvrænget. Fordi fordelingen allerede
+// er afbalanceret, er beskæringen typisk lille. Den ENESTE udregning, så
+// Preview og mailen altid viser præcis samme gitter.
+export function computeMasonryGrid(images: MasonryImage[], columnCount: number, gapPx: number): MasonryGrid {
+  const columnWidth = getMasonryColumnWidth(columnCount, gapPx);
+  const distributed = buildMasonryColumns(images, columnCount).filter((column) => column.length > 0);
+  const naturalHeights = distributed.map((column) =>
+    column.map((image) => (image.width > 0 ? (image.height / image.width) * columnWidth : columnWidth)),
+  );
+  const columnTotals = naturalHeights.map(
+    (heights, index) => heights.reduce((sum, height) => sum + height, 0) + (distributed[index].length - 1) * gapPx,
+  );
+  const target = Math.round(
+    columnTotals.reduce((sum, total) => sum + total, 0) / Math.max(columnTotals.length, 1),
+  );
+  const columns = distributed.map((column, columnIndex) => {
+    const available = target - (column.length - 1) * gapPx;
+    const naturalSum = naturalHeights[columnIndex].reduce((sum, height) => sum + height, 0);
+    const factor = naturalSum > 0 ? available / naturalSum : 1;
+    let used = 0;
+    return column.map((image, index): MasonryCell => {
+      // Sidste billede tager afrundingsresten, så kolonnen rammer PRÆCIS.
+      const height =
+        index === column.length - 1
+          ? available - used
+          : Math.max(1, Math.round(naturalHeights[columnIndex][index] * factor));
+      used += height;
+      return { image, height };
+    });
+  });
+  return { columnWidth, height: target, columns };
+}
+
 // Største antal billeder/kort, blokken kan vise (layout "6 billeder").
 export const MAX_MEDIA_ITEMS = 6;
 
@@ -368,6 +495,11 @@ export interface NewsletterBlock {
   // HTML fra TextBlockEditor (Tiptap). Hver blok-instans har sit eget, uafhængige
   // indhold, så en dupliceret eller ny blok kan redigeres separat fra andre.
   content?: string;
+  // Grå hjælpetekst til en TOM tekst-blok (overskrift/brodtekst/tekst/cta) –
+  // vises i Edit-mode og Preview, så brugeren ved, hvad blokken er til (fx i
+  // "Blank skabelon"). Ren visning: bliver aldrig til indhold, og en tom blok
+  // udelades helt af den kopierede mail (se isBlankContent).
+  placeholder?: string;
   // Kun relevant for "cta"-blokken.
   ctaUrl?: string;
   // AI'ens OPRINDELIGT genererede knap-tekst, uændret – adskilt fra content
@@ -459,6 +591,15 @@ export interface NewsletterBlock {
   // lodret tekstliste (én linje pr. produkt, klikbart produktnavn) –
   // uafhængigt af layout-valget, som da kun bestemmer antallet.
   showImage?: boolean;
+  // Kun relevant for "billedeblok": de uploadede billeder (se
+  // buildMasonryColumns for masonry-gitteret).
+  masonryImages?: MasonryImage[];
+  // Fuld bredde eller masonry-gitter – se MasonryLayout/getMasonryLayout.
+  masonryLayout?: MasonryLayout;
+  // Masonry: antal kolonner. Begge visninger: afstand og hjørner.
+  masonryColumns?: MasonryColumns;
+  masonryGap?: MasonryGap;
+  masonryRadius?: CtaBorderRadius;
   // Produktkortenes kant-form og tæthed (se PRODUCT_CARD_RADIUS_PX/
   // PRODUCT_ROW_PADDING_PX) – tætheden gælder også tekstlistens linjer.
   // Farven forbliver bevidst fast sort (se NewsletterCard.tsx/
@@ -671,6 +812,66 @@ export function createDefaultBlocks(
   });
 }
 
+// Er en tekst-bloks indhold reelt tomt (fx Tiptaps tomme "<p></p>")? Så
+// vises dens placeholder i Preview, og blokken udelades af den kopierede mail.
+export function isBlankContent(content: string | undefined): boolean {
+  return !content || content.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
+}
+
+// "Blank skabelon" på Opsætning-siden: et nyhedsbrev, brugeren selv bygger
+// fra bunden – INGEN AI-generering og INGEN produktdata. Det har en typisk
+// nyhedsbrevs-opbygning med TOMME blokke, der hver viser en grå placeholder
+// (overskrift, brødtekst, billedeblok, knap), så brugeren kan se, hvad der
+// skal udfyldes. Tomme blokke kommer ikke med i den kopierede mail.
+export const BLANK_NEWSLETTER: GeneratedNewsletter = {
+  heading: "",
+  bodyText: "",
+  // altText vises i billed-blokkens tomme pladsholder (se NewsletterCard).
+  image: { productId: "", imageUrl: "", altText: "Tilføj et billede – upload dit eget eller vælg et produkt" },
+  cta: { text: "", url: "" },
+};
+
+export function createBlankBlocks(brandDefaults: BrandDefaults): NewsletterBlock[] {
+  const textDefaults = {
+    fontFamily: resolveFontFamily(brandDefaults.primaryFont),
+    textColor: brandDefaults.primaryColor,
+  };
+  return [
+    { id: "header", type: "header", hidden: false },
+    {
+      id: "overskrift",
+      type: "overskrift",
+      hidden: false,
+      content: "",
+      placeholder: "Skriv en fængende overskrift – fx 'Forårets nyheder er landet'",
+      ...textDefaults,
+    },
+    {
+      id: "brodtekst",
+      type: "brodtekst",
+      hidden: false,
+      content: "",
+      placeholder:
+        "Skriv din hilsen og brødtekst her – fortæl kort, hvad nyhedsbrevet handler om, og hvorfor modtageren skal læse videre.",
+      ...textDefaults,
+    },
+    // Billedeblokken (egne uploads) frem for "Billede & produktvisning" – et
+    // blankt nyhedsbrev har ingen produktdata at vælge imellem.
+    { id: "billedeblok", type: "billedeblok", hidden: false, masonryImages: [], masonryLayout: "fuld" },
+    { id: "skillelinje", type: "skillelinje", hidden: false },
+    {
+      id: "cta",
+      type: "cta",
+      hidden: false,
+      content: "",
+      ctaUrl: "",
+      placeholder: "Knaptekst – fx 'Se udvalget'",
+      ...textDefaults,
+    },
+    { id: "footer", type: "footer", hidden: false },
+  ];
+}
+
 export function duplicateBlock(block: NewsletterBlock): NewsletterBlock {
   return {
     ...block,
@@ -706,6 +907,10 @@ export type TemplateBlock = Pick<
   | "productBorderRadius"
   | "productDensity"
   | "showImage"
+  | "masonryLayout"
+  | "masonryColumns"
+  | "masonryGap"
+  | "masonryRadius"
 >;
 
 // Bygger den JSON-struktur, "Gem som skabelon" gemmer i Supabase, ud fra det
@@ -730,6 +935,10 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     productBorderRadius: block.productBorderRadius,
     productDensity: block.productDensity,
     showImage: block.showImage,
+    masonryLayout: block.masonryLayout,
+    masonryColumns: block.masonryColumns,
+    masonryGap: block.masonryGap,
+    masonryRadius: block.masonryRadius,
   }));
 }
 
@@ -827,6 +1036,16 @@ export function createBlocksFromTemplate(
     // er intet oprindeligt indhold at genskabe (det er strippet med vilje),
     // så blokken starter med samme pladsholdertekst som når den tilføjes
     // manuelt via "+ Tilføj blok" (se createNewBlock).
+    // Billedeblokkens billeder er indhold (strippet med vilje, ligesom
+    // galleryUploads) – blokken starter tom, klar til nye uploads, men med
+    // skabelonens visning (fuld bredde / masonry).
+    if (block.type === "billedeblok") {
+      block.masonryImages = [];
+      block.masonryLayout = templateBlock.masonryLayout;
+      block.masonryColumns = templateBlock.masonryColumns;
+      block.masonryGap = templateBlock.masonryGap;
+      block.masonryRadius = templateBlock.masonryRadius;
+    }
     if (block.type === "tekst") {
       block.content = "Ny tekstblok – redigér indholdet her";
     }
@@ -839,9 +1058,9 @@ export function createBlocksFromTemplate(
 // produktlisten er BEVIDST slået sammen til ét "billede"-valg – layout-valget
 // (1/2/3/6, se MediaLayout) og "Vis billede" vælges bagefter inde i selve
 // blokken, ikke i denne menu.
-export type AddableBlockKind = "tekst" | "billede" | "knap" | "skillelinje";
+export type AddableBlockKind = "tekst" | "billede" | "billedeblok" | "knap" | "skillelinje";
 
-export const ADDABLE_BLOCK_KINDS: AddableBlockKind[] = ["tekst", "billede", "knap", "skillelinje"];
+export const ADDABLE_BLOCK_KINDS: AddableBlockKind[] = ["tekst", "billede", "billedeblok", "knap", "skillelinje"];
 
 export function createNewBlock(kind: AddableBlockKind): NewsletterBlock {
   const id = `${kind}-${crypto.randomUUID()}`;
@@ -855,6 +1074,14 @@ export function createNewBlock(kind: AddableBlockKind): NewsletterBlock {
       // opgavebeskrivelsen ("default til INGEN valgt", ligesom det øvrige
       // billede-flow ikke gætter for brugeren). "Vis billede" starter slået TIL.
       return { id, type: "billede", hidden: false, galleryColumns: 1, showImage: true };
+    case "billedeblok":
+      return {
+        id,
+        type: "billedeblok",
+        hidden: false,
+        masonryImages: [],
+        masonryLayout: "fuld",
+      };
     case "knap":
       return { id, type: "cta", hidden: false, content: "Se sortimentet", ctaUrl: "" };
     case "skillelinje":

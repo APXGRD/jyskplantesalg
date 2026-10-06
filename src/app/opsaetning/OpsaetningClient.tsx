@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { SectionLabel, StitchShell } from "@/components/StitchShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ChevronDownIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
-import type { NewsletterBlock } from "@/lib/newsletterBlocks";
+import { BLANK_NEWSLETTER, createBlankBlocks, type NewsletterBlock } from "@/lib/newsletterBlocks";
 import { useNewsletter, type GeneratedNewsletter } from "@/context/NewsletterContext";
+import { useBrandSettings } from "@/context/BrandSettingsContext";
 import type { TemplateSummary } from "@/lib/templates";
 
 interface OpsaetningClientProps {
@@ -106,6 +107,9 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
     setSelectedTemplateId,
     setResult,
   } = useNewsletter();
+  // Kun til "Blank skabelon": tekst-blokkene starter med kundens egen
+  // skrifttype/farve, ligesom et AI-genereret nyhedsbrev.
+  const brand = useBrandSettings();
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -277,6 +281,19 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
   }
 
 
+  // "Blank skabelon": et nyhedsbrev med tomme pladsholder-blokke, som
+  // brugeren selv udfylder og bygger videre på i Edit-mode – ingen AI-kald, ingen
+  // produktsøgning, ingen data. setResult med færdige blokke springer al
+  // produkt-opslag over (se NewsletterContext.setResult).
+  function handleBlankTemplate() {
+    setError(null);
+    void setResult(
+      BLANK_NEWSLETTER,
+      createBlankBlocks({ primaryColor: brand.colors[0], primaryFont: brand.primaryFont }),
+    );
+    router.push("/preview");
+  }
+
   const audienceLabel = customerType === "erhverv" ? "Erhverv (B2B)" : "Privat (B2C)";
   const visibleCount =
     topicTotalMatchCount !== null && hasValidMaxResults
@@ -403,6 +420,15 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                   >
                     {isGenerating && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
                     {isGenerating ? "Genererer..." : "Generér nyhedsbrev"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBlankTemplate}
+                    disabled={isGenerating}
+                    title="Start med et tomt nyhedsbrev og byg det selv fra bunden – uden AI og uden produktdata"
+                    className="inline-flex items-center gap-3 rounded border border-neutral-300 bg-white px-7 py-4 font-jetbrains text-xs font-semibold tracking-wider text-black uppercase shadow-sm transition-all hover:border-black hover:bg-neutral-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Blank skabelon
                   </button>
                   {!canGenerate && (
                     <p className="font-jetbrains text-[11px] text-[#71717A]">

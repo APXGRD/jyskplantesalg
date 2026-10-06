@@ -12,6 +12,12 @@ import {
   IMAGE_SIZE_PX,
   PRODUCT_CARD_RADIUS_PX,
   PRODUCT_CARD_GAP_PX,
+  computeMasonryGrid,
+  getMasonryColumns,
+  isBlankContent,
+  getMasonryGapPx,
+  getMasonryLayout,
+  getMasonryRadiusPx,
   PRODUCT_ROW_PADDING_PX,
   getGalleryCardWidth,
   getMediaRowSize,
@@ -215,6 +221,22 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
     );
   }
 
+  // Tom tekst-blok med en placeholder (fx fra "Blank skabelon"): vis en grå,
+  // stiplet pladsholder, så nyhedsbrevet stadig ser ud som et nyhedsbrev.
+  // Kun i Preview – den kopierede mail udelader tomme blokke helt.
+  function renderTextPlaceholder(block: NewsletterBlock, className: string): ReactNode {
+    return (
+      <div className="px-8 py-3">
+        <div
+          className={`rounded-md border border-dashed border-neutral-300 px-3 py-2 text-neutral-400 italic ${className}`}
+          style={{ fontFamily: block.fontFamily }}
+        >
+          {block.placeholder}
+        </div>
+      </div>
+    );
+  }
+
   function renderBlock(block: NewsletterBlock): ReactNode {
     switch (block.type) {
       case "header": {
@@ -238,6 +260,9 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
       }
 
       case "overskrift":
+        if (isBlankContent(block.content) && block.placeholder) {
+          return renderTextPlaceholder(block, "font-serif text-[22px] leading-[1.2]");
+        }
         return (
           <div className="px-8 py-3">
             <div
@@ -249,6 +274,9 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
         );
 
       case "brodtekst":
+        if (isBlankContent(block.content) && block.placeholder) {
+          return renderTextPlaceholder(block, "text-[13px] leading-normal");
+        }
         return (
           <div className="px-8 py-3">
             <div
@@ -270,14 +298,89 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
       case "galleri":
         return block.showImage === false ? renderMediaList(block) : renderMediaCards(block);
 
+      // Billedeblokken: masonry-gitter af egne uploadede billeder, i deres
+      // egne proportioner – samme kolonnefordeling som den kopierede HTML
+      // (se buildMasonryColumns).
+      case "billedeblok": {
+        const images = block.masonryImages ?? [];
+        if (images.length === 0) {
+          return (
+            <div className="px-8 py-3">
+              <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-active">
+                <ImagePlaceholderIcon className="h-9 w-9 text-ink-faint" />
+                <p className="text-xs text-ink-faint">Upload dine egne billeder – i fuld bredde eller som masonry-gitter</p>
+              </div>
+            </div>
+          );
+        }
+        // Afstand og hjørner gælder begge visninger – samme værdier som mailen.
+        const gap = getMasonryGapPx(block);
+        const radius = getMasonryRadiusPx(block);
+        if (getMasonryLayout(block) === "fuld") {
+          // Fuld bredde: hvert billede i hele bredden, under hinanden.
+          return (
+            <div className="flex flex-col px-8 py-3" style={{ gap }}>
+              {images.map((masonryImage) => (
+                // eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI
+                <img
+                  key={masonryImage.id}
+                  src={masonryImage.src}
+                  alt={masonryImage.altText ?? ""}
+                  className="block h-auto w-full"
+                  style={{ borderRadius: radius }}
+                />
+              ))}
+            </div>
+          );
+        }
+        // Masonry: alle kolonner flugter i top og bund (se
+        // computeMasonryGrid). Containeren har gitterets samlede proportioner,
+        // og hver kolonne fylder hele højden – billederne deler den efter
+        // deres udregnede højder og beskæres centreret (object-fit: cover),
+        // præcis som de færdigbeskårne billeder i den kopierede mail.
+        const grid = computeMasonryGrid(images, getMasonryColumns(block), gap);
+        const rowWidth = grid.columns.length * grid.columnWidth + (grid.columns.length - 1) * gap;
+        return (
+          <div className="px-8 py-3">
+            <div
+              className="mx-auto flex w-full"
+              style={{ gap, maxWidth: rowWidth, aspectRatio: `${rowWidth} / ${grid.height}` }}
+            >
+              {grid.columns.map((column, columnIndex) => (
+                <div key={columnIndex} className="flex h-full min-w-0 flex-1 flex-col" style={{ gap }}>
+                  {column.map((cell) => (
+                    <div
+                      key={cell.image.id}
+                      className="min-h-0 overflow-hidden"
+                      style={{ flex: `${cell.height} 1 0px`, borderRadius: radius }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI */}
+                      <img
+                        src={cell.image.src}
+                        alt={cell.image.altText ?? ""}
+                        className="block h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
       case "skillelinje":
         return (
           <div className="px-8 py-3">
-            <hr className="border-t border-border" />
+            {/* Skillelinjen er altid sort – samme som den kopierede mail. */}
+            <hr className="border-0 border-t border-solid border-black" />
           </div>
         );
 
       case "tekst":
+        if (isBlankContent(block.content) && block.placeholder) {
+          return renderTextPlaceholder(block, "text-[13px] leading-relaxed");
+        }
         return (
           <div className="px-8 py-3">
             <div
@@ -338,7 +441,12 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
               style={ctaStyle}
               className="inline-flex items-center gap-1 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline"
             >
-              <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />
+              {isBlankContent(block.content) && block.placeholder ? (
+                // Tom knap: vis knaptekstens placeholder halvt gennemsigtigt.
+                <span className="italic opacity-60">{block.placeholder}</span>
+              ) : (
+                <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />
+              )}
             </a>
           </div>
         );
