@@ -69,3 +69,14 @@ body {
   color: var(--foreground);
   font-family: var(--font-dm-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Tiptap-pladsholder (TextBlockEditor's `placeholder`): grå hjælpetekst i et
+   tomt tekstfelt – forsvinder, så snart der skrives. */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: #a3a3a3;
+  font-style: italic;
+}

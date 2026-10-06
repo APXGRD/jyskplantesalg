@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterHtml, buildNewsletterText } from "@/lib/newsletterExport";
+import { cropMasonryImagesForExport } from "@/lib/masonryExport";
 import { buildTemplateBlockStructure } from "@/lib/newsletterBlocks";
 import { SectionLabel, StitchShell } from "@/components/StitchShell";
 import { SegmentedControl } from "@/components/preview/SegmentedControl";
@@ -85,9 +86,20 @@ export default function PreviewPage() {
   const [productsError, setProductsError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
+  // Et nyhedsbrev uden produktsæt (fx "Blank skabelon" fra Opsætning) har
+  // ingen produkter at vælge imellem – katalogets produkter hentes da slet
+  // ikke (selectedProducts herunder ville alligevel være tom).
+  const hasProductSet = topicMatchedProductIds !== null;
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (!hasProductSet) {
+        setAllProducts([]);
+        setProductsError(null);
+        setIsLoadingProducts(false);
+        return;
+      }
       setIsLoadingProducts(true);
       setProductsError(null);
       try {
@@ -117,7 +129,7 @@ export default function PreviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [retryToken]);
+  }, [retryToken, hasProductSet]);
 
   function retryLoadProducts() {
     setRetryToken((token) => token + 1);
@@ -144,13 +156,22 @@ export default function PreviewPage() {
   async function handleCopy() {
     if (!result) return;
 
-    const html = buildNewsletterHtml(blocks, result.image, customerType, selectedProducts, brand);
     const text = buildNewsletterText(blocks, result.image, customerType, selectedProducts, brand);
+    // Masonry-billeder beskæres (asynkront) til deres plads, før HTML'en
+    // bygges – se cropMasonryImagesForExport. Givet som et løfte direkte til
+    // ClipboardItem, så kopieringen stadig sker inden for selve klikket
+    // (Safari afviser ellers udklipsholderen efter en asynkron pause).
+    const htmlBlob = cropMasonryImagesForExport(blocks).then(
+      (exportBlocks) =>
+        new Blob([buildNewsletterHtml(exportBlocks, result.image, customerType, selectedProducts, brand)], {
+          type: "text/html",
+        }),
+    );
 
     try {
       if (typeof ClipboardItem !== "undefined") {
         const item = new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
+          "text/html": htmlBlob,
           "text/plain": new Blob([text], { type: "text/plain" }),
         });
         await navigator.clipboard.write([item]);

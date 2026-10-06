@@ -25,6 +25,7 @@ import { TextBlockEditor } from "@/components/TextBlockEditor";
 import { ImageBlockControls } from "@/components/ImageBlockControls";
 import { GalleryBlockControls, type GallerySlotMode } from "@/components/GalleryBlockControls";
 import { ColorSwatches } from "@/components/ColorSwatches";
+import { MasonryBlockControls } from "@/components/MasonryBlockControls";
 import { getContrastTextColor, stripColorStyles } from "@/lib/brandColors";
 import { formatFooterAddressLine, useBrandSettings } from "@/context/BrandSettingsContext";
 import { FONT_FAMILIES, stripFontFamilyStyles, stripFontSizeStyles } from "@/lib/fontFamilies";
@@ -33,6 +34,7 @@ import {
   ChevronDownIcon,
   DividerIcon,
   DuplicateIcon,
+  GalleryIcon,
   EyeIcon,
   EyeOffIcon,
   GearIcon,
@@ -52,6 +54,8 @@ import {
   getGallerySlots,
   getSingleImageProduct,
   getGalleryArrangement,
+  getMasonryColumns,
+  getMasonryLayout,
   getMediaRowSize,
   isGalleryLayout,
   resolveSingleImageUrl,
@@ -64,6 +68,10 @@ import {
   type CtaStyle,
   type GalleryArrangement,
   type GalleryUpload,
+  type MasonryColumns,
+  type MasonryGap,
+  type MasonryImage,
+  type MasonryLayout,
   type MediaLayout,
   type ImageAlignment,
   type ImageSize,
@@ -72,7 +80,7 @@ import {
 } from "@/lib/newsletterBlocks";
 import { SearchableProductChecklist } from "@/components/SearchableProductChecklist";
 
-type BlockBadge = "Struktur" | "AI-tekst" | "Produktdata";
+type BlockBadge = "Struktur" | "AI-tekst" | "Produktdata" | "Egne billeder";
 
 // "billede" er den eneste type, ny kode fra nu af producerer; "img" og
 // "galleri" er kun stadig anerkendte type-strenge, så allerede gemte
@@ -99,6 +107,7 @@ const BLOCK_META: Record<BlockType, { title: string; subtitle?: string; badge: B
   img: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
   produkt: { title: "Produkt", badge: "Produktdata" },
   galleri: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
+  billedeblok: { title: "Billedeblok", subtitle: "Fuld bredde / masonry", badge: "Egne billeder" },
 };
 
 // Den samlede billede-/produktblok er nyhedsbrevets kerne og fremhæves med
@@ -115,6 +124,12 @@ const ADD_BLOCK_OPTIONS: {
 }[] = [
   { kind: "tekst", label: "Tekst", icon: TextIcon },
   { kind: "billede", label: MEDIA_BLOCK_TITLE, description: MEDIA_BLOCK_DESCRIPTION, icon: ImagePlaceholderIcon },
+  {
+    kind: "billedeblok",
+    label: "Billedeblok",
+    description: "Egne uploadede billeder i fuld bredde eller masonry-gitter",
+    icon: GalleryIcon,
+  },
   { kind: "knap", label: "Knap", icon: ButtonIcon },
   { kind: "skillelinje", label: "Skillelinje", icon: DividerIcon },
 ];
@@ -123,6 +138,7 @@ const BADGE_STYLES: Record<BlockBadge, string> = {
   Struktur: "border-neutral-300 bg-white text-neutral-600",
   "AI-tekst": "border-emerald-300 bg-emerald-50 text-emerald-800",
   Produktdata: "border-black bg-black text-white",
+  "Egne billeder": "border-sky-300 bg-sky-50 text-sky-800",
 };
 
 function Badge({ type }: { type: BlockBadge }) {
@@ -319,6 +335,11 @@ interface BlockContentProps {
   // Billede-/Galleri-blokkens "Vis billede"-kontakt og produktkortenes
   // kant-form/tæthed.
   onShowImageChange: (showImage: boolean) => void;
+  // Kun relevant for "billedeblok": de uploadede billeder og antal kolonner.
+  onMasonryImagesChange: (images: MasonryImage[]) => void;
+  onMasonryLayoutChange: (layout: MasonryLayout) => void;
+  // Billedeblok: kolonner (masonry), afstand og hjørner.
+  onMasonryPatch: (patch: Pick<NewsletterBlock, "masonryColumns" | "masonryGap" | "masonryRadius">) => void;
   onProductBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
   onProductDensityChange: (density: ProductListDensity) => void;
   products: ShopifyProduct[];
@@ -358,6 +379,9 @@ function BlockContent({
   onGallerySlotUploadChange,
   onImageProductSelect,
   onShowImageChange,
+  onMasonryImagesChange,
+  onMasonryLayoutChange,
+  onMasonryPatch,
   onProductBorderRadiusChange,
   onProductDensityChange,
   products,
@@ -402,6 +426,7 @@ function BlockContent({
             onFontFamilyChange={onFontFamilyChange}
             onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
+            placeholder={block.placeholder}
           />
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
         </div>
@@ -419,6 +444,7 @@ function BlockContent({
             onFontFamilyChange={onFontFamilyChange}
             onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
+            placeholder={block.placeholder}
           />
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
         </div>
@@ -436,6 +462,7 @@ function BlockContent({
             onFontFamilyChange={onFontFamilyChange}
             onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
+            placeholder={block.placeholder}
           />
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
         </div>
@@ -635,11 +662,27 @@ function BlockContent({
         </select>
       );
 
+    case "billedeblok":
+      return (
+        <MasonryBlockControls
+          images={block.masonryImages ?? []}
+          layout={getMasonryLayout(block)}
+          columns={getMasonryColumns(block)}
+          gap={block.masonryGap ?? "lille"}
+          radius={block.masonryRadius ?? "skarp"}
+          onImagesChange={onMasonryImagesChange}
+          onLayoutChange={onMasonryLayoutChange}
+          onColumnsChange={(masonryColumns: MasonryColumns) => onMasonryPatch({ masonryColumns })}
+          onGapChange={(masonryGap: MasonryGap) => onMasonryPatch({ masonryGap })}
+          onRadiusChange={(masonryRadius) => onMasonryPatch({ masonryRadius })}
+        />
+      );
+
     case "skillelinje":
       return (
         <div className="flex items-center justify-between gap-4">
           <p className={helpTextClassName}>Visuel luft mellem indhold og knappen.</p>
-          <span className="h-px w-24 shrink-0 bg-neutral-400" aria-hidden />
+          <span className="h-px w-24 shrink-0 bg-black" aria-hidden />
         </div>
       );
 
@@ -666,6 +709,7 @@ function BlockContent({
               onFontFamilyChange={onFontFamilyChange}
               onFontSizeChange={onFontSizeChange}
               showColorPicker={false}
+              placeholder={block.placeholder}
             />
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1234,6 +1278,21 @@ export function EditorBlockList({
 
   // Slår "Vis billede" til/fra – skifter kun visningen (kort vs. tekstliste),
   // ikke produktvalget, så CTA-linket er uændret.
+  function handleMasonryImagesChange(id: string, masonryImages: MasonryImage[]) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, masonryImages } : block)));
+  }
+
+  function handleMasonryPatch(
+    id: string,
+    patch: Pick<NewsletterBlock, "masonryColumns" | "masonryGap" | "masonryRadius">,
+  ) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ...patch } : block)));
+  }
+
+  function handleMasonryLayoutChange(id: string, masonryLayout: MasonryLayout) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, masonryLayout } : block)));
+  }
+
   function handleShowImageChange(id: string, showImage: boolean) {
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, showImage } : block)));
   }
@@ -1420,6 +1479,9 @@ export function EditorBlockList({
                     onGallerySlotUploadChange={(index, upload) => handleGallerySlotUploadChange(block.id, index, upload)}
                     onImageProductSelect={(productId) => handleImageProductSelect(block.id, productId)}
                     onShowImageChange={(showImage) => handleShowImageChange(block.id, showImage)}
+                    onMasonryImagesChange={(images) => handleMasonryImagesChange(block.id, images)}
+                    onMasonryLayoutChange={(layout) => handleMasonryLayoutChange(block.id, layout)}
+                    onMasonryPatch={(patch) => handleMasonryPatch(block.id, patch)}
                     onProductBorderRadiusChange={(borderRadius) => handleProductBorderRadiusChange(block.id, borderRadius)}
                     onProductDensityChange={(density) => handleProductDensityChange(block.id, density)}
                     products={products}

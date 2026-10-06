@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FocusEvent } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
+import { Placeholder } from "@tiptap/extensions";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { FONT_FAMILIES } from "@/lib/fontFamilies";
 import { BoldIcon, ChevronDownIcon, ItalicIcon, MinusIcon, PlusIcon, UnderlineIcon } from "@/components/icons";
@@ -38,6 +39,10 @@ interface TextBlockEditorProps {
   // det fælles textColor-felt. Default true (uændret for overskrift/
   // brødtekst/tekst, hvor per-udsnit farve stadig er meningsfuldt).
   showColorPicker?: boolean;
+  // Grå hjælpetekst, der vises, mens feltet er tomt (fx i "Blank skabelon"),
+  // og forsvinder, så snart der skrives. Er KUN en visning – bliver aldrig en
+  // del af blokkens indhold.
+  placeholder?: string;
 }
 
 const DEFAULT_FONT_SIZE = 13;
@@ -76,6 +81,7 @@ export function TextBlockEditor({
   onFontFamilyChange,
   onFontSizeChange,
   showColorPicker = true,
+  placeholder,
 }: TextBlockEditorProps) {
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +96,9 @@ export function TextBlockEditor({
   const editor = useEditor(
     {
       immediatelyRender: false,
-      extensions: EDITOR_EXTENSIONS,
+      extensions: placeholder
+        ? [...EDITOR_EXTENSIONS, Placeholder.configure({ placeholder, emptyEditorClass: "is-editor-empty" })]
+        : EDITOR_EXTENSIONS,
       content,
       editorProps: {
         attributes: {
