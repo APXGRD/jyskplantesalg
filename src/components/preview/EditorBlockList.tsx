@@ -26,6 +26,7 @@ import { ImageBlockControls } from "@/components/ImageBlockControls";
 import { GalleryBlockControls, type GallerySlotMode } from "@/components/GalleryBlockControls";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { MasonryBlockControls } from "@/components/MasonryBlockControls";
+import { CtaButton, SocialButtons } from "@/components/preview/NewsletterCard";
 import { getContrastTextColor, stripColorStyles } from "@/lib/brandColors";
 import { formatFooterAddressLine, useBrandSettings } from "@/context/BrandSettingsContext";
 import { FONT_FAMILIES, stripFontFamilyStyles, stripFontSizeStyles } from "@/lib/fontFamilies";
@@ -43,6 +44,7 @@ import {
   ImagePlaceholderIcon,
   PlusIcon,
   RefreshIcon,
+  ShareIcon,
   SpinnerIcon,
   TextIcon,
   TrashIcon,
@@ -54,12 +56,14 @@ import {
   getGalleryProductSlotCount,
   getGallerySlots,
   getSingleImageProduct,
-  getGalleryArrangement,
+  getMediaRowOptions,
   getMasonryColumns,
   getMasonryLayout,
   getMediaRowSize,
+  getSocialLinks,
   isGalleryLayout,
   resolveSingleImageUrl,
+  SOCIAL_PLATFORMS,
   MEDIA_LAYOUT_OPTIONS,
   RICH_TEXT_BLOCK_TYPES,
   type AddableBlockKind,
@@ -67,7 +71,6 @@ import {
   type CtaBorderRadius,
   type CtaPadding,
   type CtaStyle,
-  type GalleryArrangement,
   type GalleryUpload,
   type MasonryColumns,
   type MasonryGap,
@@ -109,6 +112,7 @@ const BLOCK_META: Record<BlockType, { title: string; subtitle?: string; badge: B
   produkt: { title: "Produkt", badge: "Produktdata" },
   galleri: { title: MEDIA_BLOCK_TITLE, badge: "Produktdata" },
   billedeblok: { title: "Billedeblok", subtitle: "Fuld bredde / masonry", badge: "Egne billeder" },
+  socials: { title: "Sociale medier", subtitle: "Facebook, Instagram …", badge: "Struktur" },
 };
 
 // Den samlede billede-/produktblok er nyhedsbrevets kerne og fremhæves med
@@ -132,6 +136,12 @@ const ADD_BLOCK_OPTIONS: {
     icon: GalleryIcon,
   },
   { kind: "knap", label: "Knap", icon: ButtonIcon },
+  {
+    kind: "socials",
+    label: "Sociale medier",
+    description: "Links til fx Facebook, Instagram og LinkedIn",
+    icon: ShareIcon,
+  },
   { kind: "skillelinje", label: "Skillelinje", icon: DividerIcon },
 ];
 
@@ -239,11 +249,14 @@ function ArrangementPreview({ count, perRow }: { count: number; perRow: number }
   );
 }
 
-// Tekst til "Fordelt på flere rækker" for et givent antal, fx "2 + 2".
-function describeGridRows(count: number): string {
-  const perRow = getMediaRowSize({ galleryColumns: count as MediaLayout, galleryArrangement: "grid" });
+// Tekst til et "Placering"-valg: `count` billeder med `perRow` pr. række,
+// fx "Alle på én række (6)", "3 + 3", "2 + 2 + 2" eller "Under hinanden".
+function describeRows(count: number, perRow: number): string {
+  if (perRow >= count) return `Alle på én række (${count})`;
   if (perRow === 1) return "Under hinanden";
-  return `${perRow} + ${count - perRow}`;
+  const rows: number[] = [];
+  for (let remaining = count; remaining > 0; remaining -= perRow) rows.push(Math.min(perRow, remaining));
+  return rows.join(" + ");
 }
 
 // CTA-blokkens udvidede styling (Padding/Knap-form/Stil) er sammenklappet som
@@ -323,8 +336,8 @@ interface BlockContentProps {
   onCtaStyleChange: (style: CtaStyle) => void;
   onGalleryProductIdsChange: (productIds: string[]) => void;
   onGalleryColumnsChange: (layout: MediaLayout) => void;
-  // Galleri-layout: alle billeder på én række eller fordelt på flere rækker.
-  onGalleryArrangementChange: (arrangement: GalleryArrangement) => void;
+  // Galleri-layout: antal billeder pr. række ("Placering").
+  onGalleryPerRowChange: (perRow: number) => void;
   // Galleri-layout: skift en enkelt plads mellem produkt og upload, og sæt
   // en upload-plads' billede/alt-tekst.
   onGallerySlotModeChange: (index: number, mode: GallerySlotMode) => void;
@@ -341,6 +354,8 @@ interface BlockContentProps {
   onMasonryLayoutChange: (layout: MasonryLayout) => void;
   // Billedeblok: kolonner (masonry), afstand og hjørner.
   onMasonryPatch: (patch: Pick<NewsletterBlock, "masonryColumns" | "masonryGap" | "masonryRadius">) => void;
+  // Sociale medier: links pr. platform og overskrift.
+  onSocialsPatch: (patch: Pick<NewsletterBlock, "socialLinks" | "socialHeading">) => void;
   onProductBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
   onProductDensityChange: (density: ProductListDensity) => void;
   products: ShopifyProduct[];
@@ -375,7 +390,7 @@ function BlockContent({
   onCtaStyleChange,
   onGalleryProductIdsChange,
   onGalleryColumnsChange,
-  onGalleryArrangementChange,
+  onGalleryPerRowChange,
   onGallerySlotModeChange,
   onGallerySlotUploadChange,
   onImageProductSelect,
@@ -383,6 +398,7 @@ function BlockContent({
   onMasonryImagesChange,
   onMasonryLayoutChange,
   onMasonryPatch,
+  onSocialsPatch,
   onProductBorderRadiusChange,
   onProductDensityChange,
   products,
@@ -546,25 +562,13 @@ function BlockContent({
             <div className="flex max-w-md flex-col gap-1.5">
               <span className={labelClassName}>Placering:</span>
               <SegmentedButtons
-                value={getGalleryArrangement(block)}
-                onChange={onGalleryArrangementChange}
-                options={[
-                  {
-                    value: "row",
-                    label: `Alle på én række (${layout})`,
-                    preview: <ArrangementPreview count={layout} perRow={layout} />,
-                  },
-                  {
-                    value: "grid",
-                    label: `Flere rækker (${describeGridRows(layout)})`,
-                    preview: (
-                      <ArrangementPreview
-                        count={layout}
-                        perRow={getMediaRowSize({ galleryColumns: layout, galleryArrangement: "grid" })}
-                      />
-                    ),
-                  },
-                ]}
+                value={String(getMediaRowSize(block))}
+                onChange={(perRow) => onGalleryPerRowChange(Number(perRow))}
+                options={getMediaRowOptions(layout).map((perRow) => ({
+                  value: String(perRow),
+                  label: describeRows(layout, perRow),
+                  preview: <ArrangementPreview count={layout} perRow={perRow} />,
+                }))}
               />
             </div>
           )}
@@ -679,6 +683,85 @@ function BlockContent({
         />
       );
 
+    case "socials": {
+      const hasLinks = getSocialLinks(block).length > 0;
+      const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
+      return (
+        <div className="flex flex-col gap-4">
+          {/* Forhåndsvisning – samme rendering som i nyhedsbrevet (SocialButtons). */}
+          <div className="flex flex-col gap-1">
+            <span className={labelClassName}>Forhåndsvisning:</span>
+            <div className="border border-neutral-200 bg-white px-3 py-4" aria-hidden>
+              {hasLinks ? (
+                <SocialButtons block={block} asLinks={false} />
+              ) : (
+                <p className="text-center font-jetbrains text-[11px] text-neutral-400 italic">
+                  Udfyld mindst ét link herunder
+                </p>
+              )}
+            </div>
+          </div>
+
+          <label className="flex flex-col gap-1">
+            <span className={labelClassName}>Overskrift (valgfri):</span>
+            <input
+              value={block.socialHeading ?? ""}
+              onChange={(event) => onSocialsPatch({ socialHeading: event.target.value })}
+              placeholder="F.eks. Følg os"
+              className={fieldClassName}
+            />
+          </label>
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className={`${labelClassName} mb-1`}>
+              Links – kun udfyldte vises i nyhedsbrevet:
+            </legend>
+            {SOCIAL_PLATFORMS.map((platform) => (
+              <label key={platform.id} className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-2">
+                <span className="font-jetbrains text-xs text-neutral-800">{platform.label}</span>
+                <input
+                  type="url"
+                  inputMode="url"
+                  value={block.socialLinks?.[platform.id] ?? ""}
+                  onChange={(event) =>
+                    onSocialsPatch({ socialLinks: { ...block.socialLinks, [platform.id]: event.target.value } })
+                  }
+                  placeholder={platform.example}
+                  aria-label={`Link til ${platform.label}`}
+                  className={fieldClassName}
+                />
+              </label>
+            ))}
+          </fieldset>
+
+          <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+            <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
+            {isOutline ? (
+              <p className="font-jetbrains text-[11px] text-neutral-400">
+                I kontur-stil bruges knapfarven til både kant og tekst.
+              </p>
+            ) : (
+              <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <span className={labelClassName}>Form:</span>
+              <SegmentedButtons
+                options={CTA_BORDER_RADIUS_OPTIONS}
+                value={block.ctaBorderRadius ?? "pille"}
+                onChange={onCtaBorderRadiusChange}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className={labelClassName}>Stil:</span>
+              <SegmentedButtons options={CTA_STYLE_OPTIONS} value={block.ctaStyle ?? "udfyldt"} onChange={onCtaStyleChange} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     case "skillelinje":
       return (
         <div className="flex items-center justify-between gap-4">
@@ -690,6 +773,16 @@ function BlockContent({
     case "cta":
       return (
         <div className="flex flex-col gap-4">
+          {/* Lille forhåndsvisning af selve knappen – PRÆCIS samme rendering
+              som i nyhedsbrevet (CtaButton), ligesom header/footer har deres
+              egen forhåndsvisning. Øverst, så den kan ses, mens der rettes i
+              farver, padding, form og stil herunder. */}
+          <div className="flex flex-col gap-1">
+            <span className={labelClassName}>Forhåndsvisning:</span>
+            <div className="flex justify-center border border-neutral-200 bg-white px-3 py-4" aria-hidden>
+              <CtaButton block={block} asLink={false} />
+            </div>
+          </div>
           <label className="flex flex-col gap-1">
             <span className={labelClassName}>Destinationslink:</span>
             <input
@@ -1221,8 +1314,8 @@ export function EditorBlockList({
   // billed-forhåndsvisningen ikke bliver tom, mens produktvælgeren stadig
   // viser produktet som valgt. Har blokken allerede sin egen imageUrl (fra
   // upload ELLER et tidligere produktvalg), røres den slet ikke.
-  function handleGalleryArrangementChange(id: string, galleryArrangement: GalleryArrangement) {
-    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, galleryArrangement } : block)));
+  function handleGalleryPerRowChange(id: string, galleryPerRow: number) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, galleryPerRow } : block)));
   }
 
   function handleGalleryColumnsChange(id: string, layout: MediaLayout) {
@@ -1335,6 +1428,10 @@ export function EditorBlockList({
     id: string,
     patch: Pick<NewsletterBlock, "masonryColumns" | "masonryGap" | "masonryRadius">,
   ) {
+    onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ...patch } : block)));
+  }
+
+  function handleSocialsPatch(id: string, patch: Pick<NewsletterBlock, "socialLinks" | "socialHeading">) {
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ...patch } : block)));
   }
 
@@ -1457,7 +1554,7 @@ export function EditorBlockList({
         onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}
         onGalleryProductIdsChange={(productIds) => handleGalleryProductIdsChange(block.id, productIds)}
         onGalleryColumnsChange={(layout) => handleGalleryColumnsChange(block.id, layout)}
-        onGalleryArrangementChange={(arrangement) => handleGalleryArrangementChange(block.id, arrangement)}
+        onGalleryPerRowChange={(perRow) => handleGalleryPerRowChange(block.id, perRow)}
         onGallerySlotModeChange={(index, mode) => handleGallerySlotModeChange(block.id, index, mode)}
         onGallerySlotUploadChange={(index, upload) => handleGallerySlotUploadChange(block.id, index, upload)}
         onImageProductSelect={(productId) => handleImageProductSelect(block.id, productId)}
@@ -1465,6 +1562,7 @@ export function EditorBlockList({
         onMasonryImagesChange={(images) => handleMasonryImagesChange(block.id, images)}
         onMasonryLayoutChange={(layout) => handleMasonryLayoutChange(block.id, layout)}
         onMasonryPatch={(patch) => handleMasonryPatch(block.id, patch)}
+        onSocialsPatch={(patch) => handleSocialsPatch(block.id, patch)}
         onProductBorderRadiusChange={(borderRadius) => handleProductBorderRadiusChange(block.id, borderRadius)}
         onProductDensityChange={(density) => handleProductDensityChange(block.id, density)}
         products={products}

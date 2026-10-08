@@ -50,7 +50,10 @@ export type BlockType =
   | "galleri"
   // Selvstændig billedblok: egne uploadede billeder (INTET med produkterne at
   // gøre) vist som masonry-gitter – se MasonryImage/buildMasonryColumns.
-  | "billedeblok";
+  | "billedeblok"
+  // Links til virksomhedens sociale medier (Facebook, Instagram …) – se
+  // SOCIAL_PLATFORMS/getSocialLinks.
+  | "socials";
 
 export type ImageAlignment = "venstre" | "center" | "hoejre";
 export type ImageSize = "lille" | "mellem" | "fuld";
@@ -151,13 +154,32 @@ export function getGalleryArrangement(
   return block.galleryArrangement ?? ((block.galleryColumns ?? 1) <= 3 ? "row" : "grid");
 }
 
-// Billeder pr. række. "row": alle på én række. "grid": fordelt på (typisk)
-// to rækker, med den fyldigste række først – 2 → 1 + 1 (under hinanden),
-// 3 → 2 + 1, 4 → 2 + 2, 5 → 3 + 2, 6 → 3 + 3.
-export function getMediaRowSize(block: Pick<NewsletterBlock, "galleryColumns" | "galleryArrangement">): number {
+// Billeder pr. række. Har brugeren valgt et antal pr. række (galleryPerRow,
+// fx 2 ved 6 billeder = 2 + 2 + 2), bruges det.
+// Ellers den ældre placering: "row" = alle på én række; "grid" = fordelt på
+// (typisk) to rækker, med den fyldigste række først – 2 → 1 + 1 (under
+// hinanden), 3 → 2 + 1, 4 → 2 + 2, 5 → 3 + 2, 6 → 3 + 3.
+export function getMediaRowSize(
+  block: Pick<NewsletterBlock, "galleryColumns" | "galleryArrangement" | "galleryPerRow">,
+): number {
   const count = block.galleryColumns ?? 1;
   if (count <= 1) return 1;
+  // Et valg, der ikke passer til det nuværende antal (fx "3 pr. række" valgt
+  // ved 6 billeder, hvorefter antallet er ændret til 4), ignoreres – så
+  // falder placeringen tilbage til standarden herunder.
+  if (block.galleryPerRow && getMediaRowOptions(count).includes(block.galleryPerRow)) return block.galleryPerRow;
   return getGalleryArrangement(block) === "row" ? count : Math.ceil(count / 2);
+}
+
+// "Placering"-valgene (antal billeder pr. række) for et givent antal
+// billeder: alle på én række, fordelt på to rækker, og 2 pr. række – fx
+// 6 → [6, 3, 2] (6 / 3 + 3 / 2 + 2 + 2), 5 → [5, 3, 2], 4 → [4, 2],
+// 3 → [3, 2], 2 → [2, 1] (side om side / under hinanden).
+export function getMediaRowOptions(count: number): number[] {
+  if (count <= 1) return [1];
+  const options = [count, Math.ceil(count / 2), 2];
+  if (count === 2) options.push(1);
+  return [...new Set(options)].sort((a, b) => b - a);
 }
 
 // Nyhedsbrevets indholdsbredde i den kopierede HTML: 600px - 2×1px ydre ramme
@@ -458,6 +480,51 @@ export function computeMasonryGrid(images: MasonryImage[], columnCount: number, 
   return { columnWidth, height: target, columns };
 }
 
+// De sociale medier, Sociale medier-blokken understøtter – i den rækkefølge,
+// de vises. Knapperne er tekst (platformens navn), IKKE logo-billeder: et
+// logo i en mail skal være et billede på en offentlig server (Gmail blokerer
+// indlejrede billeder, Outlook viser ikke SVG), så tekstknapper er den
+// eneste form, der virker i alle mail-klienter.
+export type SocialPlatform = "facebook" | "instagram" | "linkedin" | "youtube" | "tiktok" | "pinterest" | "x";
+
+export const SOCIAL_PLATFORMS: { id: SocialPlatform; label: string; example: string }[] = [
+  { id: "facebook", label: "Facebook", example: "https://facebook.com/jeresside" },
+  { id: "instagram", label: "Instagram", example: "https://instagram.com/jeresprofil" },
+  { id: "linkedin", label: "LinkedIn", example: "https://linkedin.com/company/jeresfirma" },
+  { id: "youtube", label: "YouTube", example: "https://youtube.com/@jereskanal" },
+  { id: "tiktok", label: "TikTok", example: "https://tiktok.com/@jeresprofil" },
+  { id: "pinterest", label: "Pinterest", example: "https://pinterest.com/jeresprofil" },
+  { id: "x", label: "X", example: "https://x.com/jeresprofil" },
+];
+
+// Et link uden protokol (fx "facebook.com/side") får "https://" foran, så
+// det virker som link i mailen.
+export function normalizeSocialUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+// De udfyldte links i platform-rækkefølge – kun dem vises i nyhedsbrevet.
+export function getSocialLinks(
+  block: Pick<NewsletterBlock, "socialLinks">,
+): { platform: SocialPlatform; label: string; url: string }[] {
+  return SOCIAL_PLATFORMS.flatMap(({ id, label }) => {
+    const url = normalizeSocialUrl(block.socialLinks?.[id] ?? "");
+    return url ? [{ platform: id, label, url }] : [];
+  });
+}
+
+// Højst så mange knapper pr. række – flere brydes til en ny række (ens i
+// Preview og mailen, så 7 knapper ikke bliver for brede til mailen).
+export const SOCIALS_PER_ROW = 4;
+
+export function chunkSocialLinks<T>(links: T[]): T[][] {
+  const rows: T[][] = [];
+  for (let index = 0; index < links.length; index += SOCIALS_PER_ROW) rows.push(links.slice(index, index + SOCIALS_PER_ROW));
+  return rows;
+}
+
 // Største antal billeder/kort, blokken kan vise (layout "6 billeder").
 export const MAX_MEDIA_ITEMS = 6;
 
@@ -577,6 +644,9 @@ export interface NewsletterBlock {
   // rækker (se GalleryArrangement/getMediaRowSize). undefined = standard
   // efter antal (se getGalleryArrangement).
   galleryArrangement?: GalleryArrangement;
+  // Antal billeder pr. række, valgt under "Placering" (se getMediaRowOptions/
+  // getMediaRowSize) – har forrang for galleryArrangement ovenfor.
+  galleryPerRow?: number;
   // Kun relevant ved galleri-layout (2/3/6). Én post pr. billedplads (index =
   // pladsens nummer): et GalleryUpload-objekt betyder "denne plads viser et
   // manuelt uploadet billede"; null/undefined/manglende post betyder
@@ -600,6 +670,11 @@ export interface NewsletterBlock {
   masonryColumns?: MasonryColumns;
   masonryGap?: MasonryGap;
   masonryRadius?: CtaBorderRadius;
+  // Kun relevant for "socials": et link pr. platform (tom/manglende = vises
+  // ikke) og en valgfri overskrift over knapperne (fx "Følg os"). Knappernes
+  // farve/stil/form genbruger CTA-felterne bgColor/ctaStyle/ctaBorderRadius.
+  socialLinks?: Partial<Record<SocialPlatform, string>>;
+  socialHeading?: string;
   // Produktkortenes kant-form og tæthed (se PRODUCT_CARD_RADIUS_PX/
   // PRODUCT_ROW_PADDING_PX) – tætheden gælder også tekstlistens linjer.
   // Farven forbliver bevidst fast sort (se NewsletterCard.tsx/
@@ -904,6 +979,7 @@ export type TemplateBlock = Pick<
   | "ctaStyle"
   | "galleryColumns"
   | "galleryArrangement"
+  | "galleryPerRow"
   | "productBorderRadius"
   | "productDensity"
   | "showImage"
@@ -911,6 +987,8 @@ export type TemplateBlock = Pick<
   | "masonryColumns"
   | "masonryGap"
   | "masonryRadius"
+  | "socialLinks"
+  | "socialHeading"
 >;
 
 // Bygger den JSON-struktur, "Gem som skabelon" gemmer i Supabase, ud fra det
@@ -932,6 +1010,7 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     ctaStyle: block.ctaStyle,
     galleryColumns: block.galleryColumns,
     galleryArrangement: block.galleryArrangement,
+    galleryPerRow: block.galleryPerRow,
     productBorderRadius: block.productBorderRadius,
     productDensity: block.productDensity,
     showImage: block.showImage,
@@ -939,6 +1018,10 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     masonryColumns: block.masonryColumns,
     masonryGap: block.masonryGap,
     masonryRadius: block.masonryRadius,
+    // Sociale medie-links er virksomhedens faste profiler (ikke AI-tekst
+    // eller et produktvalg) – de følger med skabelonen.
+    socialLinks: block.socialLinks,
+    socialHeading: block.socialHeading,
   }));
 }
 
@@ -995,7 +1078,10 @@ export function createBlocksFromTemplate(
       ctaPadding: templateBlock.ctaPadding,
       ctaBorderRadius: templateBlock.ctaBorderRadius,
       ctaStyle: templateBlock.ctaStyle,
+      socialLinks: templateBlock.socialLinks,
+      socialHeading: templateBlock.socialHeading,
       galleryArrangement: templateBlock.galleryArrangement,
+      galleryPerRow: templateBlock.galleryPerRow,
       productBorderRadius: templateBlock.productBorderRadius,
       productDensity: templateBlock.productDensity,
       showImage: templateBlock.showImage,
@@ -1058,9 +1144,9 @@ export function createBlocksFromTemplate(
 // produktlisten er BEVIDST slået sammen til ét "billede"-valg – layout-valget
 // (1/2/3/6, se MediaLayout) og "Vis billede" vælges bagefter inde i selve
 // blokken, ikke i denne menu.
-export type AddableBlockKind = "tekst" | "billede" | "billedeblok" | "knap" | "skillelinje";
+export type AddableBlockKind = "tekst" | "billede" | "billedeblok" | "knap" | "socials" | "skillelinje";
 
-export const ADDABLE_BLOCK_KINDS: AddableBlockKind[] = ["tekst", "billede", "billedeblok", "knap", "skillelinje"];
+export const ADDABLE_BLOCK_KINDS: AddableBlockKind[] = ["tekst", "billede", "billedeblok", "knap", "socials", "skillelinje"];
 
 export function createNewBlock(kind: AddableBlockKind): NewsletterBlock {
   const id = `${kind}-${crypto.randomUUID()}`;
@@ -1074,6 +1160,17 @@ export function createNewBlock(kind: AddableBlockKind): NewsletterBlock {
       // opgavebeskrivelsen ("default til INGEN valgt", ligesom det øvrige
       // billede-flow ikke gætter for brugeren). "Vis billede" starter slået TIL.
       return { id, type: "billede", hidden: false, galleryColumns: 1, showImage: true };
+    case "socials":
+      return {
+        id,
+        type: "socials",
+        hidden: false,
+        socialHeading: "Følg os",
+        socialLinks: {},
+        bgColor: "#111111",
+        ctaStyle: "udfyldt",
+        ctaBorderRadius: "pille",
+      };
     case "billedeblok":
       return {
         id,

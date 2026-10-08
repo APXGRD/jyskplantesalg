@@ -12,7 +12,9 @@ import {
   IMAGE_SIZE_PX,
   PRODUCT_CARD_RADIUS_PX,
   PRODUCT_CARD_GAP_PX,
+  chunkSocialLinks,
   computeMasonryGrid,
+  getSocialLinks,
   getMasonryColumns,
   isBlankContent,
   getMasonryGapPx,
@@ -54,6 +56,97 @@ interface NewsletterCardProps {
   selectedBlockId?: string | null;
   onSelectBlock?: (id: string) => void;
   getBlockLabel?: (block: NewsletterBlock) => string;
+}
+
+// Sociale medier-blokkens overskrift + knapper, PRÆCIS som i nyhedsbrevet –
+// delt af NewsletterCard og blokkens forhåndsvisning i editorens sidepanel.
+// Samme farve-/stil-/form-felter som CTA-knappen (bgColor/ctaStyle/
+// ctaBorderRadius). `asLinks={false}` (sidepanelet) viser knapperne uden at
+// være klikbare links.
+export function SocialButtons({ block, asLinks = true }: { block: NewsletterBlock; asLinks?: boolean }) {
+  const links = getSocialLinks(block);
+  const bgColor = block.bgColor || "#111111";
+  const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
+  const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
+  const buttonStyle: CSSProperties = {
+    borderRadius: CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "pille"],
+    padding: "6px 14px",
+    color: textColor,
+    ...(isOutline ? { backgroundColor: "transparent", border: `2px solid ${bgColor}` } : { backgroundColor: bgColor }),
+  };
+  const buttonClassName = "inline-block text-xs font-semibold leading-tight";
+  return (
+    <div className="flex flex-col items-center gap-2" style={{ fontFamily: block.fontFamily }}>
+      {block.socialHeading?.trim() && (
+        <p className="text-[13px] font-semibold" style={{ color: "#1a1a1a" }}>
+          {block.socialHeading.trim()}
+        </p>
+      )}
+      {chunkSocialLinks(links).map((row, rowIndex) => (
+        <div key={rowIndex} className="flex justify-center gap-2">
+          {row.map((link) =>
+            asLinks ? (
+              <a key={link.platform} href={link.url} target="_blank" rel="noreferrer" style={buttonStyle} className={buttonClassName}>
+                {link.label}
+              </a>
+            ) : (
+              <span key={link.platform} style={buttonStyle} className={buttonClassName}>
+                {link.label}
+              </span>
+            ),
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// CTA-knappen, PRÆCIS som den vises i nyhedsbrevet – delt af NewsletterCard
+// og CTA-blokkens forhåndsvisning i editorens sidepanel (EditorBlockList), så
+// de to aldrig kan se forskellige ud. `asLink={false}` (sidepanelet) viser
+// knappen uden at være et klikbart link.
+export function CtaButton({ block, asLink = true }: { block: NewsletterBlock; asLink?: boolean }) {
+  const bgColor = block.bgColor || "#3a5837";
+  const padding = CTA_PADDING_PX[block.ctaPadding ?? "normal"];
+  const borderRadius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "afrundet"];
+  const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
+  // "kontur": ingen baggrund, kun en 2px kant i bgColor, og knap-teksten
+  // får samme farve som konturen. "udfyldt": knap-TEKSTENS farve følger
+  // en global/per-blok textColor-vælger hvis sat, ellers den automatisk
+  // udregnede kontrastfarve mod baggrunden.
+  const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
+  const ctaStyle: CSSProperties = {
+    fontFamily: block.fontFamily,
+    fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
+    borderRadius,
+    paddingTop: padding.vertical,
+    paddingBottom: padding.vertical,
+    paddingLeft: padding.horizontal,
+    paddingRight: padding.horizontal,
+    color: textColor,
+    ...(isOutline ? { backgroundColor: "transparent", border: `2px solid ${bgColor}` } : { backgroundColor: bgColor }),
+  };
+  const className = "inline-flex items-center gap-1 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline";
+  const label =
+    isBlankContent(block.content) && block.placeholder ? (
+      // Tom knap: vis knaptekstens placeholder i kursiv – i PRÆCIS den valgte
+      // tekstfarve (ingen gennemsigtighed, som fik fx hvid til at se grå ud).
+      <span className="italic">{block.placeholder}</span>
+    ) : (
+      <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />
+    );
+  if (!asLink) {
+    return (
+      <span style={ctaStyle} className={className}>
+        {label}
+      </span>
+    );
+  }
+  return (
+    <a href={block.ctaUrl || "#"} target="_blank" rel="noreferrer" style={ctaStyle} className={className}>
+      {label}
+    </a>
+  );
 }
 
 export function NewsletterCard({
@@ -427,48 +520,28 @@ export function NewsletterCard({
         );
       }
 
-      case "cta": {
-        const bgColor = block.bgColor || "#3a5837";
-        const padding = CTA_PADDING_PX[block.ctaPadding ?? "normal"];
-        const borderRadius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "afrundet"];
-        const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
-        // "kontur": ingen baggrund, kun en 2px kant i bgColor, og knap-teksten
-        // får samme farve som konturen. "udfyldt": knap-TEKSTENS farve følger
-        // en global/per-blok textColor-vælger hvis sat, ellers den automatisk
-        // udregnede kontrastfarve mod baggrunden.
-        const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
-        const ctaStyle: CSSProperties = {
-          fontFamily: block.fontFamily,
-          fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
-          borderRadius,
-          paddingTop: padding.vertical,
-          paddingBottom: padding.vertical,
-          paddingLeft: padding.horizontal,
-          paddingRight: padding.horizontal,
-          color: textColor,
-          ...(isOutline
-            ? { backgroundColor: "transparent", border: `2px solid ${bgColor}` }
-            : { backgroundColor: bgColor }),
-        };
+      case "cta":
         return (
           <div className="flex justify-center px-8 py-3">
-            <a
-              href={block.ctaUrl || "#"}
-              target="_blank"
-              rel="noreferrer"
-              style={ctaStyle}
-              className="inline-flex items-center gap-1 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline"
-            >
-              {isBlankContent(block.content) && block.placeholder ? (
-                // Tom knap: vis knaptekstens placeholder halvt gennemsigtigt.
-                <span className="italic opacity-60">{block.placeholder}</span>
-              ) : (
-                <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />
-              )}
-            </a>
+            <CtaButton block={block} />
           </div>
         );
-      }
+
+      case "socials":
+        if (getSocialLinks(block).length === 0) {
+          return (
+            <div className="px-8 py-3">
+              <div className="rounded-md border border-dashed border-neutral-300 px-3 py-4 text-center text-xs text-neutral-400 italic">
+                Tilføj links til jeres sociale medier – fx Facebook og Instagram
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="px-8 py-3">
+            <SocialButtons block={block} />
+          </div>
+        );
 
       case "footer": {
         const bgColor = block.bgColor || "#f5f7f4";

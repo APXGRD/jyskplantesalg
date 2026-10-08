@@ -7,7 +7,9 @@ import {
   IMAGE_ALIGN_CSS,
   PRODUCT_CARD_GAP_PX,
   RICH_TEXT_BLOCK_TYPES,
+  chunkSocialLinks,
   computeMasonryGrid,
+  getSocialLinks,
   isBlankContent,
   getMasonryColumns,
   getMasonryGapPx,
@@ -251,6 +253,39 @@ function renderMediaListHtml(
       </td></tr>`;
 }
 
+// Sociale medier-blokken: overskrift + knapper med platformens navn (samme
+// farve/stil/form-felter som CTA-knappen). Hver knap er en <td> med bgcolor
+// (Outlook) og style (øvrige klienter) og et <a> indeni – samme bulletproof-
+// teknik som CTA-knappen. Højst SOCIALS_PER_ROW knapper pr. række, ens med
+// Preview. Uden udfyldte links udelades blokken.
+function renderSocialsHtml(block: NewsletterBlock): string {
+  const links = getSocialLinks(block);
+  if (links.length === 0) return "";
+  const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+  const bgColor = block.bgColor || "#111111";
+  const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
+  const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
+  const radius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "pille"];
+  const cellBgcolorAttr = isOutline ? "" : ` bgcolor="${bgColor}"`;
+  const cellFill = isOutline ? `border:2px solid ${bgColor};` : `background:${bgColor};`;
+  const heading = block.socialHeading?.trim();
+  const headingRow = heading
+    ? `<tr><td style="padding:12px 32px 0;text-align:center;font-family:${fontFamily};font-size:13px;font-weight:bold;color:#1a1a1a;">${escapeHtml(heading)}</td></tr>`
+    : "";
+  const rows = chunkSocialLinks(links)
+    .map((row, rowIndex) => {
+      const cells = row
+        .map(
+          (link) =>
+            `<td${cellBgcolorAttr} align="center" style="${cellFill}border-radius:${radius}px;padding:6px 14px;font-family:${fontFamily};"><a href="${escapeAttr(link.url)}" target="_blank" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-size:12px;font-weight:bold;line-height:1.25;display:inline-block;">${escapeHtml(link.label)}</a></td>`,
+        )
+        .join(`<td width="8" style="width:8px;font-size:0;line-height:0;">&nbsp;</td>`);
+      return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:${rowIndex === 0 ? "0" : "8px"} auto 0;border-collapse:separate;"><tr>${cells}</tr></table>`;
+    })
+    .join("");
+  return `${headingRow}<tr><td style="padding:${heading ? "8px" : "12px"} 32px 12px;">${rows}</td></tr>`;
+}
+
 // Billedeblokken: masonry-gitter af egne uploadede billeder. Outlook
 // understøtter hverken CSS columns, grid eller flexbox – gitteret bygges
 // derfor som ÉN tabelrække med en celle pr. kolonne (fast bredde, valign
@@ -368,6 +403,9 @@ function renderBlockHtml(
 
     case "billedeblok":
       return renderMasonryHtml(block);
+
+    case "socials":
+      return renderSocialsHtml(block);
 
     case "skillelinje":
       // Skillelinjen er altid sort (samme som Preview).
@@ -503,6 +541,13 @@ function renderBlockText(
       });
       // Tom blok (intet billede) – udelades, ligesom i HTML-udgaven.
       return lines.join("\n");
+    }
+
+    case "socials": {
+      const links = getSocialLinks(block);
+      if (links.length === 0) return "";
+      const heading = block.socialHeading?.trim();
+      return [heading, ...links.map((link) => `${link.label}: ${link.url}`)].filter(Boolean).join("\n");
     }
 
     case "billedeblok":

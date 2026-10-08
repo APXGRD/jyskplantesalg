@@ -9,7 +9,7 @@
 
 import { getSupabaseClient } from "@/lib/supabase";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
-import { extractSearchWordCandidates, normalizeWord } from "@/lib/searchWords";
+import { extractSearchWordCandidates, normalizeWord, type SearchWordCandidate } from "@/lib/searchWords";
 
 // PostgREST begrænser som standard ét enkelt select-svar til 1000 rækker
 // (db-max-rows), uanset det faktiske antal rækker i tabellen – uden denne
@@ -119,10 +119,10 @@ export async function getCachedPlantForms(): Promise<string[]> {
 // ("Beskriv dit nyhedsbrev") er udfyldt OG intet produkt er manuelt valgt,
 // i stedet for at slå manuelt valgte produkt-id'er op. Understøtter
 // en hel, naturlig sætning: splitter emne-teksten op i enkeltord, fjerner
-// danske fyld-ord (DANISH_STOP_WORDS), og matcher et produkt, hvis dets
-// title, productType ELLER tags indeholder MINDST ÉT af de resterende,
-// meningsfulde ord (efter samme bøjnings-normalisering, se normalizeWord)
-// som delstreng – case-insensitivt. Ingen grænse på antal matches; læser fra
+// danske fyld-ord (DANISH_STOP_WORDS), og finder de produkter, hvis title,
+// productType ELLER tags indeholder FLEST af de resterende, meningsfulde ord
+// (efter samme bøjnings-normalisering, se normalizeWord) som delstreng –
+// case-insensitivt ("bedste match", se searchCachedProductsByTopic). Ingen grænse på antal matches; læser fra
 // den samme cache som al anden produkt-hentning (ingen Shopify-kald).
 //
 // onlyWithImage (default false, samme "Kun med billede"-kontakt som på
@@ -224,8 +224,9 @@ export async function searchCachedProductsByTopic(
   if (candidates.length === 0) return { products: [], matchedWords: [], totalMatchCount: 0 };
 
   const { products } = await getCachedProducts();
-  const matchedProducts: ShopifyProduct[] = [];
-  const matchedWords = new Set<string>();
+  // Hvert produkt, der matcher mindst ét søgeord, med de søgeord, det
+  // matcher (se "bedste match" herunder).
+  const scoredProducts: { product: ShopifyProduct; words: SearchWordCandidate[] }[] = [];
 
   for (const product of products) {
     if (onlyWithImage && !product.hasImage) continue;
@@ -241,15 +242,26 @@ export async function searchCachedProductsByTopic(
     // matcher) – et andet produkt kunne ellers være den ENESTE bekræftelse
     // for et senere kandidat-ord, som aldrig ville blive tjekket, hvis
     // løkken stoppede ved produktets første træf.
-    let productMatched = false;
-    for (const candidate of candidates) {
-      if (haystack.some((haystackWord) => haystackWord.includes(candidate.normalized))) {
-        productMatched = true;
-        matchedWords.add(candidate.original);
-      }
-    }
-    if (productMatched) matchedProducts.push(product);
+    const words = candidates.filter((candidate) =>
+      haystack.some((haystackWord) => haystackWord.includes(candidate.normalized)),
+    );
+    if (words.length > 0) scoredProducts.push({ product, words });
   }
+
+  // "Bedste match": kun de produkter, der matcher FLEST af søgeordene,
+  // medtages – ikke alle, der matcher bare ét. Uden dette ville fx "japansk
+  // kirsebær" også tage alle japanske ahorn/kristtorn med (de matcher
+  // "japansk"), selvom der findes produkter, der matcher BEGGE ord. Ord, der
+  // slet ingen produkter rammer (fx instruks-ord som "pæn"), påvirker ikke
+  // resultatet. Matcher intet produkt flere ord på én gang (fx "æbletræer og
+  // pæretræer" – intet produkt er begge dele), er det bedste match ét ord, og
+  // ALLE produkter, der matcher et af ordene, medtages som hidtil.
+  const bestScore = Math.max(0, ...scoredProducts.map((scored) => scored.words.length));
+  const bestMatches = scoredProducts.filter((scored) => scored.words.length === bestScore);
+  const matchedProducts = bestMatches.map((scored) => scored.product);
+  // Kun ord, der rent faktisk gav et af de MEDTAGNE produkter (fx ikke
+  // "japansk" alene fra en udeladt ahorn) – bruges til CTA-søgelinket.
+  const matchedWords = new Set(bestMatches.flatMap((scored) => scored.words.map((word) => word.original)));
 
   // Alfabetisk (dansk sortering), så resultatet er forudsigeligt og
   // testbart – IKKE en påstået "bedste"/mest populære udvælgelse, siden der
