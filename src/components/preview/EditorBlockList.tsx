@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -30,6 +30,7 @@ import { getContrastTextColor, stripColorStyles } from "@/lib/brandColors";
 import { formatFooterAddressLine, useBrandSettings } from "@/context/BrandSettingsContext";
 import { FONT_FAMILIES, stripFontFamilyStyles, stripFontSizeStyles } from "@/lib/fontFamilies";
 import {
+  ArrowLeftIcon,
   ButtonIcon,
   ChevronDownIcon,
   DividerIcon,
@@ -144,7 +145,7 @@ const BADGE_STYLES: Record<BlockBadge, string> = {
 function Badge({ type }: { type: BlockBadge }) {
   return (
     <span
-      className={`hidden border px-2 py-0.5 font-jetbrains text-[10px] font-semibold tracking-wider uppercase sm:inline ${BADGE_STYLES[type]}`}
+      className={`hidden shrink-0 border px-1.5 py-0.5 font-jetbrains text-[9px] font-semibold tracking-wider uppercase @sm:inline ${BADGE_STYLES[type]}`}
     >
       {type}
     </span>
@@ -272,7 +273,7 @@ function CtaAdvancedControls({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
       <div className="flex flex-col gap-1.5">
         <span className={labelClassName}>Knap-form:</span>
         <SegmentedButtons
@@ -399,7 +400,7 @@ function BlockContent({
       return (
         <div className="flex flex-col gap-3">
           <p className={helpTextClassName}>Logo og butiksnavn – vises fast øverst i nyhedsbrevet.</p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
             <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
             <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
           </div>
@@ -620,7 +621,7 @@ function BlockContent({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-3 @lg:grid-cols-2">
           {/* Kant-form gælder kun kortene – tekstlisten har ingen kort. */}
           {showImage && (
             <div className="flex flex-col gap-1.5">
@@ -712,7 +713,7 @@ function BlockContent({
               placeholder={block.placeholder}
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
             <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
             {(block.ctaStyle ?? "udfyldt") === "kontur" ? (
               <p className="font-jetbrains text-[11px] text-neutral-400">
@@ -736,7 +737,7 @@ function BlockContent({
       return (
         <div className="flex flex-col gap-3">
           <p className={helpTextClassName}>Adresse, CVR og afmeldingslink – vises fast nederst.</p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
             <ColorSwatches label="Baggrund" value={block.bgColor} onChange={onBgColorChange} />
             <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
           </div>
@@ -754,16 +755,79 @@ function BlockContent({
   }
 }
 
+// Blokkens tre handlinger (duplikér/skjul/slet) – samme knapper i den
+// kompakte blokliste og i den valgte bloks panel-header.
+function BlockActions({
+  block,
+  title,
+  onDuplicate,
+  onToggleHidden,
+  onDelete,
+}: {
+  block: NewsletterBlock;
+  title: string;
+  onDuplicate: () => void;
+  onToggleHidden: () => void;
+  onDelete: () => void;
+}) {
+  const iconButtonClassName =
+    "flex h-7 w-7 items-center justify-center text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-2 focus-visible:outline-black";
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <button
+        type="button"
+        onClick={onDuplicate}
+        aria-label={`Dupliker blokken ${title}`}
+        title="Duplikér blok"
+        className={iconButtonClassName}
+      >
+        <DuplicateIcon className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={onToggleHidden}
+        aria-label={block.hidden ? `Vis blokken ${title}` : `Skjul blokken ${title}`}
+        aria-pressed={block.hidden}
+        title={block.hidden ? "Vis blok" : "Skjul blok"}
+        className={iconButtonClassName}
+      >
+        {block.hidden ? <EyeOffIcon className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`Slet blokken ${title}`}
+        title="Slet blok"
+        className="flex h-7 w-7 items-center justify-center text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-black"
+      >
+        <TrashIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function blockLabel(number: number, title: string, subtitle?: string) {
+  return (
+    <>
+      {String(number).padStart(2, "0")}. {title}
+      {subtitle && <span className="font-normal text-neutral-500">{` // ${subtitle}`}</span>}
+    </>
+  );
+}
+
+// Én række i sidepanelets kompakte blokliste (når ingen blok er valgt):
+// træk-håndtag (dnd-kit), blokkens navn som knap, der vælger blokken, og
+// duplikér/skjul/slet.
 function SortableBlockRow({
   block,
   number,
   title,
   subtitle,
   badge,
+  onSelect,
   onDuplicate,
   onToggleHidden,
   onDelete,
-  children,
 }: {
   block: NewsletterBlock;
   // Blokkens position i nyhedsbrevet (1-baseret) – vises som "01.".
@@ -771,10 +835,10 @@ function SortableBlockRow({
   title: string;
   subtitle?: string;
   badge: BlockBadge;
+  onSelect: () => void;
   onDuplicate: () => void;
   onToggleHidden: () => void;
   onDelete: () => void;
-  children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.id,
@@ -785,76 +849,45 @@ function SortableBlockRow({
     transition,
     opacity: isDragging ? 0.6 : undefined,
   };
-  const emphasized = isMediaBlockType(block.type);
-  const iconButtonClassName =
-    "flex h-7 w-7 items-center justify-center text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black";
 
   return (
-    <article
+    <li
       ref={setNodeRef}
       style={style}
-      className={`bg-white transition-shadow duration-150 ${
-        emphasized ? "border-2 border-black shadow-sm" : "border border-black shadow-xs hover:shadow-md"
-      } ${isDragging ? "shadow-lg" : ""} ${block.hidden ? "opacity-60 grayscale" : ""}`}
+      className={`flex items-center justify-between gap-2 border border-neutral-300 bg-white px-2 py-1.5 transition-shadow hover:border-black ${
+        isDragging ? "shadow-lg" : ""
+      } ${block.hidden ? "opacity-60" : ""}`}
     >
-      <div
-        className={`flex items-center justify-between gap-3 border-b px-3 py-2 sm:px-4 ${
-          emphasized ? "border-black bg-neutral-100" : "border-neutral-200 bg-[#fafaf8]"
-        }`}
-      >
-        <div className="flex min-w-0 items-center gap-2.5">
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            aria-label={`Flyt blokken ${title}`}
-            title="Træk for at flytte blokken op/ned"
-            className="-ml-1 shrink-0 cursor-grab touch-none p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-black active:cursor-grabbing"
-          >
-            <GripIcon className="h-4 w-4" />
-          </button>
-          <p className="truncate font-jetbrains text-xs font-bold tracking-wider text-neutral-900 uppercase">
-            {String(number).padStart(2, "0")}. {title}
-            {subtitle && <span className="font-normal text-neutral-500">{` // ${subtitle}`}</span>}
-          </p>
-          <Badge type={badge} />
-        </div>
-
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={onDuplicate}
-            aria-label={`Dupliker blokken ${title}`}
-            title="Duplikér blok"
-            className={iconButtonClassName}
-          >
-            <DuplicateIcon className="h-3.5 w-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onToggleHidden}
-            aria-label={block.hidden ? `Vis blokken ${title}` : `Skjul blokken ${title}`}
-            aria-pressed={block.hidden}
-            title={block.hidden ? "Vis blok" : "Skjul blok"}
-            className={iconButtonClassName}
-          >
-            {block.hidden ? <EyeOffIcon className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={onDelete}
-            aria-label={`Slet blokken ${title}`}
-            title="Slet blok"
-            className="flex h-7 w-7 items-center justify-center text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-700"
-          >
-            <TrashIcon className="h-3.5 w-3.5" />
-          </button>
-        </div>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label={`Flyt blokken ${title}`}
+          title="Træk for at flytte blokken op/ned"
+          className="shrink-0 cursor-grab touch-none p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-black focus-visible:outline-2 focus-visible:outline-black active:cursor-grabbing"
+        >
+          <GripIcon className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          id={`block-row-${block.id}`}
+          onClick={onSelect}
+          aria-label={`Rediger blokken ${title}${block.hidden ? " (skjult)" : ""}`}
+          className="min-w-0 flex-1 truncate py-1 text-left font-jetbrains text-xs font-bold tracking-wider text-neutral-900 uppercase hover:underline focus-visible:outline-2 focus-visible:outline-black"
+        >
+          {blockLabel(number, title, subtitle)}
+        </button>
+        <Badge type={badge} />
       </div>
-      <div className={emphasized ? "p-4 sm:p-5" : "p-4"}>{children}</div>
-    </article>
+      <BlockActions
+        block={block}
+        title={title}
+        onDuplicate={onDuplicate}
+        onToggleHidden={onToggleHidden}
+        onDelete={onDelete}
+      />
+    </li>
   );
 }
 
@@ -978,6 +1011,19 @@ interface EditorBlockListProps {
   // "Regenerér tekst" til at give AI'en samme tone-/fokus-instruks som
   // oprindeligt, uden at det ellers påvirker noget i selve editoren.
   instructions: string;
+  // Den blok, sidepanelet viser kontroller for (null = vis bloklisten).
+  // Styres af preview-siden, så et klik på en blok i selve nyhedsbrevet og
+  // et klik i listen her vælger den samme blok.
+  selectedBlockId: string | null;
+  onSelectBlock: (id: string | null) => void;
+  // Ekstra indhold nederst i bloklisten (fx preview-sidens inspektør).
+  listFooter?: React.ReactNode;
+}
+
+// Blokkens visningsnavn – bruges også af preview-siden til nyhedsbrevets
+// klikbare blokke (aria-label).
+export function getBlockTitle(type: BlockType): string {
+  return BLOCK_META[type].title;
 }
 
 export function EditorBlockList({
@@ -988,6 +1034,9 @@ export function EditorBlockList({
   topicSearchTerm,
   customerType,
   instructions,
+  selectedBlockId,
+  onSelectBlock,
+  listFooter,
 }: EditorBlockListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -1351,11 +1400,30 @@ export function EditorBlockList({
 
   function handleDelete(id: string) {
     onBlocksChange(blocks.filter((block) => block.id !== id));
+    // Den slettede blok kan ikke længere være valgt – tilbage til listen.
+    if (id === selectedBlockId) onSelectBlock(null);
   }
 
+  // Den nye blok vælges med det samme, så dens kontroller vises i panelet.
   function handleAddBlock(kind: AddableBlockKind) {
-    onBlocksChange([...blocks, createNewBlock(kind)]);
+    const newBlock = createNewBlock(kind);
+    onBlocksChange([...blocks, newBlock]);
+    onSelectBlock(newBlock.id);
   }
+
+  // Fokus-styring for tastatur/skærmlæser: når en blok vælges, flyttes
+  // fokus til panelets overskrift (som annoncerer blokkens navn); når man går
+  // tilbage til listen, får den netop forladte bloks række fokus igen.
+  const selectedHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousSelectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedBlockId) {
+      selectedHeadingRef.current?.focus({ preventScroll: true });
+    } else if (previousSelectedRef.current) {
+      document.getElementById(`block-row-${previousSelectedRef.current}`)?.focus({ preventScroll: true });
+    }
+    previousSelectedRef.current = selectedBlockId;
+  }, [selectedBlockId]);
 
   // Alle tekst-blokke sættes altid samlet af handleGlobalFontChange/
   // handleGlobalColorChange, så deres fontFamily/textColor-felter i praksis
@@ -1365,8 +1433,111 @@ export function EditorBlockList({
   const globalFontFamily = firstTextBlock?.fontFamily ?? "";
   const globalTextColor = firstTextBlock?.textColor;
 
+  // Den valgte bloks kontroller – de eksisterende kontrol-komponenter
+  // (BlockContent), uændret, blot vist i sidepanelet for én blok ad gangen.
+  function renderBlockContent(block: NewsletterBlock) {
+    return (
+      <BlockContent
+        block={block}
+        onContentChange={(html) => handleContentChange(block.id, html)}
+        onCtaUrlChange={(url) => handleCtaUrlChange(block.id, url)}
+        onProductIdChange={(productId) => handleProductIdChange(block.id, productId)}
+        onImageChange={(imageUrl) => handleImageChange(block.id, imageUrl)}
+        onAltTextChange={(altText) => handleAltTextChange(block.id, altText)}
+        onImageTitleChange={(imageTitle) => handleImageTitleChange(block.id, imageTitle)}
+        onImagePriceChange={(imagePrice) => handleImagePriceChange(block.id, imagePrice)}
+        onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
+        onSizeChange={(size) => handleSizeChange(block.id, size)}
+        onBgColorChange={(color) => handleBgColorChange(block.id, color)}
+        onTextColorChange={(color) => handleTextColorChange(block.id, color)}
+        onFontFamilyChange={(fontFamily) => handleBlockFontFamilyChange(block.id, fontFamily)}
+        onFontSizeChange={(fontSize) => handleBlockFontSizeChange(block.id, fontSize)}
+        onCtaPaddingChange={(padding) => handleCtaPaddingChange(block.id, padding)}
+        onCtaBorderRadiusChange={(borderRadius) => handleCtaBorderRadiusChange(block.id, borderRadius)}
+        onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}
+        onGalleryProductIdsChange={(productIds) => handleGalleryProductIdsChange(block.id, productIds)}
+        onGalleryColumnsChange={(layout) => handleGalleryColumnsChange(block.id, layout)}
+        onGalleryArrangementChange={(arrangement) => handleGalleryArrangementChange(block.id, arrangement)}
+        onGallerySlotModeChange={(index, mode) => handleGallerySlotModeChange(block.id, index, mode)}
+        onGallerySlotUploadChange={(index, upload) => handleGallerySlotUploadChange(block.id, index, upload)}
+        onImageProductSelect={(productId) => handleImageProductSelect(block.id, productId)}
+        onShowImageChange={(showImage) => handleShowImageChange(block.id, showImage)}
+        onMasonryImagesChange={(images) => handleMasonryImagesChange(block.id, images)}
+        onMasonryLayoutChange={(layout) => handleMasonryLayoutChange(block.id, layout)}
+        onMasonryPatch={(patch) => handleMasonryPatch(block.id, patch)}
+        onProductBorderRadiusChange={(borderRadius) => handleProductBorderRadiusChange(block.id, borderRadius)}
+        onProductDensityChange={(density) => handleProductDensityChange(block.id, density)}
+        products={products}
+        topicMatchedProductIds={topicMatchedProductIds}
+        customerType={customerType}
+      />
+    );
+  }
+
+  const selectedIndex = selectedBlockId ? blocks.findIndex((block) => block.id === selectedBlockId) : -1;
+  const selectedBlock = selectedIndex >= 0 ? blocks[selectedIndex] : undefined;
+
+  if (selectedBlock) {
+    const meta = BLOCK_META[selectedBlock.type];
+    return (
+      <div
+        className="@container flex w-full flex-col gap-4"
+        onKeyDown={(event) => {
+          // Escape lukker blokkens kontroller og går tilbage til listen.
+          if (event.key === "Escape" && !event.defaultPrevented) onSelectBlock(null);
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => onSelectBlock(null)}
+          className="inline-flex w-fit items-center gap-1.5 border border-neutral-300 bg-white px-3 py-1.5 font-jetbrains text-xs text-neutral-800 transition-colors hover:border-black focus-visible:outline-2 focus-visible:outline-black"
+        >
+          <ArrowLeftIcon className="h-3.5 w-3.5" />
+          Alle blokke
+        </button>
+        <section
+          aria-labelledby="selected-block-heading"
+          className={`bg-white ${isMediaBlockType(selectedBlock.type) ? "border-2 border-black" : "border border-black"} ${
+            selectedBlock.hidden ? "opacity-70" : ""
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-neutral-200 bg-[#fafaf8] px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2
+                id="selected-block-heading"
+                ref={selectedHeadingRef}
+                tabIndex={-1}
+                className="truncate font-jetbrains text-xs font-bold tracking-wider text-neutral-900 uppercase focus:outline-none"
+              >
+                {blockLabel(selectedIndex + 1, meta.title, meta.subtitle)}
+              </h2>
+              <Badge type={meta.badge} />
+            </div>
+            <BlockActions
+              block={selectedBlock}
+              title={meta.title}
+              onDuplicate={() => handleDuplicate(selectedBlock.id)}
+              onToggleHidden={() => handleToggleHidden(selectedBlock.id)}
+              onDelete={() => handleDelete(selectedBlock.id)}
+            />
+          </div>
+          {selectedBlock.hidden && (
+            <p className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 font-jetbrains text-[11px] text-neutral-500">
+              Blokken er skjult og vises ikke i nyhedsbrevet.
+            </p>
+          )}
+          {/* key: kontrollerne monteres forfra ved skift til en anden blok
+              (fx Tiptap-editorens indhold/placeholder og lokal UI-tilstand). */}
+          <div key={selectedBlock.id} className="p-4">
+            {renderBlockContent(selectedBlock)}
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-4">
+    <div className="@container flex w-full flex-col gap-4">
       {/* Typografi & farveprofil for hele nyhedsbrevet */}
       <section
         className="flex flex-wrap items-center justify-between gap-3 border border-neutral-300 bg-white p-3.5 font-jetbrains text-xs shadow-xs"
@@ -1431,7 +1602,7 @@ export function EditorBlockList({
           <GripIcon className="h-3.5 w-3.5 shrink-0" />
           Træk i håndtagene for at ændre rækkefølgen af sektionerne
         </span>
-        <span className="hidden shrink-0 text-neutral-500 sm:inline">
+        <span className="hidden shrink-0 text-neutral-500 @md:inline">
           {blocks.filter((block) => !block.hidden).length} blokke aktive · {blocks.filter((block) => block.hidden).length}{" "}
           skjult
         </span>
@@ -1439,7 +1610,7 @@ export function EditorBlockList({
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
-          <div className="flex flex-col gap-4">
+          <ol className="flex flex-col gap-1.5" aria-label="Nyhedsbrevets blokke">
             {blocks.map((block, index) => {
               const meta = BLOCK_META[block.type];
               return (
@@ -1450,52 +1621,20 @@ export function EditorBlockList({
                   title={meta.title}
                   subtitle={meta.subtitle}
                   badge={meta.badge}
+                  onSelect={() => onSelectBlock(block.id)}
                   onDuplicate={() => handleDuplicate(block.id)}
                   onToggleHidden={() => handleToggleHidden(block.id)}
                   onDelete={() => handleDelete(block.id)}
-                >
-                  <BlockContent
-                    block={block}
-                    onContentChange={(html) => handleContentChange(block.id, html)}
-                    onCtaUrlChange={(url) => handleCtaUrlChange(block.id, url)}
-                    onProductIdChange={(productId) => handleProductIdChange(block.id, productId)}
-                    onImageChange={(imageUrl) => handleImageChange(block.id, imageUrl)}
-                    onAltTextChange={(altText) => handleAltTextChange(block.id, altText)}
-                    onImageTitleChange={(imageTitle) => handleImageTitleChange(block.id, imageTitle)}
-                    onImagePriceChange={(imagePrice) => handleImagePriceChange(block.id, imagePrice)}
-                    onAlignmentChange={(alignment) => handleAlignmentChange(block.id, alignment)}
-                    onSizeChange={(size) => handleSizeChange(block.id, size)}
-                    onBgColorChange={(color) => handleBgColorChange(block.id, color)}
-                    onTextColorChange={(color) => handleTextColorChange(block.id, color)}
-                    onFontFamilyChange={(fontFamily) => handleBlockFontFamilyChange(block.id, fontFamily)}
-                    onFontSizeChange={(fontSize) => handleBlockFontSizeChange(block.id, fontSize)}
-                    onCtaPaddingChange={(padding) => handleCtaPaddingChange(block.id, padding)}
-                    onCtaBorderRadiusChange={(borderRadius) => handleCtaBorderRadiusChange(block.id, borderRadius)}
-                    onCtaStyleChange={(style) => handleCtaStyleChange(block.id, style)}
-                    onGalleryProductIdsChange={(productIds) => handleGalleryProductIdsChange(block.id, productIds)}
-                    onGalleryColumnsChange={(layout) => handleGalleryColumnsChange(block.id, layout)}
-                    onGalleryArrangementChange={(arrangement) => handleGalleryArrangementChange(block.id, arrangement)}
-                    onGallerySlotModeChange={(index, mode) => handleGallerySlotModeChange(block.id, index, mode)}
-                    onGallerySlotUploadChange={(index, upload) => handleGallerySlotUploadChange(block.id, index, upload)}
-                    onImageProductSelect={(productId) => handleImageProductSelect(block.id, productId)}
-                    onShowImageChange={(showImage) => handleShowImageChange(block.id, showImage)}
-                    onMasonryImagesChange={(images) => handleMasonryImagesChange(block.id, images)}
-                    onMasonryLayoutChange={(layout) => handleMasonryLayoutChange(block.id, layout)}
-                    onMasonryPatch={(patch) => handleMasonryPatch(block.id, patch)}
-                    onProductBorderRadiusChange={(borderRadius) => handleProductBorderRadiusChange(block.id, borderRadius)}
-                    onProductDensityChange={(density) => handleProductDensityChange(block.id, density)}
-                    products={products}
-                    topicMatchedProductIds={topicMatchedProductIds}
-                    customerType={customerType}
-                  />
-                </SortableBlockRow>
+                />
               );
             })}
-
-            <AddBlockMenu onAdd={handleAddBlock} />
-          </div>
+          </ol>
         </SortableContext>
       </DndContext>
+
+      <AddBlockMenu onAdd={handleAddBlock} />
+
+      {listFooter}
     </div>
   );
 }
