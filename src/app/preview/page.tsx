@@ -9,11 +9,12 @@ import { buildTemplateBlockStructure } from "@/lib/newsletterBlocks";
 import { SectionLabel, StitchShell } from "@/components/StitchShell";
 import { SegmentedControl } from "@/components/preview/SegmentedControl";
 import { NewsletterCard } from "@/components/preview/NewsletterCard";
-import { EditorBlockList } from "@/components/preview/EditorBlockList";
+import { EditorBlockList, getBlockTitle } from "@/components/preview/EditorBlockList";
 import { SaveTemplateDialog } from "@/components/preview/SaveTemplateDialog";
 import {
   ArrowLeftIcon,
   CheckIcon,
+  ChevronDownIcon,
   CopyIcon,
   DesktopIcon,
   DocumentIcon,
@@ -58,7 +59,6 @@ function InspectorCard({
   );
 }
 
-type View = "preview" | "rediger";
 type Viewport = "desktop" | "mobil";
 type CopyState = "idle" | "copied" | "error";
 type SaveTemplateState = "idle" | "saved";
@@ -75,7 +75,17 @@ export default function PreviewPage() {
     useNewsletter();
   const brand = useBrandSettings();
 
-  const [activeView, setActiveView] = useState<View>("preview");
+  // Én samlet visning (Shopify-stil): nyhedsbrevet i midten og et sidepanel
+  // med den valgte bloks kontroller. null = sidepanelet viser bloklisten.
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  // Kun på smal skærm, hvor sidepanelet er et panel i bunden: er det foldet
+  // ud? (På bred skærm er sidepanelet altid synligt.)
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  function selectBlock(id: string | null) {
+    setSelectedBlockId(id);
+    if (id) setIsPanelOpen(true);
+  }
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
@@ -211,6 +221,11 @@ export default function PreviewPage() {
 
   const isB2B = customerType === "erhverv";
 
+  // Editoren (sidepanelet) vises kun, når der er et nyhedsbrev at redigere.
+  const showEditor = Boolean(result) && !isLoadingProducts && !productsError;
+  // Den valgte blok – kan forsvinde (fx slettet), så slås op hver gang.
+  const selectedBlock = selectedBlockId ? blocks.find((block) => block.id === selectedBlockId) : undefined;
+
   return (
     <StitchShell active="preview">
       {/* Titel + målgruppe-badge + trinindikator */}
@@ -240,45 +255,30 @@ export default function PreviewPage() {
       {/* Værktøjslinje */}
       <section className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 bg-white px-4 py-2.5 font-jetbrains text-xs sm:px-8">
         <div className="flex flex-wrap items-center gap-2">
-          <SegmentedControl<View>
-            value={activeView}
-            onChange={setActiveView}
+          <SegmentedControl<Viewport>
+            value={viewport}
+            onChange={setViewport}
             options={[
-              { value: "preview", label: "Preview" },
-              { value: "rediger", label: "Rediger" },
+              { value: "desktop", label: "Desktop", icon: DesktopIcon },
+              { value: "mobil", label: "Mobil", icon: MobileIcon },
             ]}
           />
-          {activeView === "preview" && (
-            <>
-              <span className="mx-1 hidden h-4 w-px bg-neutral-300 sm:block" />
-              <SegmentedControl<Viewport>
-                value={viewport}
-                onChange={setViewport}
-                options={[
-                  { value: "desktop", label: "Desktop", icon: DesktopIcon },
-                  { value: "mobil", label: "Mobil", icon: MobileIcon },
-                ]}
-              />
-            </>
-          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {activeView === "preview" && (
-            <button
-              type="button"
-              onClick={() => setIsSaveTemplateOpen(true)}
-              disabled={!result || blocks.length === 0}
-              className="flex items-center gap-1.5 border border-neutral-300 bg-white px-3 py-1.5 tracking-wider text-neutral-800 shadow-xs transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saveTemplateState === "saved" ? (
-                <CheckIcon className="h-3.5 w-3.5" />
-              ) : (
-                <DocumentIcon className="h-3.5 w-3.5 text-neutral-600" />
-              )}
-              {saveTemplateState === "saved" ? "Skabelon gemt!" : "Gem som skabelon"}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsSaveTemplateOpen(true)}
+            disabled={!result || blocks.length === 0}
+            className="flex items-center gap-1.5 border border-neutral-300 bg-white px-3 py-1.5 tracking-wider text-neutral-800 shadow-xs transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saveTemplateState === "saved" ? (
+              <CheckIcon className="h-3.5 w-3.5" />
+            ) : (
+              <DocumentIcon className="h-3.5 w-3.5 text-neutral-600" />
+            )}
+            {saveTemplateState === "saved" ? "Skabelon gemt!" : "Gem som skabelon"}
+          </button>
           <button
             type="button"
             onClick={handleCopy}
@@ -291,18 +291,19 @@ export default function PreviewPage() {
         </div>
       </section>
 
-      <main className="grid flex-1 grid-cols-1 bg-[#eeeeea] lg:grid-cols-12">
-        {/* Lærred: nyhedsbrevet (Preview) eller blok-editoren (Rediger).
-            overflow-x-auto – NewsletterCard's Desktop-visning er BEVIDST fast
-            600px bred (præcis som en rigtig e-mail-klient), og skal kunne
-            scrolles vandret på smalle skærme i stedet for at blive klemt. */}
+      <main className="flex flex-1 flex-col bg-[#eeeeea] lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)]">
+        {/* Lærred: nyhedsbrevet, altid i preview. Et klik på en blok vælger
+            den (se NewsletterCard's onSelectBlock); et klik på selve lærredet
+            uden for nyhedsbrevet fravælger igen. overflow-x-auto –
+            Desktop-visningen er BEVIDST fast 600px bred (som en rigtig
+            e-mail-klient). Ekstra luft i bunden på smal skærm, så det
+            nederste af nyhedsbrevet ikke skjules bag bundpanelet. */}
         <section
-          className={`min-w-0 overflow-x-auto border-b border-black/10 p-4 md:p-8 lg:col-span-8 lg:border-r lg:border-b-0 ${
-            // Rediger: prikket "blueprint"-baggrund bag blok-kortene.
-            activeView === "rediger" && result
-              ? "bg-[#f6f6f4] bg-[radial-gradient(rgba(0,0,0,0.08)_1px,transparent_0)] bg-size-[20px_20px]"
-              : ""
-          }`}
+          aria-label="Nyhedsbrev"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setSelectedBlockId(null);
+          }}
+          className={`min-w-0 overflow-x-auto p-4 md:p-8 ${showEditor ? "pb-28 lg:pb-8" : ""} bg-[#f6f6f4] bg-[radial-gradient(rgba(0,0,0,0.08)_1px,transparent_0)] bg-size-[20px_20px]`}
         >
           {!result ? (
             <div className="flex justify-center">
@@ -338,10 +339,10 @@ export default function PreviewPage() {
                 Prøv igen
               </button>
             </div>
-          ) : activeView === "preview" ? (
+          ) : (
             <div className="flex w-max min-w-full flex-col items-center">
               <div className="mb-2 flex w-full max-w-150 items-center justify-between px-1 font-jetbrains text-[10px] text-neutral-400 uppercase">
-                <span>Lærred: e-mail</span>
+                <span>Lærred: e-mail · klik på en blok for at redigere den</span>
                 <span>{viewport === "mobil" ? "375" : "600"} x auto</span>
               </div>
               <div className="relative">
@@ -352,11 +353,39 @@ export default function PreviewPage() {
                   customerType={customerType}
                   products={selectedProducts}
                   viewport={viewport}
+                  selectedBlockId={selectedBlockId}
+                  onSelectBlock={selectBlock}
+                  getBlockLabel={(block) => getBlockTitle(block.type)}
                 />
               </div>
             </div>
-          ) : (
-            <div className="flex justify-center">
+          )}
+        </section>
+
+        {/* Sidepanel: bloklisten eller den valgte bloks kontroller. På bred
+            skærm til højre (klæber, med egen scroll); på smal skærm et
+            panel i bunden, der kan foldes ud/ind – kun ét panel ad gangen. */}
+        {showEditor && (
+          <aside
+            aria-label="Redigering af nyhedsbrevet"
+            className="fixed inset-x-0 bottom-0 z-30 flex max-h-[65vh] flex-col border-t-2 border-black bg-[#fbfbfa] shadow-[0_-8px_24px_rgba(0,0,0,0.12)] lg:static lg:z-auto lg:max-h-none lg:border-t-0 lg:border-l lg:border-black/10 lg:shadow-none"
+          >
+            <button
+              type="button"
+              onClick={() => setIsPanelOpen((open) => !open)}
+              aria-expanded={isPanelOpen}
+              aria-controls="editor-panel"
+              className="flex items-center justify-between gap-3 border-b border-black/10 bg-white px-4 py-3 font-jetbrains text-xs font-bold tracking-wider text-neutral-900 uppercase lg:hidden"
+            >
+              <span className="truncate">
+                {selectedBlock ? `Rediger: ${getBlockTitle(selectedBlock.type)}` : "Alle blokke"}
+              </span>
+              <ChevronDownIcon className={`h-3.5 w-3.5 shrink-0 transition-transform ${isPanelOpen ? "" : "rotate-180"}`} />
+            </button>
+            <div
+              id="editor-panel"
+              className={`${isPanelOpen ? "block" : "hidden"} min-h-0 overflow-y-auto p-4 lg:sticky lg:top-0 lg:block lg:max-h-screen sm:p-5`}
+            >
               <EditorBlockList
                 blocks={blocks}
                 onBlocksChange={setBlocks}
@@ -365,52 +394,51 @@ export default function PreviewPage() {
                 topicSearchTerm={topicSearchTerm}
                 customerType={customerType}
                 instructions={instructions}
+                selectedBlockId={selectedBlock ? selectedBlock.id : null}
+                onSelectBlock={selectBlock}
+                listFooter={
+                  <section aria-label="Inspektør" className="flex flex-col gap-3 border-t border-[#e2e2df] pt-4">
+                    <SectionLabel>Inspektør</SectionLabel>
+                      <div className="space-y-3 font-jetbrains text-xs">
+                        <InspectorCard label="01. Målgruppe" tag={isB2B ? "B2B valgt" : "B2C valgt"}>
+                          <div className="font-bold text-neutral-900">{isB2B ? "Erhvervskunder" : "Privatkunder"}</div>
+                          <div className="mt-1 font-grotesk text-[11px] text-neutral-600">
+                            {isB2B
+                              ? "Fagligt, præcist sprog · Fokus på specifikationer og robusthed"
+                              : "Tilgængeligt, inspirerende sprog · Fokus på udtryk og haveoplevelse"}
+                          </div>
+                        </InspectorCard>
+
+                        <InspectorCard label="02. Prisberegning" tag={isB2B ? "Moms: ekskl" : "Moms: inkl"} tagClassName="text-neutral-900">
+                          <div className="text-neutral-800">Priser vist {isB2B ? "ekskl." : "inkl."} moms</div>
+                          <div className="mt-1 text-[10px] text-neutral-400">Valuta: DKK</div>
+                        </InspectorCard>
+
+                        <InspectorCard label="03. AI-instruks">
+                          <div className="text-[11px] text-neutral-900">
+                            {instructions.trim() ? `"${instructions.trim()}"` : "Ingen instruks angivet"}
+                          </div>
+                        </InspectorCard>
+
+                        <InspectorCard
+                          label="04. Produkter fra databasen"
+                          tag={result ? `${selectedProducts.length} matchede` : undefined}
+                          tagClassName="text-neutral-900"
+                        >
+                          <div className="font-medium text-neutral-900">
+                            {topicSearchTerm ? `Søgeord: ${topicSearchTerm}` : "Ingen søgning endnu"}
+                          </div>
+                          <div className="mt-1 text-[10px] text-neutral-500">
+                            Klik på en blok i nyhedsbrevet for at vælge, hvilke produkter der vises.
+                          </div>
+                        </InspectorCard>
+                      </div>
+                  </section>
+                }
               />
             </div>
-          )}
-        </section>
-
-        {/* Inspektør: de rigtige parametre bag nyhedsbrevet */}
-        <aside className="flex flex-col gap-6 bg-[#fbfbfa] p-4 sm:p-6 lg:col-span-4">
-          <div className="border-b border-[#e2e2df] pb-3">
-            <SectionLabel>Inspektør</SectionLabel>
-          </div>
-
-          <div className="space-y-3 font-jetbrains text-xs">
-            <InspectorCard label="01. Målgruppe" tag={isB2B ? "B2B valgt" : "B2C valgt"}>
-              <div className="font-bold text-neutral-900">{isB2B ? "Erhvervskunder" : "Privatkunder"}</div>
-              <div className="mt-1 font-grotesk text-[11px] text-neutral-600">
-                {isB2B
-                  ? "Fagligt, præcist sprog · Fokus på specifikationer og robusthed"
-                  : "Tilgængeligt, inspirerende sprog · Fokus på udtryk og haveoplevelse"}
-              </div>
-            </InspectorCard>
-
-            <InspectorCard label="02. Prisberegning" tag={isB2B ? "Moms: ekskl" : "Moms: inkl"} tagClassName="text-neutral-900">
-              <div className="text-neutral-800">Priser vist {isB2B ? "ekskl." : "inkl."} moms</div>
-              <div className="mt-1 text-[10px] text-neutral-400">Valuta: DKK</div>
-            </InspectorCard>
-
-            <InspectorCard label="03. AI-instruks">
-              <div className="text-[11px] text-neutral-900">
-                {instructions.trim() ? `"${instructions.trim()}"` : "Ingen instruks angivet"}
-              </div>
-            </InspectorCard>
-
-            <InspectorCard
-              label="04. Produkter fra databasen"
-              tag={result ? `${selectedProducts.length} matchede` : undefined}
-              tagClassName="text-neutral-900"
-            >
-              <div className="font-medium text-neutral-900">
-                {topicSearchTerm ? `Søgeord: ${topicSearchTerm}` : "Ingen søgning endnu"}
-              </div>
-              <div className="mt-1 text-[10px] text-neutral-500">
-                Vælg under Rediger, hvilke produkter der vises i nyhedsbrevet.
-              </div>
-            </InspectorCard>
-          </div>
-        </aside>
+          </aside>
+        )}
       </main>
 
       {isSaveTemplateOpen && (

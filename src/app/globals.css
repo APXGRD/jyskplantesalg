@@ -71,11 +71,19 @@ body {
 }
 
 /* Tiptap-pladsholder (TextBlockEditor's `placeholder`): grå hjælpetekst i et
-   tomt tekstfelt – forsvinder, så snart der skrives. */
+   tomt tekstfelt – forsvinder, så snart der skrives. Pladsholderen og det
+   tomme afsnits markør lægges i samme grid-celle (i stedet for den gængse
+   float + height:0), så feltet vokser med en pladsholder over flere linjer
+   i et smalt panel i stedet for at tekst flyder ud over feltet. */
+.ProseMirror p.is-editor-empty:first-child {
+  display: grid;
+}
+.ProseMirror p.is-editor-empty:first-child::before,
+.ProseMirror p.is-editor-empty:first-child > * {
+  grid-area: 1 / 1;
+}
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  float: left;
-  height: 0;
   pointer-events: none;
   color: #a3a3a3;
   font-style: italic;

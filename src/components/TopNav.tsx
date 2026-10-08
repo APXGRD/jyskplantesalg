@@ -10,7 +10,6 @@ import Link from "next/link";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
 import { logout } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/client";
-import { initials } from "@/lib/initials";
 
 export type TopNavPage = "home" | "settings" | "preview" | "customers" | "brand-settings";
 
@@ -48,13 +47,11 @@ export function TopNav({ active, previewName }: { active?: TopNavPage; previewNa
   return (
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-black/10 bg-white/70 px-4 py-4 backdrop-blur-md sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
       <div className="flex min-w-0 items-center gap-3">
-        {settings.logoData ? (
+        {/* Kun et UPLOADET logo vises – uden logo står firmanavnet alene (ingen
+            automatisk genereret logo). */}
+        {settings.logoData && (
           // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
           <img src={settings.logoData} alt="" className="h-7 w-7 shrink-0 object-contain" />
-        ) : (
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-black font-jetbrains text-xs font-bold tracking-tighter text-white">
-            {companyName ? initials(companyName) : "–"}
-          </div>
         )}
         <span
           className={`truncate text-lg leading-none font-bold tracking-tight uppercase ${

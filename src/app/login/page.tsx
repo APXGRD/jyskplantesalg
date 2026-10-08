@@ -9,7 +9,6 @@
 
 import { login } from "./actions";
 import { getBrandSettingsWithStatus } from "@/lib/brandSettings";
-import { initials } from "@/lib/initials";
 
 // Vises, når der endnu ikke er gemt et firmanavn på Indstillinger-siden – i
 // stedet for brand.ts's hardcodede standardnavn.
@@ -33,13 +32,11 @@ export default async function LoginPage({
       <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/15 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.06)]">
         {/* Brand-linje, samme opbygning som topbaren */}
         <div className="flex items-center gap-3 border-b border-black/10 bg-white/70 px-6 py-4">
-          {status === "configured" && settings.logo_data ? (
+          {/* Kun et UPLOADET logo vises – uden logo står firmanavnet alene (ingen
+              automatisk genereret logo). */}
+          {status === "configured" && settings.logo_data && (
             // eslint-disable-next-line @next/next/no-img-element -- kundens uploadede logo, base64 data-URI
             <img src={settings.logo_data} alt="" className="h-7 w-7 shrink-0 object-contain" />
-          ) : (
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-black font-jetbrains text-xs font-bold tracking-tighter text-white">
-              {initials(companyName)}
-            </div>
           )}
           <span className="truncate text-lg leading-none font-bold tracking-tight text-[#111111] uppercase">
             {companyName}

@@ -257,7 +257,7 @@ export function MasonryBlockControls({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <span className="font-jetbrains text-xs text-neutral-600">Afstand mellem billeder:</span>
           <OptionButtons options={GAP_OPTIONS} value={gap} onChange={onGapChange} />

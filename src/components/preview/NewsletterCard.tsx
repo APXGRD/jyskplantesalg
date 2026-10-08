@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { getUnsubscribeUrl } from "@/lib/unsubscribeUrl";
@@ -45,9 +45,27 @@ interface NewsletterCardProps {
   customerType: CustomerType;
   products: ShopifyProduct[];
   viewport: "desktop" | "mobil";
+  // Valgfri blok-markering til editoren (preview-siden): et klik eller
+  // Enter/mellemrum på en blok vælger den, og den valgte blok får en kant i
+  // sort (75 % opacitet). Markeringen er en `outline` (påvirker ikke layoutet)
+  // på en omsluttende <div> – selve blokkens rendering er UÆNDRET, og den
+  // kopierede mail bygges helt separat (newsletterExport.ts), så klik og
+  // markering kan aldrig ændre outputtet.
+  selectedBlockId?: string | null;
+  onSelectBlock?: (id: string) => void;
+  getBlockLabel?: (block: NewsletterBlock) => string;
 }
 
-export function NewsletterCard({ blocks, image, customerType, products, viewport }: NewsletterCardProps) {
+export function NewsletterCard({
+  blocks,
+  image,
+  customerType,
+  products,
+  viewport,
+  selectedBlockId,
+  onSelectBlock,
+  getBlockLabel,
+}: NewsletterCardProps) {
   const brand = useBrandSettings();
   const audience = customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
 
@@ -482,9 +500,44 @@ export function NewsletterCard({ blocks, image, customerType, products, viewport
     >
       {blocks
         .filter((block) => !block.hidden)
-        .map((block) => (
-          <div key={block.id}>{renderBlock(block)}</div>
-        ))}
+        .map((block) => {
+          if (!onSelectBlock) return <div key={block.id}>{renderBlock(block)}</div>;
+          const isSelected = block.id === selectedBlockId;
+          const label = getBlockLabel?.(block) ?? block.type;
+          function select(event: MouseEvent<HTMLDivElement>) {
+            // I editoren vælger et klik blokken i stedet for at følge links
+            // (CTA-knap, produktbilleder). Ctrl/Cmd-klik åbner stadig linket.
+            if ((event.target as HTMLElement).closest("a") && !event.metaKey && !event.ctrlKey) {
+              event.preventDefault();
+            }
+            onSelectBlock?.(block.id);
+          }
+          function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+            if (event.target !== event.currentTarget) return;
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onSelectBlock?.(block.id);
+            }
+          }
+          return (
+            <div
+              key={block.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              aria-label={`${label}${isSelected ? " – valgt" : ""}. Vælg for at redigere blokken`}
+              onClick={select}
+              onKeyDown={handleKeyDown}
+              className={`relative cursor-pointer outline-offset-[-1px] ${
+                isSelected
+                  ? "outline-1 outline-black/75 outline-solid"
+                  : "outline-1 outline-transparent outline-dashed hover:outline-neutral-400 focus-visible:outline-2 focus-visible:outline-black"
+              }`}
+            >
+              {renderBlock(block)}
+            </div>
+          );
+        })}
     </div>
   );
 }
