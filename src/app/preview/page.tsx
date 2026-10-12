@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterHtml, buildNewsletterText } from "@/lib/newsletterExport";
 import { cropMasonryImagesForExport } from "@/lib/masonryExport";
-import { buildTemplateBlockStructure } from "@/lib/newsletterBlocks";
+import { buildTemplateBlockStructure, isBlankContent } from "@/lib/newsletterBlocks";
 import { SectionLabel, StitchShell } from "@/components/StitchShell";
 import { SegmentedControl } from "@/components/preview/SegmentedControl";
 import { NewsletterCard } from "@/components/preview/NewsletterCard";
 import { EditorBlockList, getBlockTitle } from "@/components/preview/EditorBlockList";
 import { SaveTemplateDialog } from "@/components/preview/SaveTemplateDialog";
+import { SendTestMailDialog } from "@/components/preview/SendTestMailDialog";
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -19,6 +20,7 @@ import {
   DesktopIcon,
   DocumentIcon,
   MobileIcon,
+  SendIcon,
 } from "@/components/icons";
 import { useNewsletter } from "@/context/NewsletterContext";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
@@ -89,6 +91,7 @@ export default function PreviewPage() {
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
+  const [isTestMailOpen, setIsTestMailOpen] = useState(false);
   const [saveTemplateState, setSaveTemplateState] = useState<SaveTemplateState>("idle");
 
   const [allProducts, setAllProducts] = useState<ShopifyProduct[]>([]);
@@ -197,6 +200,30 @@ export default function PreviewPage() {
     }
   }
 
+  // "Send test-mail": samme HTML og tekst som "Kopiér nyhedsbrev" (inkl.
+  // beskårne masonry-billeder), sendt via /api/send-test-mail til én modtager.
+  // Emnelinjen er nyhedsbrevets overskrift (ellers "Nyhedsbrev"); serveren
+  // sætter "[TEST]" foran. Kaster ved fejl – vises i dialogen.
+  async function handleSendTestMail(to: string) {
+    if (!result) return;
+    const exportBlocks = await cropMasonryImagesForExport(blocks);
+    const html = buildNewsletterHtml(exportBlocks, result.image, customerType, selectedProducts, brand);
+    const text = buildNewsletterText(exportBlocks, result.image, customerType, selectedProducts, brand);
+    const headingBlock = blocks.find(
+      (block) => block.type === "overskrift" && !block.hidden && !isBlankContent(block.content),
+    );
+    const subject = headingBlock?.content?.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() || "Nyhedsbrev";
+    const response = await fetch("/api/send-test-mail", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject, html, text }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error ?? "Kunne ikke sende test-mailen. Prøv igen.");
+    }
+  }
+
   async function handleSaveTemplate(name: string, description: string) {
     const response = await fetch("/api/templates", {
       method: "POST",
@@ -278,6 +305,15 @@ export default function PreviewPage() {
               <DocumentIcon className="h-3.5 w-3.5 text-neutral-600" />
             )}
             {saveTemplateState === "saved" ? "Skabelon gemt!" : "Gem som skabelon"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsTestMailOpen(true)}
+            disabled={!result || blocks.length === 0}
+            className="flex items-center gap-1.5 border border-neutral-300 bg-white px-3 py-1.5 tracking-wider text-neutral-800 shadow-xs transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <SendIcon className="h-3.5 w-3.5 text-neutral-600" />
+            Send test-mail
           </button>
           <button
             type="button"
@@ -440,6 +476,10 @@ export default function PreviewPage() {
           </aside>
         )}
       </main>
+
+      {isTestMailOpen && (
+        <SendTestMailDialog onClose={() => setIsTestMailOpen(false)} onSend={handleSendTestMail} />
+      )}
 
       {isSaveTemplateOpen && (
         <SaveTemplateDialog onClose={() => setIsSaveTemplateOpen(false)} onSave={handleSaveTemplate} />
