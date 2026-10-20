@@ -9,12 +9,13 @@ export interface ImportedFile {
 
 interface ImportCustomersButtonProps {
   onImport: (file: ImportedFile) => void;
+  className?: string;
 }
 
 // Kun UI indtil videre – vælger man en CSV-fil, registreres dens navn, men
 // indholdet parses ikke rigtigt endnu (se KunderPage, der viser en
 // "X kunder importeret"-bekræftelse ud fra filen).
-export function ImportCustomersButton({ onImport }: ImportCustomersButtonProps) {
+export function ImportCustomersButton({ onImport, className }: ImportCustomersButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
@@ -30,10 +31,10 @@ export function ImportCustomersButton({ onImport }: ImportCustomersButtonProps) 
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="inline-flex items-center gap-1.5 border border-[#cfcfcf] bg-white px-3 py-1.5 font-jetbrains text-xs font-medium text-black uppercase shadow-sm transition hover:border-black"
+        className={className}
       >
-        <UploadIcon className="h-3.5 w-3.5" />
-        Importér CSV
+        <UploadIcon className="h-[18px] w-[18px]" />
+        <span>Importer CSV</span>
       </button>
       <input ref={inputRef} type="file" accept=".csv" onChange={handleChange} className="sr-only" />
     </>

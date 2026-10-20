@@ -567,7 +567,7 @@ export function NewsletterCard({
 
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)] transition-[width] ${
+      className={`flex flex-col overflow-hidden rounded-[4px] border border-border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)] transition-[width] ${
         viewport === "mobil" ? "w-[375px]" : "w-[600px]"
       }`}
     >

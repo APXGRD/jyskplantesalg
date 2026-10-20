@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { SectionLabel, StitchShell } from "@/components/StitchShell";
+import { EditorialShell } from "@/components/EditorialShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CustomerTable } from "@/components/customers/CustomerTable";
 import { CustomerPanel } from "@/components/customers/CustomerPanel";
@@ -9,7 +9,7 @@ import { ImportCustomersButton, type ImportedFile } from "@/components/customers
 import { getCustomerType, getCustomers, isActiveCustomer, type ShopifyCustomer } from "@/lib/customers";
 import type { CustomerType } from "@/lib/format";
 import { formatRelativeTime } from "@/lib/format";
-import { ChevronDownIcon, PlusIcon, RefreshIcon, SearchIcon, SpinnerIcon, XIcon } from "@/components/icons";
+import { ChevronDownIcon, RefreshIcon, SearchIcon, SpinnerIcon, UserPlusIcon, XIcon } from "@/components/icons";
 
 interface ImportResult extends ImportedFile {
   count: number;
@@ -18,8 +18,15 @@ interface ImportResult extends ImportedFile {
 type PanelState = { mode: "add" } | { mode: "edit"; customer: ShopifyCustomer } | null;
 type StatusFilter = "active" | "unsubscribed" | "";
 
+// Stitch-designet: filtre og søgning på cremefarvet baggrund uden kant.
 const selectClassName =
-  "w-full cursor-pointer appearance-none rounded-sm border border-[#e5e7eb] bg-white py-2 pr-8 pl-3 font-jetbrains text-xs text-zinc-700 transition hover:border-zinc-400 focus:border-black focus:outline-none";
+  "h-11 w-full cursor-pointer appearance-none rounded-xs border-[0.5px] border-forest bg-white pr-8 pl-3.5 text-sm text-ink-deep focus:ring-1 focus:ring-forest/30 focus:outline-none";
+
+// Knapperne øverst (Synkroniser / Importer CSV) og pagineringens knapper.
+const headerButtonClassName =
+  "flex h-10 items-center gap-1 rounded-xs border-[0.5px] border-forest bg-transparent px-4 text-[11px] font-semibold tracking-[0.025em] text-forest uppercase transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-forest disabled:hover:bg-transparent disabled:hover:text-forest";
+const pagerButtonClassName =
+  "h-8 rounded-xs border border-hairline bg-white px-2.5 text-[11px] tracking-wider text-forest uppercase transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white disabled:cursor-not-allowed disabled:text-stone disabled:opacity-40 disabled:hover:border-hairline disabled:hover:bg-white disabled:hover:text-stone";
 
 // Antal kunder pr. side i tabellen.
 const PAGE_SIZE = 25;
@@ -194,24 +201,11 @@ export function KunderClient({ initialCustomers, initialSyncedAt, initialError }
     setImportResult({ ...file, count: Math.floor(Math.random() * 18) + 3 });
   }
 
-  const syncButton = (
-    <button
-      type="button"
-      onClick={handleSync}
-      disabled={isSyncing}
-      className="inline-flex items-center gap-1.5 border border-[#cfcfcf] bg-white px-3 py-1.5 font-jetbrains text-xs font-medium text-black uppercase shadow-sm transition hover:border-black disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {isSyncing ? <SpinnerIcon className="h-3.5 w-3.5 animate-spin" /> : <RefreshIcon className="h-3.5 w-3.5" />}
-      {isSyncing ? "Synkroniserer..." : "Synkronisér"}
-    </button>
-  );
-
   // Tal til filter-dropdowns og Database oversigt – udledt af den fulde liste.
   const activeCount = customers.filter(isActiveCustomer).length;
   const unsubscribedCount = customers.length - activeCount;
   const b2bCount = customers.filter((customer) => getCustomerType(customer) === "erhverv").length;
   const b2cCount = customers.length - b2bCount;
-  const activePercent = customers.length ? (activeCount / customers.length) * 100 : 0;
 
   // Ren visnings-paginering af den (fuldt) filtrerede liste – søgning og
   // filtre virker stadig på alle kunder.
@@ -220,110 +214,102 @@ export function KunderClient({ initialCustomers, initialSyncedAt, initialError }
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pagedCustomers = filteredCustomers.slice(pageStart, pageStart + PAGE_SIZE);
 
+  const percent = (part: number) => (customers.length ? `${((part / customers.length) * 100).toFixed(1)}%` : "0%");
+  const b2bShare = customers.length ? (b2bCount / customers.length) * 100 : 0;
+
   return (
-    <StitchShell active="customers">
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Titel, handlinger og trinindikator */}
-        <section className="border-b border-[#e5e5e5] bg-white px-4 py-7 sm:px-8">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div>
-              <h1 className="text-3xl font-bold tracking-[-0.04em] uppercase sm:text-4xl">Kunder</h1>
-              <div className="flex flex-wrap items-center gap-2 pt-4">
-                {syncButton}
-                <ImportCustomersButton onImport={handleImport} />
-                <button
-                  type="button"
-                  onClick={() => setPanel({ mode: "add" })}
-                  className="inline-flex items-center gap-1.5 bg-black px-3.5 py-1.5 font-jetbrains text-xs font-bold tracking-wider text-white uppercase shadow-sm transition hover:bg-neutral-800"
-                >
-                  <PlusIcon className="h-3.5 w-3.5" />
-                  Tilføj kunde
-                </button>
-              </div>
-            </div>
-            <div className="text-right font-jetbrains">
-              <div className="text-4xl font-bold tracking-tight">
-                03<span className="font-light text-[#a0a0a0]">/04</span>
-              </div>
-              <div className="mt-2 text-[11px] text-[#666666]">
-                {customers.length} kunder i alt
-                {syncedAt && ` · Synkroniseret ${formatRelativeTime(new Date(syncedAt))}`}
-              </div>
-            </div>
+    <EditorialShell active="customers">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-5 pb-12 md:px-12">
+        {/* Titel + handlinger */}
+        <section className="flex flex-col justify-between gap-4 pt-8 pb-4 md:flex-row md:items-end">
+          <div>
+            <span className="text-xs font-semibold tracking-widest text-stone uppercase">Trin 03 / Kunder</span>
+            <h1 className="mt-1 font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-forest md:text-4xl md:leading-[1.25]">
+              Kunder
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSync}
+              disabled={isSyncing}
+              title={syncedAt ? `Synkroniseret ${formatRelativeTime(new Date(syncedAt))}` : "Hent kunder fra Shopify"}
+              className={headerButtonClassName}
+            >
+              {isSyncing ? (
+                <SpinnerIcon className="h-[18px] w-[18px] animate-spin" />
+              ) : (
+                <RefreshIcon className="h-[18px] w-[18px]" />
+              )}
+              <span>{isSyncing ? "Synkroniserer..." : "Synkroniser"}</span>
+            </button>
+            <ImportCustomersButton onImport={handleImport} className={headerButtonClassName} />
+            <button
+              type="button"
+              onClick={() => setPanel({ mode: "add" })}
+              className={headerButtonClassName}
+            >
+              <UserPlusIcon className="h-[18px] w-[18px]" />
+              <span>Tilføj kunde</span>
+            </button>
           </div>
         </section>
 
-        {syncError && (
-          <p className="border-b border-[#e5e5e5] bg-red-50 px-4 py-2 font-jetbrains text-[11px] text-red-700 sm:px-8">
-            {syncError}
-          </p>
-        )}
-
-        {importResult && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5e5e5] bg-white px-4 py-3 sm:px-8">
-            <p className="flex items-center gap-2 font-jetbrains text-xs text-black">
-              <span className="h-1.5 w-1.5 bg-black" />
-              <span className="font-semibold">{importResult.count} kunder importeret</span> fra{" "}
-              <span>{importResult.name}</span>
-            </p>
-            <button type="button" onClick={() => setImportResult(null)} aria-label="Luk" className="text-zinc-400 hover:text-black">
-              <XIcon className="h-3.5 w-3.5" />
-            </button>
+        {(syncError || importResult || unsubscribeError) && (
+          <div className="mb-4 flex flex-col gap-2">
+            {syncError && <p className="rounded-xs bg-rose-bg px-4 py-2 text-sm text-rose-ink">{syncError}</p>}
+            {importResult && (
+              <div className="flex items-center justify-between gap-3 rounded-xs bg-mint px-4 py-2 text-sm text-forest">
+                <p>
+                  <span className="font-medium">{importResult.count} kunder importeret</span> fra {importResult.name}
+                </p>
+                <button type="button" onClick={() => setImportResult(null)} aria-label="Luk" className="hover:opacity-60">
+                  <XIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+            {unsubscribeError && (
+              <div className="flex items-center justify-between gap-3 rounded-xs bg-rose-bg px-4 py-2 text-sm text-rose-ink">
+                <p>{unsubscribeError}</p>
+                <button type="button" onClick={() => setUnsubscribeError(null)} aria-label="Luk" className="hover:opacity-60">
+                  <XIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {unsubscribeError && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5e5e5] bg-red-50 px-4 py-3 sm:px-8">
-            <p className="font-jetbrains text-xs text-red-700">{unsubscribeError}</p>
-            <button
-              type="button"
-              onClick={() => setUnsubscribeError(null)}
-              aria-label="Luk"
-              className="text-red-700 hover:text-red-900"
-            >
-              <XIcon className="h-3.5 w-3.5" />
+        {isLoading ? (
+          <p className="py-16 text-center text-sm text-stone">Henter kunder...</p>
+        ) : loadError ? (
+          <div className="flex max-w-md flex-col gap-3 rounded-xs border border-hairline bg-white p-6">
+            <h2 className="font-garamond text-2xl leading-[1.35] font-medium text-forest">Kunne ikke hente kunder</h2>
+            <p className="text-sm text-red-700">{loadError}</p>
+            <button type="button" onClick={retryLoadCustomers} className={`${headerButtonClassName} w-fit`}>
+              Prøv igen
             </button>
           </div>
-        )}
-
-        <main className="flex-1 bg-[#f8f9fa] px-4 py-8 sm:px-6 md:px-10">
-          {isLoading ? (
-            <p className="py-16 text-center font-jetbrains text-xs tracking-wider text-zinc-500 uppercase">
-              Henter kunder...
-            </p>
-          ) : loadError ? (
-            <div className="flex max-w-md flex-col gap-3 rounded-sm border border-red-200 bg-white p-6">
-              <SectionLabel>Kunne ikke hente kunder</SectionLabel>
-              <p className="text-sm text-red-600">{loadError}</p>
-              <button
-                type="button"
-                onClick={retryLoadCustomers}
-                className="w-fit border border-[#cfcfcf] bg-white px-4 py-2 font-jetbrains text-xs tracking-wider uppercase hover:border-black"
-              >
-                Prøv igen
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-12">
-              {/* Venstre: filtre + tabel */}
-              <section className="flex min-w-0 flex-col gap-4 xl:col-span-9">
-                <div className="flex flex-col items-stretch gap-2.5 rounded-sm border border-[#e5e7eb] bg-white p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:flex-row sm:flex-wrap sm:items-center">
-                  <div className="relative w-full sm:w-80">
-                    <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(event) => {
-                        setSearch(event.target.value);
-                        setPage(1);
-                      }}
-                      placeholder="Søg efter navn eller email..."
-                      aria-label="Søg efter navn eller email"
-                      className="w-full rounded-sm border border-[#e5e7eb] bg-zinc-50 py-2 pr-3 pl-8 font-jetbrains text-xs text-black placeholder:text-zinc-400 transition focus:border-black focus:ring-1 focus:ring-black focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="relative w-full sm:w-auto">
+        ) : (
+          <>
+            {/* Søg + filtre */}
+            <section className="mb-8 w-full rounded-xs border border-hairline bg-white p-2">
+              <div className="flex flex-col items-stretch justify-between gap-2 lg:flex-row lg:items-center">
+                <div className="relative max-w-xl grow">
+                  <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-stone" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Søg efter navn eller mail..."
+                    aria-label="Søg efter navn eller email"
+                    className="h-11 w-full rounded-xs border border-transparent bg-transparent pr-4 pl-10 text-sm text-ink-deep transition-all placeholder:text-stone focus:border-forest focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                  <div className="relative w-full min-w-[170px] sm:w-auto">
                     <select
                       value={customerTypeFilter}
                       onChange={(event) => {
@@ -334,13 +320,12 @@ export function KunderClient({ initialCustomers, initialSyncedAt, initialError }
                       className={selectClassName}
                     >
                       <option value="">Kundetype: Alle</option>
-                      <option value="privat">Privat ({b2cCount})</option>
-                      <option value="erhverv">Erhverv [B2B] ({b2bCount})</option>
+                      <option value="privat">Kundetype: Privat ({b2cCount})</option>
+                      <option value="erhverv">Kundetype: Erhverv ({b2bCount})</option>
                     </select>
-                    <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-3 w-3 -translate-y-1/2 text-zinc-400" />
+                    <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-3 w-3 -translate-y-1/2 text-forest" />
                   </div>
-
-                  <div className="relative w-full sm:w-auto">
+                  <div className="relative w-full min-w-[160px] sm:w-auto">
                     <select
                       value={statusFilter}
                       onChange={(event) => {
@@ -351,96 +336,118 @@ export function KunderClient({ initialCustomers, initialSyncedAt, initialError }
                       className={selectClassName}
                     >
                       <option value="">Status: Alle</option>
-                      <option value="active">Aktiv ({activeCount})</option>
-                      <option value="unsubscribed">Afmeldt ({unsubscribedCount})</option>
+                      <option value="active">Status: Aktiv ({activeCount})</option>
+                      <option value="unsubscribed">Status: Afmeldt ({unsubscribedCount})</option>
                     </select>
-                    <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-3 w-3 -translate-y-1/2 text-zinc-400" />
+                    <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-3 w-3 -translate-y-1/2 text-forest" />
                   </div>
                 </div>
+              </div>
+            </section>
 
-                <div className="overflow-hidden rounded-sm border border-[#e5e7eb] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                  <CustomerTable
-                    customers={pagedCustomers}
-                    onEdit={(customer) => setPanel({ mode: "edit", customer })}
-                    onUnsubscribe={handleUnsubscribeClick}
-                  />
-
-                  <div className="flex flex-col items-center justify-between gap-3 border-t border-[#e5e7eb] bg-zinc-50 px-5 py-3.5 font-jetbrains text-xs sm:flex-row">
-                    <span className="text-zinc-500">
-                      Viser{" "}
-                      <span className="font-semibold text-black">
-                        {filteredCustomers.length === 0
-                          ? "0"
-                          : `${pageStart + 1}-${pageStart + pagedCustomers.length}`}
-                      </span>{" "}
-                      af {filteredCustomers.length} kunder
+            <div className="grid w-full grid-cols-1 items-start gap-8 lg:grid-cols-12">
+              {/* Tabel */}
+              <div className="flex flex-col overflow-hidden rounded-xs border border-hairline bg-white lg:col-span-8">
+                <CustomerTable
+                  customers={pagedCustomers}
+                  onEdit={(customer) => setPanel({ mode: "edit", customer })}
+                  onUnsubscribe={handleUnsubscribeClick}
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-3 text-sm text-stone">
+                  <span>
+                    Viser{" "}
+                    {filteredCustomers.length === 0 ? "0" : `${pageStart + 1}-${pageStart + pagedCustomers.length}`} af{" "}
+                    {filteredCustomers.length} kontakter
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPage(currentPage - 1)}
+                      disabled={currentPage <= 1}
+                      className={pagerButtonClassName}
+                    >
+                      Forrige
+                    </button>
+                    <span
+                      aria-label={`Side ${currentPage} af ${pageCount}`}
+                      className="flex h-8 min-w-8 items-center justify-center rounded-xs bg-forest px-2 text-sm font-medium text-white"
+                    >
+                      {currentPage}
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setPage(currentPage - 1)}
-                        disabled={currentPage <= 1}
-                        className="rounded-sm border border-[#e5e7eb] bg-white px-2.5 py-1 text-zinc-700 uppercase transition hover:border-black hover:text-black disabled:cursor-not-allowed disabled:text-zinc-400 disabled:opacity-40 disabled:hover:border-[#e5e7eb]"
-                      >
-                        ← Forrige
-                      </button>
-                      <span className="rounded-sm border border-black bg-white px-3 py-1 font-semibold text-black">
-                        {currentPage}
+                    <span className="px-2 text-[11px] tracking-wider uppercase">af {pageCount}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(currentPage + 1)}
+                      disabled={currentPage >= pageCount}
+                      className={pagerButtonClassName}
+                    >
+                      Næste
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kunde oversigt */}
+              <aside className="flex flex-col gap-4 lg:col-span-4">
+                <div className="flex flex-col rounded-xs border border-hairline bg-white p-4">
+                  <div className="mb-4 flex items-baseline justify-between border-b border-hairline pb-2">
+                    <h2 className="font-garamond text-2xl leading-[1.35] font-medium text-forest">Kunde oversigt</h2>
+                    <span className="text-xs font-semibold tracking-wider text-stone">Total: {customers.length}</span>
+                  </div>
+                  <div className="mb-4 grid grid-cols-2 gap-2">
+                    <div className="flex flex-col justify-between rounded-xs bg-forest p-2 text-white">
+                      <span className="text-[10px] font-semibold tracking-widest uppercase opacity-80">Aktive</span>
+                      <div className="mt-1 flex items-baseline justify-between">
+                        <span className="font-garamond text-2xl leading-[1.35] font-medium">{activeCount}</span>
+                        <span className="text-xs opacity-75">{percent(activeCount)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col justify-between rounded-xs border border-hairline bg-ash p-2 text-ink-deep">
+                      <span className="text-[10px] font-semibold tracking-widest text-stone uppercase">Afmeldte</span>
+                      <div className="mt-1 flex items-baseline justify-between">
+                        <span className="font-garamond text-2xl leading-[1.35] font-medium text-[#1a1a1a]">
+                          {unsubscribedCount}
+                        </span>
+                        <span className="text-xs text-stone">{percent(unsubscribedCount)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mb-4 w-full">
+                    <div className="mb-1 flex items-center justify-between text-xs text-stone">
+                      <span>Segmentering</span>
+                      <span>B2B / B2C</span>
+                    </div>
+                    <div className="flex h-2 w-full overflow-hidden rounded-full bg-ash">
+                      <div className="h-full bg-forest" style={{ width: `${b2bShare}%` }} title={`Erhverv: ${Math.round(b2bShare)}%`} />
+                      <div
+                        className="h-full bg-sage-light"
+                        style={{ width: `${customers.length ? 100 - b2bShare : 0}%` }}
+                        title={`Privat: ${Math.round(customers.length ? 100 - b2bShare : 0)}%`}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1 border-t border-hairline pt-2 text-sm">
+                    <div className="flex items-center justify-between py-1">
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-forest" />
+                        <span className="text-ink-deep">Erhvervskunder (B2B)</span>
                       </span>
-                      <span className="px-1 text-zinc-400">af {pageCount}</span>
-                      <button
-                        type="button"
-                        onClick={() => setPage(currentPage + 1)}
-                        disabled={currentPage >= pageCount}
-                        className="rounded-sm border border-[#e5e7eb] bg-white px-2.5 py-1 text-zinc-700 uppercase transition hover:border-black hover:text-black disabled:cursor-not-allowed disabled:text-zinc-400 disabled:opacity-40 disabled:hover:border-[#e5e7eb]"
-                      >
-                        Næste →
-                      </button>
+                      <span className="font-medium text-[#1a1a1a]">{b2bCount}</span>
                     </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Højre: database-oversigt */}
-              <aside className="xl:col-span-3">
-                <div className="flex flex-col gap-3 rounded-sm border border-[#e5e7eb] bg-white p-4 font-jetbrains shadow-sm">
-                  <div className="flex items-center justify-between gap-2 text-[11px]">
-                    <span className="font-semibold tracking-tight text-zinc-600 uppercase">01 // Database oversigt</span>
-                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700">
-                      TOTAL: {customers.length}
-                    </span>
-                  </div>
-                  <div
-                    className="flex h-2 w-full overflow-hidden rounded-full bg-zinc-100"
-                    title={`${Math.round(activePercent)}% aktive`}
-                  >
-                    <div className="h-full bg-emerald-500" style={{ width: `${activePercent}%` }} />
-                    <div className="h-full flex-1 bg-zinc-300" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                    <div className="rounded border border-zinc-200 bg-zinc-50 p-2.5">
-                      <div className="text-[10px] font-medium text-zinc-400 uppercase">Aktive modtagere</div>
-                      <div className="mt-0.5 text-base font-bold text-black">{activeCount}</div>
+                    <div className="flex items-center justify-between py-1">
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-sage-light" />
+                        <span className="text-ink-deep">Privatkunder (B2C)</span>
+                      </span>
+                      <span className="font-medium text-[#1a1a1a]">{b2cCount}</span>
                     </div>
-                    <div className="rounded border border-zinc-200 bg-zinc-50 p-2.5">
-                      <div className="text-[10px] font-medium text-zinc-400 uppercase">Afmeldte</div>
-                      <div className="mt-0.5 text-base font-bold text-zinc-700">{unsubscribedCount}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-zinc-100 pt-2 text-xs text-zinc-600">
-                    <span>Erhvervskunder (B2B):</span>
-                    <span className="font-bold text-black">{b2bCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-zinc-600">
-                    <span>Privatkunder (B2C):</span>
-                    <span className="font-bold text-black">{b2cCount}</span>
                   </div>
                 </div>
               </aside>
             </div>
-          )}
-        </main>
-      </div>
+          </>
+        )}
+      </main>
 
       {panel && (
         <CustomerPanel
@@ -459,6 +466,6 @@ export function KunderClient({ initialCustomers, initialSyncedAt, initialError }
           onCancel={() => setUnsubscribeTarget(null)}
         />
       )}
-    </StitchShell>
+    </EditorialShell>
   );
 }

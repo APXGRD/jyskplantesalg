@@ -36,13 +36,11 @@ import {
   ChevronDownIcon,
   DividerIcon,
   DuplicateIcon,
-  GalleryIcon,
   EyeIcon,
   EyeOffIcon,
-  GearIcon,
+  GalleryIcon,
   GripIcon,
   ImagePlaceholderIcon,
-  PlusIcon,
   RefreshIcon,
   ShareIcon,
   SpinnerIcon,
@@ -863,37 +861,39 @@ function BlockActions({
   onToggleHidden: () => void;
   onDelete: () => void;
 }) {
+  // Stitch-designet: synlighed i skovgrøn, duplikér/slet dæmpet (slet bliver
+  // rød ved hover).
   const iconButtonClassName =
-    "flex h-7 w-7 items-center justify-center text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-2 focus-visible:outline-black";
+    "rounded-xs p-1 transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-forest";
   return (
-    <div className="flex shrink-0 items-center gap-0.5">
-      <button
-        type="button"
-        onClick={onDuplicate}
-        aria-label={`Dupliker blokken ${title}`}
-        title="Duplikér blok"
-        className={iconButtonClassName}
-      >
-        <DuplicateIcon className="h-3.5 w-3.5" />
-      </button>
+    <div className="flex shrink-0 items-center gap-1">
       <button
         type="button"
         onClick={onToggleHidden}
         aria-label={block.hidden ? `Vis blokken ${title}` : `Skjul blokken ${title}`}
         aria-pressed={block.hidden}
         title={block.hidden ? "Vis blok" : "Skjul blok"}
-        className={iconButtonClassName}
+        className={`${iconButtonClassName} text-forest`}
       >
-        {block.hidden ? <EyeOffIcon className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
+        {block.hidden ? <EyeOffIcon className="h-[18px] w-[18px]" /> : <EyeIcon className="h-[18px] w-[18px]" />}
+      </button>
+      <button
+        type="button"
+        onClick={onDuplicate}
+        aria-label={`Dupliker blokken ${title}`}
+        title="Duplikér blok"
+        className={`${iconButtonClassName} text-stone hover:text-forest`}
+      >
+        <DuplicateIcon className="h-[18px] w-[18px]" />
       </button>
       <button
         type="button"
         onClick={onDelete}
         aria-label={`Slet blokken ${title}`}
         title="Slet blok"
-        className="flex h-7 w-7 items-center justify-center text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-black"
+        className={`${iconButtonClassName} text-stone hover:text-red-700`}
       >
-        <TrashIcon className="h-3.5 w-3.5" />
+        <TrashIcon className="h-[18px] w-[18px]" />
       </button>
     </div>
   );
@@ -902,8 +902,11 @@ function BlockActions({
 function blockLabel(number: number, title: string, subtitle?: string) {
   return (
     <>
-      {String(number).padStart(2, "0")}. {title}
-      {subtitle && <span className="font-normal text-neutral-500">{` // ${subtitle}`}</span>}
+      <span className="mr-2.5 text-[11px] text-stone">
+        {String(number).padStart(2, "0")}
+      </span>
+      {title}
+      {subtitle && <>{` – ${subtitle}`}</>}
     </>
   );
 }
@@ -947,18 +950,18 @@ function SortableBlockRow({
     <li
       ref={setNodeRef}
       style={style}
-      className={`flex items-center justify-between gap-2 border border-neutral-300 bg-white px-2 py-1.5 transition-shadow hover:border-black ${
+      className={`flex items-center justify-between gap-2 rounded-sm border border-hairline bg-white p-2.5 transition-colors hover:bg-track ${
         isDragging ? "shadow-lg" : ""
-      } ${block.hidden ? "opacity-60" : ""}`}
+      } ${block.hidden ? "opacity-50" : ""}`}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <button
           type="button"
           {...attributes}
           {...listeners}
           aria-label={`Flyt blokken ${title}`}
           title="Træk for at flytte blokken op/ned"
-          className="shrink-0 cursor-grab touch-none p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-black focus-visible:outline-2 focus-visible:outline-black active:cursor-grabbing"
+          className="shrink-0 cursor-grab touch-none rounded-xs p-0.5 text-stone transition-colors hover:text-forest focus-visible:outline-2 focus-visible:outline-forest active:cursor-grabbing"
         >
           <GripIcon className="h-4 w-4" />
         </button>
@@ -967,11 +970,11 @@ function SortableBlockRow({
           id={`block-row-${block.id}`}
           onClick={onSelect}
           aria-label={`Rediger blokken ${title}${block.hidden ? " (skjult)" : ""}`}
-          className="min-w-0 flex-1 truncate py-1 text-left font-jetbrains text-xs font-bold tracking-wider text-neutral-900 uppercase hover:underline focus-visible:outline-2 focus-visible:outline-black"
+          title={`${title} · ${badge}`}
+          className="min-w-0 flex-1 truncate py-1 text-left text-sm font-medium text-forest hover:underline focus-visible:outline-2 focus-visible:outline-forest"
         >
           {blockLabel(number, title, subtitle)}
         </button>
-        <Badge type={badge} />
       </div>
       <BlockActions
         block={block}
@@ -984,27 +987,38 @@ function SortableBlockRow({
   );
 }
 
-// "+ Tilføj ny sektion": alle blok-typer, der kan tilføjes, som knapper på
-// én gang (samme valg og samme handling som den tidligere dropdown).
+// "Tilføj en ny sektion": alle blok-typer, der kan tilføjes, i Stitch-
+// designets rækkefølge og tekster (to kolonner).
+const ADD_MENU_ORDER: { kind: AddableBlockKind; label: string }[] = [
+  { kind: "tekst", label: "Tekst" },
+  { kind: "billede", label: "Produktvisning" },
+  { kind: "skillelinje", label: "Skillelinje" },
+  { kind: "socials", label: "Sociale medier" },
+  { kind: "knap", label: "Knap" },
+  { kind: "billedeblok", label: "Billedblok" },
+];
+
 function AddBlockMenu({ onAdd }: { onAdd: (kind: AddableBlockKind) => void }) {
   return (
-    <div className="border-2 border-dashed border-neutral-400 bg-white p-4 text-center transition-colors hover:border-black">
-      <p className="mb-2.5 flex items-center justify-center gap-1.5 font-jetbrains text-xs font-bold tracking-wider text-neutral-800 uppercase">
-        <PlusIcon className="h-3 w-3" />
-        Tilføj ny sektion til nyhedsbrevet
-      </p>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {ADD_BLOCK_OPTIONS.map(({ kind, label, description, icon: Icon }) => (
-          <button
-            key={kind}
-            type="button"
-            onClick={() => onAdd(kind)}
-            title={description}
-            className="flex items-center gap-1.5 border border-neutral-300 bg-neutral-50 px-3 py-1.5 font-jetbrains text-xs text-neutral-800 transition-colors hover:border-black hover:bg-black hover:text-white"
-          >
-            <Icon className="h-3.5 w-3.5 shrink-0" />+ {label}
-          </button>
-        ))}
+    <div className="pt-3">
+      <span className="mb-2 block text-xs font-semibold tracking-[0.12em] text-stone">Tilføj en ny sektion</span>
+      <div className="grid grid-cols-2 gap-2">
+        {ADD_MENU_ORDER.map(({ kind, label }) => {
+          const option = ADD_BLOCK_OPTIONS.find((candidate) => candidate.kind === kind);
+          const Icon = option?.icon;
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={() => onAdd(kind)}
+              title={option?.description ?? `Tilføj ${label}`}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xs border border-hairline px-3 py-2 text-sm text-forest transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white"
+            >
+              {Icon && <Icon className="h-4 w-4 shrink-0" />}
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1146,6 +1160,8 @@ export function EditorBlockList({
   // Galleri – "Regenerér tekst"-knappen deaktiveres da (se JSX herunder),
   // ligesom CTA-linket i så fald heller ikke opdateres.
   const regenerateTextProducts = collectCtaRelevantProducts(blocks, products);
+  // Swatches til "Global tekstfarve" – kundens brandfarver (samme som ColorSwatches).
+  const brandColors = useBrandSettings().colors;
 
   // Kalder /api/regenerate-text med UNIONEN af aktuelt viste produkter
   // (regenerateTextProducts ovenfor) og opdaterer KUN Overskrift-/
@@ -1588,24 +1604,24 @@ export function EditorBlockList({
         <button
           type="button"
           onClick={() => onSelectBlock(null)}
-          className="inline-flex w-fit items-center gap-1.5 border border-neutral-300 bg-white px-3 py-1.5 font-jetbrains text-xs text-neutral-800 transition-colors hover:border-black focus-visible:outline-2 focus-visible:outline-black"
+          className="inline-flex w-fit items-center gap-2 rounded-xs border border-forest px-3.5 py-2 text-sm font-medium text-forest transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white focus-visible:outline-2 focus-visible:outline-forest"
         >
           <ArrowLeftIcon className="h-3.5 w-3.5" />
           Alle blokke
         </button>
         <section
           aria-labelledby="selected-block-heading"
-          className={`bg-white ${isMediaBlockType(selectedBlock.type) ? "border-2 border-black" : "border border-black"} ${
+          className={`overflow-hidden rounded-sm bg-white shadow-sm ${isMediaBlockType(selectedBlock.type) ? "border-2 border-forest" : "border border-hairline"} ${
             selectedBlock.hidden ? "opacity-70" : ""
           }`}
         >
-          <div className="flex items-center justify-between gap-2 border-b border-neutral-200 bg-[#fafaf8] px-3 py-2">
+          <div className="flex items-center justify-between gap-2 border-b border-hairline px-4 py-3">
             <div className="flex min-w-0 items-center gap-2">
               <h2
                 id="selected-block-heading"
                 ref={selectedHeadingRef}
                 tabIndex={-1}
-                className="truncate font-jetbrains text-xs font-bold tracking-wider text-neutral-900 uppercase focus:outline-none"
+                className="truncate text-sm font-medium text-forest focus:outline-none"
               >
                 {blockLabel(selectedIndex + 1, meta.title, meta.subtitle)}
               </h2>
@@ -1620,7 +1636,7 @@ export function EditorBlockList({
             />
           </div>
           {selectedBlock.hidden && (
-            <p className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 font-jetbrains text-[11px] text-neutral-500">
+            <p className="border-b border-hairline bg-[#f5f3ee] px-4 py-2 text-xs text-stone">
               Blokken er skjult og vises ikke i nyhedsbrevet.
             </p>
           )}
@@ -1634,103 +1650,139 @@ export function EditorBlockList({
     );
   }
 
+  const regenerateProductNames = regenerateTextProducts.map((product) => product.title).filter(Boolean);
+  const editorCardClassName = "flex w-full flex-col rounded-sm bg-white p-5 shadow-sm";
+  const cardTitleClassName = "font-garamond text-2xl leading-[1.35] font-medium text-forest";
+  const fieldLabelClassName = "text-xs font-semibold tracking-[0.12em] text-stone";
+
   return (
-    <div className="@container flex w-full flex-col gap-4">
-      {/* Typografi & farveprofil for hele nyhedsbrevet */}
-      <section
-        className="flex flex-wrap items-center justify-between gap-3 border border-neutral-300 bg-white p-3.5 font-jetbrains text-xs shadow-xs"
-        title="Indstillinger for hele nyhedsbrevet"
-      >
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="flex items-center gap-1.5 text-[11px] tracking-wider text-neutral-500 uppercase">
-            <GearIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Typografi &amp; farveprofil:
-          </span>
-          <div className="relative flex items-center">
-          <select
-            id="global-font-family"
-            value={globalFontFamily}
-            onChange={(event) => handleGlobalFontChange(event.target.value)}
-            aria-label="Skrifttype for hele nyhedsbrevet"
-            style={{ fontFamily: globalFontFamily || undefined }}
-            className="appearance-none rounded-none border border-neutral-300 bg-[#fbfbf9] py-1 pr-7 pl-3 text-xs text-neutral-900 focus:border-black focus:outline-none"
-          >
-            <option value="" disabled>
-              Skrifttype
-            </option>
-            {FONT_FAMILIES.map((font) => (
-              <option key={font.value} value={font.value}>
-                {font.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDownIcon className="pointer-events-none absolute right-2 h-2.5 w-2.5 text-neutral-500" />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2" aria-label="Tekstfarve for hele nyhedsbrevet">
-          <span className="text-[11px] text-neutral-400 uppercase">Global tekstfarve:</span>
-          <div className="border border-neutral-200 bg-[#fbfbf9] p-1">
-            <ColorSwatches value={globalTextColor} onChange={handleGlobalColorChange} />
-          </div>
-        </div>
-      </section>
-
-      <div className="flex flex-col gap-1.5">
+    <div className="@container flex w-full flex-col gap-6 font-sans">
+      {/* AI Tekstoptimering */}
+      <section className={`${editorCardClassName} gap-3`}>
+        <h3 className={cardTitleClassName}>AI Tekstoptimering</h3>
+        <p className="text-sm text-stone">
+          Generér overskrift og brødtekst på ny ud fra det valgte produkt
+          {regenerateProductNames.length > 0 ? (
+            <>
+              {" "}
+              (<span className="font-garamond text-forest italic">{regenerateProductNames.join(", ")}</span>)
+            </>
+          ) : null}
+          . Rører ikke ved blok-struktur, styling, billeder eller CTA-knappen.
+        </p>
         <button
           type="button"
           onClick={handleRegenerateText}
           disabled={regenerateTextProducts.length === 0 || isRegeneratingText}
-          title="Genererer Overskrift og Brødtekst på ny, ud fra det/de produkter, der aktuelt er valgt i Billede & produktvisning-blokkene herunder – rører ikke ved blok-struktur, styling, billeder eller CTA-knappen."
-          className="inline-flex w-fit items-center gap-1.5 self-start border border-neutral-400 bg-white px-3 py-1.5 font-jetbrains text-xs text-neutral-800 transition-all hover:border-black hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+          title={
+            regenerateTextProducts.length === 0
+              ? "Vælg et produkt i en Billede & produktvisning-blok først"
+              : "Genererer Overskrift og Brødtekst på ny"
+          }
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xs bg-forest px-4 py-2.5 text-sm font-medium text-white shadow-xs transition-colors hover:bg-plant-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-forest"
         >
           {isRegeneratingText ? (
-            <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+            <SpinnerIcon className="h-[18px] w-[18px] animate-spin" />
           ) : (
-            <RefreshIcon className="h-3.5 w-3.5" />
+            <RefreshIcon className="h-[18px] w-[18px]" />
           )}
-          {isRegeneratingText ? "Regenererer tekst..." : "Regenerér tekst ud fra det viste produkt"}
+          {isRegeneratingText ? "Regenererer tekst..." : "Regenerér tekst ud fra det valgte produkt"}
         </button>
-        {regenerateTextError && <p className="font-jetbrains text-[12px] text-red-600">{regenerateTextError}</p>}
-      </div>
+        {regenerateTextError && <p className="text-sm text-red-700">{regenerateTextError}</p>}
+      </section>
 
-      {/* Hjælpelinje til drag-and-drop + antal blokke */}
-      <div className="flex items-center justify-between gap-3 border border-dashed border-neutral-400 bg-[#f0f0eb] px-3 py-1.5 font-jetbrains text-[11px] text-neutral-600">
-        <span className="flex items-center gap-1.5 font-medium uppercase">
-          <GripIcon className="h-3.5 w-3.5 shrink-0" />
-          Træk i håndtagene for at ændre rækkefølgen af sektionerne
-        </span>
-        <span className="hidden shrink-0 text-neutral-500 @md:inline">
-          {blocks.filter((block) => !block.hidden).length} blokke aktive · {blocks.filter((block) => block.hidden).length}{" "}
-          skjult
-        </span>
-      </div>
-
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
-          <ol className="flex flex-col gap-1.5" aria-label="Nyhedsbrevets blokke">
-            {blocks.map((block, index) => {
-              const meta = BLOCK_META[block.type];
+      {/* Typografi & Stil for hele nyhedsbrevet */}
+      <section className={`${editorCardClassName} gap-4`}>
+        <h3 className={cardTitleClassName}>Typografi &amp; Stil</h3>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="global-font-family" className={fieldLabelClassName}>
+            Typografi
+          </label>
+          <div className="relative">
+            <select
+              id="global-font-family"
+              value={globalFontFamily}
+              onChange={(event) => handleGlobalFontChange(event.target.value)}
+              style={{ fontFamily: globalFontFamily || undefined }}
+              className="w-full cursor-pointer appearance-none rounded-xs border-[0.5px] border-forest bg-white px-3 py-2 pr-8 text-sm text-forest transition-colors focus:ring-1 focus:ring-forest/30 focus:outline-none"
+            >
+              <option value="" disabled>
+                Skrifttype
+              </option>
+              {FONT_FAMILIES.map((font) => (
+                <option key={font.value} value={font.value}>
+                  {font.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-3 w-3 -translate-y-1/2 text-forest" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className={fieldLabelClassName}>Global tekstfarve</span>
+          {/* Én lille firkant pr. brandfarve (afrunding 5px) – den valgte har en
+              mørkegrøn ring. Hex-koden står i tooltip og skærmlæser-label. */}
+          <div role="group" aria-label="Tekstfarve for hele nyhedsbrevet" className="flex flex-wrap items-center gap-2">
+            {brandColors.map((color, index) => {
+              const isActive = globalTextColor?.toLowerCase() === color.toLowerCase();
               return (
-                <SortableBlockRow
-                  key={block.id}
-                  block={block}
-                  number={index + 1}
-                  title={meta.title}
-                  subtitle={meta.subtitle}
-                  badge={meta.badge}
-                  onSelect={() => onSelectBlock(block.id)}
-                  onDuplicate={() => handleDuplicate(block.id)}
-                  onToggleHidden={() => handleToggleHidden(block.id)}
-                  onDelete={() => handleDelete(block.id)}
+                <button
+                  key={`${index}-${color}`}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleGlobalColorChange(color)}
+                  aria-pressed={isActive}
+                  aria-label={`Tekstfarve ${color.toUpperCase()}`}
+                  title={color.toUpperCase()}
+                  className={`h-7 w-7 shrink-0 rounded-[5px] border border-black/15 transition-transform hover:scale-110 ${
+                    isActive ? "ring-2 ring-forest ring-offset-2" : ""
+                  }`}
+                  style={{ backgroundColor: color }}
                 />
               );
             })}
-          </ol>
-        </SortableContext>
-      </DndContext>
+          </div>
+        </div>
+      </section>
 
-      <AddBlockMenu onAdd={handleAddBlock} />
+      {/* Sektioner i mailen */}
+      <section className={`${editorCardClassName} gap-4`}>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className={cardTitleClassName}>Sektioner i mailen</h3>
+          <span className="text-sm font-medium text-stone">
+            {blocks.length} {blocks.length === 1 ? "sektion" : "sektioner"}
+          </span>
+        </div>
+        <p className="-mt-2 text-sm text-stone">
+          Træk for at ændre rækkefølgen. Skjul, duplikér eller slet sektioner – klik på en sektion for at redigere den.
+        </p>
+
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
+            <ol className="flex flex-col gap-2" aria-label="Nyhedsbrevets blokke">
+              {blocks.map((block, index) => {
+                const meta = BLOCK_META[block.type];
+                return (
+                  <SortableBlockRow
+                    key={block.id}
+                    block={block}
+                    number={index + 1}
+                    title={meta.title}
+                    subtitle={meta.subtitle}
+                    badge={meta.badge}
+                    onSelect={() => onSelectBlock(block.id)}
+                    onDuplicate={() => handleDuplicate(block.id)}
+                    onToggleHidden={() => handleToggleHidden(block.id)}
+                    onDelete={() => handleDelete(block.id)}
+                  />
+                );
+              })}
+            </ol>
+          </SortableContext>
+        </DndContext>
+
+        <AddBlockMenu onAdd={handleAddBlock} />
+      </section>
 
       {listFooter}
     </div>

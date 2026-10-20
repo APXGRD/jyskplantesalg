@@ -38,6 +38,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import {
+  authButtonClassName,
+  authErrorClassName,
+  authFieldClassName,
+  authLabelClassName,
+} from "@/components/AuthShell";
+import { CheckIcon, SpinnerIcon } from "@/components/icons";
 
 type Status = "verifying" | "ready" | "invalid" | "done";
 
@@ -142,7 +149,8 @@ export function SetPasswordForm() {
 
   if (status === "verifying") {
     return (
-      <p className="mt-7 font-jetbrains text-xs tracking-wider text-[#71717A] uppercase">
+      <p className="flex items-center gap-2 text-sm text-stone">
+        <SpinnerIcon className="h-4 w-4 animate-spin" />
         Bekræfter invitationslinket...
       </p>
     );
@@ -150,13 +158,11 @@ export function SetPasswordForm() {
 
   if (status === "invalid") {
     return (
-      <div className="mt-7 flex flex-col gap-4">
-        <p className="border-l-2 border-red-600 bg-red-50 px-3 py-3 font-jetbrains text-xs text-red-700">
-          Invitationslinket er ugyldigt eller udløbet.
-        </p>
+      <div className="flex flex-col gap-4">
+        <p className={authErrorClassName}>Invitationslinket er ugyldigt eller udløbet.</p>
         <a
           href="/login"
-          className="w-full border border-[#cfcfcf] bg-white px-7 py-3 text-center font-jetbrains text-xs font-medium tracking-wider text-black uppercase shadow-sm transition hover:border-black"
+          className="flex h-12 w-full items-center justify-center rounded-sm border border-forest px-8 text-xs font-semibold tracking-widest text-forest uppercase transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white"
         >
           Gå til login
         </a>
@@ -165,11 +171,9 @@ export function SetPasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-5">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="font-jetbrains text-[11px] text-[#666666] uppercase">
-          Ny adgangskode
-        </label>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <label className="block">
+        <span className={authLabelClassName}>Ny adgangskode</span>
         <input
           id="password"
           type="password"
@@ -177,15 +181,13 @@ export function SetPasswordForm() {
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          className="w-full rounded-xs border border-[#cfcfcf] bg-[#fdfdfd] px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-neutral-400 transition-colors focus:border-black focus:bg-white focus:outline-none"
+          className={authFieldClassName}
         />
-        <p className="text-xs text-[#777777]">Mindst {MIN_PASSWORD_LENGTH} tegn.</p>
-      </div>
+        <span className="mt-1 block text-xs text-stone">Mindst {MIN_PASSWORD_LENGTH} tegn.</span>
+      </label>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="confirmPassword" className="font-jetbrains text-[11px] text-[#666666] uppercase">
-          Gentag adgangskode
-        </label>
+      <label className="block">
+        <span className={authLabelClassName}>Gentag adgangskode</span>
         <input
           id="confirmPassword"
           type="password"
@@ -193,21 +195,22 @@ export function SetPasswordForm() {
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
-          className="w-full rounded-xs border border-[#cfcfcf] bg-[#fdfdfd] px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-neutral-400 transition-colors focus:border-black focus:bg-white focus:outline-none"
+          className={authFieldClassName}
         />
+      </label>
+
+      {formError && <p className={authErrorClassName}>{formError}</p>}
+
+      <div className="mt-2 border-t border-hairline pt-6">
+        <button type="submit" disabled={submitting || status === "done"} className={authButtonClassName}>
+          {submitting ? (
+            <SpinnerIcon className="h-[18px] w-[18px] animate-spin" />
+          ) : (
+            <CheckIcon className="h-[18px] w-[18px]" />
+          )}
+          {status === "done" ? "Fuldført – viderestiller..." : submitting ? "Gemmer..." : "Sæt adgangskode"}
+        </button>
       </div>
-
-      {formError && (
-        <p className="border-l-2 border-red-600 bg-red-50 px-3 py-2 font-jetbrains text-xs text-red-700">{formError}</p>
-      )}
-
-      <button
-        type="submit"
-        disabled={submitting || status === "done"}
-        className="mt-1 w-full bg-black px-7 py-3 font-jetbrains text-xs font-bold tracking-wider text-white uppercase shadow-sm transition-all hover:bg-[#222222] active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-300"
-      >
-        {status === "done" ? "Fuldført – viderestiller..." : submitting ? "Gemmer..." : "Sæt adgangskode"}
-      </button>
     </form>
   );
 }

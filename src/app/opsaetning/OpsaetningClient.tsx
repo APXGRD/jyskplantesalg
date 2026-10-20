@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { SectionLabel, StitchShell } from "@/components/StitchShell";
+import { EditorialShell } from "@/components/EditorialShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ChevronDownIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
+import { CheckCircleIcon, FilterIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import { BLANK_NEWSLETTER, createBlankBlocks, type NewsletterBlock } from "@/lib/newsletterBlocks";
 import { useNewsletter, type GeneratedNewsletter } from "@/context/NewsletterContext";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
@@ -15,15 +15,40 @@ interface OpsaetningClientProps {
   initialPlantForms: string[];
 }
 
+// Et nummereret trin i Stitch-designet: kort med hårfin kant, kursivt
+// nummer i EB Garamond, titel og en lille etiket til højre.
+function StepSection({
+  number,
+  title,
+  label,
+  children,
+}: {
+  number: string;
+  title: string;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-sm border border-hairline p-5 sm:p-8">
+      <div className="mb-4 flex items-baseline justify-between gap-4">
+        <div className="flex items-baseline gap-2">
+          <span className="font-garamond text-2xl leading-[1.35] font-medium text-sage italic">{number}</span>
+          <h2 className="text-lg leading-[1.4] font-medium text-forest">{title}</h2>
+        </div>
+        <span className="hidden text-xs font-semibold tracking-[0.12em] text-stone sm:inline">{label}</span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function AudienceCard({
   title,
-  badge,
   description,
   selected,
   onSelect,
 }: {
   title: string;
-  badge: string;
   description: string;
   selected: boolean;
   onSelect: () => void;
@@ -34,57 +59,39 @@ function AudienceCard({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`flex flex-col rounded-md border p-5 text-left transition-all ${
-        selected
-          ? "border-black bg-[#141414] text-white shadow-lg"
-          : "border-black/10 bg-white hover:border-black/30"
+      className={`flex flex-col rounded-sm bg-white p-4 text-left transition-all duration-200 ${
+        selected ? "border-2 border-forest" : "border border-hairline hover:border-sage"
       }`}
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <span
-            className={`flex h-4 w-4 items-center justify-center rounded-full ${
-              selected ? "border-2 border-white p-0.5" : "border border-black/30"
-            }`}
-          >
-            {selected && <span className="h-full w-full rounded-full bg-white" />}
-          </span>
-          <span className="text-base font-bold tracking-tight">{title}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {selected && (
-            <span className="rounded bg-white px-2 py-0.5 font-jetbrains text-[9px] font-semibold tracking-wider text-black uppercase">
-              Valgt
-            </span>
-          )}
-          <span
-            className={`rounded border px-2 py-0.5 font-jetbrains text-[9px] uppercase ${
-              selected ? "border-white/20 text-neutral-300" : "border-black/10 bg-[#F8F8F8] text-[#71717A]"
-            }`}
-          >
-            {badge}
-          </span>
-        </div>
-      </div>
-      <p className={`text-xs leading-relaxed ${selected ? "text-neutral-300" : "text-[#71717A]"}`}>{description}</p>
+      <span className="flex items-center justify-between">
+        <span className="text-lg leading-[1.4] font-medium text-forest">{title}</span>
+        {selected ? (
+          <CheckCircleIcon className="h-5 w-5 text-forest" />
+        ) : (
+          <span aria-hidden className="mr-[1.5px] size-[17px] rounded-full border-2 border-hairline" />
+        )}
+      </span>
+      <span className="mt-1 text-sm text-stone">{description}</span>
+      <span aria-hidden className="mt-4 border-t border-hairline pt-1" />
     </button>
   );
 }
 
-// Planteform-rækker: synlig, native checkbox (ikke sr-only – en sr-only-
-// input uden nær positioneret forælder har tidligere oppustet hele sidens
-// scrollhøjde, se git-historikken).
-function PlantFormRow({ checked, onChange, label, tag }: { checked: boolean; onChange: () => void; label: string; tag?: string }) {
+// Afbryder (Stitch "role=switch") – en native checkbox under overfladen, så
+// den kan betjenes med tastatur og skærmlæser.
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
   return (
-    <label
-      className={`flex cursor-pointer items-center gap-3 rounded border p-2 transition-colors ${
-        checked ? "border-black/10 bg-white" : "border-transparent hover:bg-white/60"
-      }`}
-    >
-      <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 shrink-0 accent-black" />
-      <span className={checked ? "font-medium text-black" : "text-neutral-700"}>{label}</span>
-      {tag && <span className="ml-auto text-[10px] text-[#71717A]">{tag}</span>}
-    </label>
+    <span className="relative inline-flex h-6 w-12 shrink-0">
+      <input
+        type="checkbox"
+        role="switch"
+        aria-label={label}
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="peer absolute inset-0 m-0 cursor-pointer appearance-none rounded-full bg-[#e4e2dd] transition-colors duration-200 checked:bg-forest focus-visible:ring-2 focus-visible:ring-forest/40 focus-visible:ring-offset-2 focus-visible:outline-none"
+      />
+      <span className="pointer-events-none absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
+    </span>
   );
 }
 
@@ -294,71 +301,82 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
     router.push("/preview");
   }
 
-  const audienceLabel = customerType === "erhverv" ? "Erhverv (B2B)" : "Privat (B2C)";
   const visibleCount =
     topicTotalMatchCount !== null && hasValidMaxResults
       ? Math.min(parsedMaxResults, topicTotalMatchCount)
       : topicTotalMatchCount;
 
+  const audienceLabel = customerType === "erhverv" ? "Erhvervskunder (B2B)" : "Privatkunder (B2C)";
+
   return (
-    <StitchShell active="settings">
+    <EditorialShell active="settings">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-5 pb-12 md:px-12">
+        {/* Titel + status */}
+        <header className="flex flex-col justify-between gap-4 border-b border-hairline py-8 md:flex-row md:items-end">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-stone">
+              <span className="text-xs font-semibold tracking-[0.12em] text-sage uppercase">Trin 01 / Nyhedsbrev</span>
+              <span className="text-hairline">/</span>
+              <span className="text-sm">Konfiguration &amp; Kuratering</span>
+            </div>
+            <h1 className="font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-forest md:text-4xl md:leading-[1.25]">
+              Opsætning
+            </h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="hidden flex-col text-right sm:flex">
+              <span className="text-xs font-semibold tracking-[0.12em] text-stone uppercase">Målgruppe</span>
+              <span className="text-sm font-medium text-forest">{audienceLabel}</span>
+            </div>
+            <div className="hidden h-8 w-px bg-hairline sm:block" />
+            <span className="inline-flex items-center rounded-xs bg-mint px-2 py-1 text-xs font-semibold tracking-[0.12em] text-forest-hover">
+              {canGenerate ? "Klar til generering" : "Afventer beskrivelse"}
+            </span>
+          </div>
+        </header>
 
-          <main className="grid flex-1 grid-cols-1 divide-y divide-black/10 lg:grid-cols-12 lg:divide-x lg:divide-y-0">
-            {/* Venstre kolonne: målgruppe, skabelon, beskrivelse, generér */}
-            <div className="flex flex-col divide-y divide-black/10 lg:col-span-8">
-              <div className="bg-white/40 px-4 py-7 sm:px-8">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="mb-1.5 font-jetbrains text-[10px] tracking-widest text-[#71717A] uppercase">
-                      Trin 01 <span className="text-black/30">/</span> Nyhedsbrev
-                    </div>
-                    <h1 className="text-4xl font-bold tracking-[-0.04em] uppercase sm:text-5xl">Opsætning</h1>
-                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#71717A]">
-                      Angiv målgruppe og eventuelle særlige instrukser til AI-genereringen af nyhedsbrevet.
-                    </p>
-                  </div>
-                  <div className="hidden flex-col items-end text-right font-jetbrains sm:flex">
-                    <span className="text-3xl font-light tracking-tighter text-black/90">
-                      01<span className="text-black/30">/04</span>
-                    </span>
-                    <span className="text-[9px] tracking-widest text-[#71717A] uppercase">
-                      Status: {canGenerate ? "Klar til generering" : "Afventer beskrivelse"}
-                    </span>
-                  </div>
-                </div>
+        <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-12">
+          {/* Venstre: trinene */}
+          <div className="flex flex-col gap-12 lg:col-span-7 xl:col-span-8">
+            <StepSection number="01" title="Målgruppe & Momsforhold" label="Segmentering">
+              <div role="radiogroup" aria-label="Målgruppe" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <AudienceCard
+                  title="Privatkunder"
+                  description="Priser inkl. moms"
+                  selected={customerType === "privat"}
+                  onSelect={() => setCustomerType("privat")}
+                />
+                <AudienceCard
+                  title="Erhvervskunder"
+                  description="Priser ekskl. moms"
+                  selected={customerType === "erhverv"}
+                  onSelect={() => setCustomerType("erhverv")}
+                />
               </div>
+            </StepSection>
 
-              <section className="space-y-4 bg-white/20 p-4 sm:p-8">
-                <SectionLabel>01. Målgruppe</SectionLabel>
-                <div role="radiogroup" className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <AudienceCard
-                    title="Privatkunder"
-                    badge="B2C"
-                    description="Priser inkl. moms · Tilgængeligt, inspirerende sprog · Fokus på udtryk og haveoplevelse"
-                    selected={customerType === "privat"}
-                    onSelect={() => setCustomerType("privat")}
-                  />
-                  <AudienceCard
-                    title="Erhvervskunder"
-                    badge="B2B"
-                    description="Priser ekskl. moms · Fagligt, præcist sprog · Fokus på specifikationer og robusthed"
-                    selected={customerType === "erhverv"}
-                    onSelect={() => setCustomerType("erhverv")}
-                  />
+            <StepSection number="02" title="Skabelon & Æstetik" label="Layout">
+              <div className="flex flex-col justify-between gap-4 rounded-sm border border-hairline p-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                  <span className="block truncate text-xs font-semibold tracking-wide text-forest uppercase">
+                    {selectedTemplate ? selectedTemplate.name : "Standard layout"}
+                  </span>
+                  <p className="mt-0.5 text-sm text-stone">
+                    {selectedTemplate
+                      ? selectedTemplate.description?.trim() || "Gemt skabelon."
+                      : "Appens standardopbygning af nyhedsbrevet."}
+                  </p>
                 </div>
-              </section>
-
-              <section className="space-y-3 bg-white/10 p-4 sm:p-8">
-                <div className="flex items-center justify-between gap-2">
-                  <SectionLabel>02. Skabelon</SectionLabel>
-                  <span className="font-jetbrains text-[10px] text-[#71717A] uppercase">Layout</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  {/* "Skift": den native skabelon-vælger ligger usynligt ovenpå
+                      knappen, så et klik åbner listen over gemte skabeloner. */}
+                  <span className="relative inline-flex rounded-xs border border-forest px-4 py-2 text-sm font-medium text-forest transition-colors focus-within:ring-2 focus-within:ring-forest/30 hover:border-plant-hover hover:bg-plant-hover hover:text-white">
+                    Skift
                     <select
+                      aria-label="Skift skabelon"
                       value={selectedTemplateId ?? ""}
                       onChange={(event) => setSelectedTemplateId(event.target.value || null)}
-                      className="w-full cursor-pointer appearance-none rounded border border-black/15 bg-white px-4 py-3.5 pr-10 text-sm font-medium tracking-tight text-black transition-colors hover:border-black focus:border-black focus:ring-1 focus:ring-black focus:outline-none"
+                      className="absolute inset-0 cursor-pointer appearance-none opacity-0"
                     >
                       <option value="">Standard layout</option>
                       {templates.map((template) => (
@@ -367,133 +385,39 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                         </option>
                       ))}
                     </select>
-                    <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-4 h-3.5 w-3.5 -translate-y-1/2 text-black" />
-                  </div>
-                  {selectedTemplate && (
-                    <button
-                      type="button"
-                      onClick={handleDeleteTemplate}
-                      aria-label={`Slet skabelonen ${selectedTemplate.name}`}
-                      title="Slet skabelon"
-                      className="flex h-12.5 w-12.5 shrink-0 items-center justify-center rounded border border-black/15 bg-white text-[#71717A] transition-colors hover:border-black hover:text-red-600"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-                {deleteError && <p className="text-[12px] text-red-600">{deleteError}</p>}
-              </section>
-
-              <section className="flex flex-1 flex-col space-y-3 bg-white/40 p-4 sm:p-8">
-                <SectionLabel>03. Beskriv dit nyhedsbrev</SectionLabel>
-                <div className="relative flex flex-1 flex-col overflow-hidden rounded border border-black/20 bg-white shadow-sm focus-within:border-black focus-within:ring-1 focus-within:ring-black">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 bg-[#FBFBFB] px-4 py-2 font-jetbrains text-[10px] text-[#71717A] uppercase">
-                    <span>Input: Fritekst til AI</span>
-                    <span className="font-medium text-neutral-500">Målgruppe: {audienceLabel}</span>
-                  </div>
-                  <textarea
-                    value={instructions}
-                    onChange={(event) => setInstructions(event.target.value)}
-                    placeholder="F.eks. 'Lav et nyhedsbrev i en professionel tone til vores erhvervskunder om vores blommetræer'"
-                    rows={5}
-                    className="min-h-32 w-full flex-1 resize-none border-0 bg-transparent p-4 font-jetbrains text-sm leading-relaxed text-black placeholder:text-neutral-400 focus:ring-0 focus:outline-none"
-                  />
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/5 bg-[#F9F9F9] px-4 py-2.5 font-jetbrains text-[11px]">
-                    <div className="flex items-center gap-1.5 text-neutral-600">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-neutral-900" />
-                      <span>Teksten bruges både som søgning og som AI-instruks</span>
-                    </div>
-                    <div className="tracking-wider text-neutral-500">
-                      <span className="font-semibold text-black">{instructions.length}</span> anslag
-                    </div>
-                  </div>
-                </div>
-
-                {error && <p className="text-sm text-red-600">{error}</p>}
-
-                <div className="flex flex-wrap items-center gap-4 pt-4">
+                  </span>
+                  {/* Kan kun slette en gemt skabelon – ikke "Standard layout". */}
                   <button
                     type="button"
-                    onClick={handleGenerate}
-                    disabled={!canGenerate || isGenerating}
-                    className="inline-flex items-center gap-3 rounded bg-black px-7 py-4 font-jetbrains text-xs font-semibold tracking-wider text-white uppercase shadow-md transition-all hover:bg-neutral-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:shadow-none disabled:active:scale-100"
+                    onClick={handleDeleteTemplate}
+                    disabled={!selectedTemplate}
+                    aria-label={selectedTemplate ? `Slet skabelonen ${selectedTemplate.name}` : "Slet skabelon"}
+                    title={selectedTemplate ? "Slet skabelon" : "Vælg en gemt skabelon for at kunne slette den"}
+                    className="p-2 text-stone transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-stone"
                   >
-                    {isGenerating && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
-                    {isGenerating ? "Genererer..." : "Generér nyhedsbrev"}
+                    <TrashIcon className="h-5 w-5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleBlankTemplate}
-                    disabled={isGenerating}
-                    title="Start med et tomt nyhedsbrev og byg det selv fra bunden – uden AI og uden produktdata"
-                    className="inline-flex items-center gap-3 rounded border border-neutral-300 bg-white px-7 py-4 font-jetbrains text-xs font-semibold tracking-wider text-black uppercase shadow-sm transition-all hover:border-black hover:bg-neutral-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Blank skabelon
-                  </button>
-                  {!canGenerate && (
-                    <p className="font-jetbrains text-[11px] text-[#71717A]">
-                      Beskriv dit nyhedsbrev ovenfor, før du kan generere det.
-                    </p>
-                  )}
-                </div>
-              </section>
-            </div>
-
-            {/* Højre kolonne: filtrering + søgestatus */}
-            <aside className="flex flex-col divide-y divide-black/10 bg-[#F8F8F8] lg:col-span-4">
-              <div className="bg-white/70 p-4 sm:p-6">
-                <SectionLabel>Filtrering</SectionLabel>
-                <p className="mt-2 text-xs leading-tight text-[#71717A]">
-                  Udvælg hvilke planter der skal indgå i nyhedsbrevet.
-                </p>
-              </div>
-
-              <div className="space-y-4 p-4 sm:p-6">
-                <div className="flex items-center justify-between">
-                  <span className="font-jetbrains text-xs font-bold tracking-wider text-black uppercase">Planteform</span>
-                  <button
-                    type="button"
-                    onClick={() => setTopicPlantForm("")}
-                    className="font-jetbrains text-[10px] text-[#71717A] uppercase underline hover:text-black"
-                  >
-                    Nulstil
-                  </button>
-                </div>
-                <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1 font-jetbrains text-xs">
-                  <PlantFormRow
-                    checked={topicPlantForm === ""}
-                    onChange={() => setTopicPlantForm("")}
-                    label="Alle planteformer"
-                    tag="ALT"
-                  />
-                  {plantForms.map((form) => (
-                    <PlantFormRow
-                      key={form}
-                      checked={topicPlantForm === form}
-                      onChange={() => setTopicPlantForm(form)}
-                      label={form}
-                    />
-                  ))}
                 </div>
               </div>
+              {deleteError && <p className="mt-2 text-sm text-red-700">{deleteError}</p>}
+            </StepSection>
 
-              <div className="space-y-5 bg-white/40 p-4 sm:p-6">
-                <span className="block font-jetbrains text-xs font-bold tracking-wider text-black uppercase">
-                  Visningsregler
-                </span>
-                <label className="flex cursor-pointer items-center justify-between gap-3">
-                  <span className="text-xs font-medium text-neutral-800">Kun med billede</span>
-                  <input
-                    type="checkbox"
-                    checked={topicOnlyWithImage}
-                    onChange={(event) => setTopicOnlyWithImage(event.target.checked)}
-                    className="h-4 w-4 accent-black"
-                  />
+            <StepSection number="03" title="Visningsregler & Produkter" label="Dendrologisk Udtræk">
+              <div className="grid grid-cols-1 gap-8 border-b border-hairline pb-8 md:grid-cols-2">
+                <label className="flex cursor-pointer items-center justify-between gap-2 rounded-sm border border-hairline p-4">
+                  <span className="flex flex-col pr-2">
+                    <span className="text-sm font-medium text-forest">Kun produkter med billeder</span>
+                    <span className="text-xs text-stone">Udelukker produkter uden billede</span>
+                  </span>
+                  <Toggle checked={topicOnlyWithImage} onChange={setTopicOnlyWithImage} label="Kun produkter med billeder" />
                 </label>
-                <div>
-                  <label htmlFor="topic-max-results" className="mb-2 block text-xs font-medium text-neutral-800">
-                    Antal produkter
-                  </label>
+                <div className="flex items-center justify-between gap-2 rounded-sm border border-hairline p-4">
+                  <span className="flex flex-col">
+                    <label htmlFor="topic-max-results" className="text-sm font-medium text-forest">
+                      Maks. antal produkter
+                    </label>
+                    <span className="text-xs text-stone">Vises i nyhedsbrevet</span>
+                  </span>
                   <input
                     id="topic-max-results"
                     type="number"
@@ -501,36 +425,124 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                     min={1}
                     value={topicMaxResults}
                     onChange={(event) => setTopicMaxResults(event.target.value)}
-                    className="w-full rounded border border-black/20 bg-white px-3 py-2 font-jetbrains text-sm font-semibold text-black focus:border-black focus:ring-1 focus:ring-black focus:outline-none"
+                    placeholder="1"
+                    className="h-10 w-20 rounded-xs border border-hairline bg-white text-center text-lg font-medium text-forest transition-colors focus:border-forest focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="bg-[#EFEFEF] p-4 sm:p-6">
-                <div className="flex flex-col gap-2 rounded border border-black/15 bg-white p-4">
-                  <div className="flex items-center justify-between font-jetbrains text-[10px] text-[#71717A] uppercase">
-                    <span>Søgestatus</span>
-                    {!showMatchCountNote ? (
-                      <span>Afventer</span>
-                    ) : topicTotalMatchCount === 0 ? (
-                      <span className="font-bold text-red-600">Ingen match</span>
-                    ) : (
-                      <span className="font-bold text-emerald-600">Match fundet</span>
-                    )}
-                  </div>
-                  <div className="font-jetbrains text-sm font-bold tracking-tight">
-                    {showMatchCountNote ? `${topicTotalMatchCount} produkter fundet` : "Beskriv nyhedsbrevet for at søge"}
-                  </div>
-                  {showMatchCountNote && topicTotalMatchCount !== 0 && (
-                    <div className="flex justify-between border-t border-black/5 pt-2 font-jetbrains text-[11px] text-[#71717A]">
-                      <span>Vises i nyhedsbrevet:</span>
-                      <span className="font-semibold text-black">De første {visibleCount}</span>
-                    </div>
+              <div aria-live="polite" className="mt-8 rounded-sm border border-hairline bg-white p-4">
+                <p className="mt-1 font-garamond text-2xl leading-[1.35] text-forest">
+                  {!showMatchCountNote
+                    ? "Beskriv nyhedsbrevet for at søge efter produkter."
+                    : topicTotalMatchCount === 0
+                      ? "Ingen produkter matcher aktuelle kriterier."
+                      : `${topicTotalMatchCount} produkter matcher aktuelle kriterier.`}
+                </p>
+                {showMatchCountNote && topicTotalMatchCount !== 0 && (
+                  <p className="mt-1 text-sm text-stone">
+                    Vises i nyhedsbrevet: <strong className="font-medium text-forest">De første {visibleCount}</strong>
+                  </p>
+                )}
+              </div>
+            </StepSection>
+
+            <StepSection number="04" title="Beskriv dit nyhedsbrev" label="AI Prompt & Tonalitet">
+              <label htmlFor="ai-prompt-input" className="sr-only">
+                Beskriv dit nyhedsbrev
+              </label>
+              <textarea
+                id="ai-prompt-input"
+                value={instructions}
+                onChange={(event) => setInstructions(event.target.value)}
+                placeholder="F.eks. 'Lav et nyhedsbrev i en professionel tone til vores erhvervskunder om vores blommetræer'"
+                rows={5}
+                className="w-full resize-y rounded-sm border border-hairline bg-white p-4 leading-relaxed text-forest transition-all placeholder:text-stone/60 focus:border-forest focus:outline-none"
+              />
+              <div className="mt-1 flex items-center justify-between gap-4 px-1 text-sm text-stone">
+                <span>Teksten bruges både som søgning og som AI-instruks</span>
+                <span className="shrink-0">{instructions.length} anslag</span>
+              </div>
+
+              {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+
+              <div className="mt-12 flex flex-col items-stretch justify-between gap-4 border-t border-hairline pt-8 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={handleBlankTemplate}
+                  disabled={isGenerating}
+                  title="Start med et tomt nyhedsbrev og byg det selv fra bunden – uden AI og uden produktdata"
+                  className="flex items-center justify-center rounded-xs border border-forest bg-transparent px-8 py-3 text-sm font-medium text-forest transition-all hover:border-plant-hover hover:bg-plant-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-forest disabled:hover:bg-transparent disabled:hover:text-forest"
+                >
+                  BLANK SKABELON
+                </button>
+                <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={!canGenerate || isGenerating}
+                    className="flex items-center justify-center gap-2 rounded-xs bg-forest px-12 py-3 text-sm font-medium tracking-wider text-white transition-all hover:bg-plant-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-forest"
+                  >
+                    {isGenerating && <SpinnerIcon className="h-4 w-4 animate-spin" />}
+                    {isGenerating ? "GENERERER..." : "GENERÉR NYHEDSBREV"}
+                  </button>
+                  {!canGenerate && (
+                    <p className="text-xs text-stone">Beskriv dit nyhedsbrev ovenfor, før du kan generere det.</p>
                   )}
                 </div>
               </div>
-            </aside>
-          </main>
+            </StepSection>
+          </div>
+
+          {/* Højre: planteform-filter */}
+          <aside className="flex flex-col gap-8 lg:col-span-5 xl:col-span-4">
+            <div className="rounded-sm border border-hairline p-5 sm:p-8">
+              <div className="mb-4 flex items-center justify-between border-b border-hairline pb-2">
+                <div className="flex items-center gap-2">
+                  <FilterIcon className="h-5 w-5 text-forest" />
+                  <h3 className="text-lg leading-[1.4] font-medium text-forest">Planteform</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTopicPlantForm("")}
+                  className="text-sm text-stone underline decoration-hairline hover:text-forest"
+                >
+                  Nulstil
+                </button>
+              </div>
+              <span className="mb-1 block text-xs font-semibold tracking-[0.12em] text-stone uppercase">
+                Form &amp; Vækstkarakter
+              </span>
+              {/* Én planteform ad gangen (samme filter som hidtil). */}
+              <div role="radiogroup" aria-label="Planteform" className="flex max-h-96 flex-col gap-2 overflow-y-auto">
+                {[{ value: "", label: "Alle planteformer" }, ...plantForms.map((form) => ({ value: form, label: form }))].map(
+                  (option) => {
+                    const checked = topicPlantForm === option.value;
+                    return (
+                      <label key={option.value || "alle"} className="group flex cursor-pointer items-center gap-2 p-1">
+                        <input
+                          type="radio"
+                          name="plant-form"
+                          checked={checked}
+                          onChange={() => setTopicPlantForm(option.value)}
+                          className="h-4 w-4 shrink-0 cursor-pointer accent-forest"
+                        />
+                        <span
+                          className={`text-sm ${
+                            checked ? "font-medium text-forest" : "text-stone-dark group-hover:text-forest"
+                          }`}
+                        >
+                          {option.label}
+                        </span>
+                      </label>
+                    );
+                  },
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
 
       {deleteTarget && (
         <ConfirmDialog
@@ -541,6 +553,6 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-    </StitchShell>
+    </EditorialShell>
   );
 }
