@@ -7,32 +7,34 @@ interface CustomerTableProps {
   onUnsubscribe: (customer: ShopifyCustomer) => void;
 }
 
+const headerCellClassName = "px-4 py-3 text-[11px] font-semibold tracking-wider uppercase";
+
 export function CustomerTable({ customers, onEdit, onUnsubscribe }: CustomerTableProps) {
   return (
     // overflow-x-auto – på smalle skærme scroller tabellen vandret for sig,
     // i stedet for at klemme kolonnerne eller bryde sidens layout.
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-140 border-collapse text-left">
+    <div className="w-full overflow-x-auto">
+      <table className="w-full min-w-[620px] border-collapse text-left">
         <thead>
-          <tr className="border-b border-[#e5e7eb] bg-zinc-50 font-jetbrains text-[10px] tracking-wider text-zinc-500 uppercase">
-            <th scope="col" className="px-4 py-3 font-semibold">
+          <tr className="bg-forest text-white">
+            <th scope="col" className={headerCellClassName}>
               Navn
             </th>
-            <th scope="col" className="px-4 py-3 font-semibold">
-              Email / kontakt
+            <th scope="col" className={headerCellClassName}>
+              Email / Kontakt
             </th>
-            <th scope="col" className="px-4 py-3 font-semibold">
+            <th scope="col" className={headerCellClassName}>
               Kundetype
             </th>
-            <th scope="col" className="px-4 py-3 font-semibold">
+            <th scope="col" className={headerCellClassName}>
               Status
             </th>
-            <th scope="col" className="px-4 py-3 text-right font-semibold">
+            <th scope="col" className={`${headerCellClassName} text-right`}>
               Handlinger
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#e5e7eb] font-jetbrains text-xs">
+        <tbody className="divide-y divide-hairline bg-white">
           {customers.map((customer) => (
             <CustomerRow key={customer.id} customer={customer} onEdit={onEdit} onUnsubscribe={onUnsubscribe} />
           ))}
@@ -40,9 +42,7 @@ export function CustomerTable({ customers, onEdit, onUnsubscribe }: CustomerTabl
       </table>
 
       {customers.length === 0 && (
-        <p className="px-4 py-12 text-center font-jetbrains text-xs tracking-wider text-zinc-400 uppercase">
-          Ingen kunder matcher dine filtre
-        </p>
+        <p className="px-4 py-12 text-center text-sm text-stone">Ingen kunder matcher dine filtre</p>
       )}
     </div>
   );

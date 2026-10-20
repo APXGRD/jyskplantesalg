@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import { DM_Sans, Instrument_Serif, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { DM_Sans, EB_Garamond, Instrument_Serif, JetBrains_Mono, Libre_Baskerville, Space_Grotesk } from "next/font/google";
 import { ClientOnlyNewsletterProvider } from "@/context/ClientOnlyNewsletterProvider";
 import { BrandSettingsProvider } from "@/context/BrandSettingsContext";
 import { brand } from "@/config/brand";
@@ -42,6 +42,21 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+// Figma-redesignet (JYSK PLANTESALG) – bruges via font-baskerville.
+const libreBaskerville = Libre_Baskerville({
+  variable: "--font-libre-baskerville",
+  subsets: ["latin"],
+  weight: "400",
+});
+
+// Stitch-redesignet (forsiden) – bruges via font-garamond.
+const ebGaramond = EB_Garamond({
+  variable: "--font-eb-garamond",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  style: ["normal", "italic"],
+});
+
 // Appens eget navn i browser-fanen – ikke brand.ts's hardcodede firmanavn.
 export const metadata: Metadata = {
   title: "Nyhedsbrev generator",
@@ -52,7 +67,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="da"
-      className={`${dmSans.variable} ${instrumentSerif.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${instrumentSerif.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${libreBaskerville.variable} ${ebGaramond.variable} h-full antialiased`}
       style={brandColorVariables}
     >
       <body className="min-h-full flex flex-col">

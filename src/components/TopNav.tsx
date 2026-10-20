@@ -14,20 +14,17 @@ import { createClient } from "@/lib/supabase/client";
 export type TopNavPage = "home" | "settings" | "preview" | "customers" | "brand-settings";
 
 // "00 / Forside" står altid først i navigationen.
-const HOME_ITEM: { id: TopNavPage; label: string; href: string } = { id: "home", label: "Forside", href: "/" };
+export const HOME_ITEM: { id: TopNavPage; label: string; href: string } = { id: "home", label: "Forside", href: "/" };
 
-const NAV_ITEMS: { id: TopNavPage; label: string; href: string }[] = [
+export const NAV_ITEMS: { id: TopNavPage; label: string; href: string }[] = [
   { id: "settings", label: "Opsætning", href: "/opsaetning" },
   { id: "preview", label: "Preview & Rediger", href: "/preview" },
   { id: "customers", label: "Kunder", href: "/kunder" },
   { id: "brand-settings", label: "Indstillinger", href: "/indstillinger" },
 ];
 
-// previewName: live-forhåndsvisning af firmanavnet, mens det skrives på
-// Indstillinger-siden (før gem) – tomt felt viser "Logo"-placeholderen.
-export function TopNav({ active, previewName }: { active?: TopNavPage; previewName?: string }) {
-  const settings = useBrandSettings();
-  const companyName = (previewName ?? settings.name).trim();
+// Den indloggede brugers email (vises i topbaren) – null indtil den er hentet.
+export function useUserEmail() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,6 +38,16 @@ export function TopNav({ active, previewName }: { active?: TopNavPage; previewNa
       cancelled = true;
     };
   }, []);
+
+  return userEmail;
+}
+
+// previewName: live-forhåndsvisning af firmanavnet, mens det skrives på
+// Indstillinger-siden (før gem) – tomt felt viser "Logo"-placeholderen.
+export function TopNav({ active, previewName }: { active?: TopNavPage; previewName?: string }) {
+  const settings = useBrandSettings();
+  const companyName = (previewName ?? settings.name).trim();
+  const userEmail = useUserEmail();
 
   // Desktop (lg): tre-kolonne-grid med lige brede sidekolonner, så menuen
   // altid står præcis i midten – uanset firmanavnets og emailens bredde.

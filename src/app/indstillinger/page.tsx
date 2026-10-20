@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
-import { SectionLabel, StitchShell } from "@/components/StitchShell";
-import { CheckIcon, ChevronDownIcon, PlusIcon, SpinnerIcon, TrashIcon, UploadIcon } from "@/components/icons";
+import { EditorialShell } from "@/components/EditorialShell";
+import { CheckIcon, ChevronDownIcon, PlusIcon, SpinnerIcon, TrashIcon, UploadIcon, XIcon } from "@/components/icons";
 import { FONT_FAMILIES } from "@/lib/fontFamilies";
-import { getContrastTextColor } from "@/lib/brandColors";
 import { useRefreshBrandSettings } from "@/context/BrandSettingsContext";
 
 interface BrandSettingsForm {
@@ -55,55 +54,46 @@ const EMPTY_FORM: BrandSettingsForm = {
 const LOGO_FILE_ACCEPT = ".png,.jpg,.jpeg";
 const MAX_LOGO_FILE_BYTES = 500 * 1024;
 
+// Stitch-designet: hvide felter med hårfin kant, skovgrøn ved fokus.
 const fieldClassName =
-  "w-full rounded-xs border border-[#cfcfcf] bg-[#fdfdfd] px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-neutral-400 transition-colors focus:border-black focus:bg-white focus:outline-none";
+  "h-11 w-full rounded-sm border border-hairline bg-white px-4 text-sm text-[#1a1a1a] placeholder:text-stone/60 transition-colors focus:border-forest focus:outline-none";
+const subLabelClassName = "mb-1 block text-[11px] text-stone uppercase";
 
-const subLabelClassName = "mb-1 block font-jetbrains text-[11px] text-[#666666] uppercase";
-
-// De to første farver bruges som appens primær-/sekundærfarve (se
-// hjælpeteksten under Brandfarver) – resten er blot ekstra swatches.
+// De to første farver bruges som appens primær-/sekundærfarve – resten er
+// blot ekstra swatches.
 function colorRole(index: number): string {
   if (index === 0) return "Primær";
   if (index === 1) return "Sekundær";
   return `Farve ${index + 1}`;
 }
 
+// Nummereret sektion: grå nummer i EB Garamond + versal-etiket.
 function FieldBlock({
   number,
-  title,
-  meta,
-  description,
+  label,
+  htmlFor,
+  aside,
   children,
 }: {
   number: string;
-  title: string;
-  meta?: string;
-  description?: string;
+  label: ReactNode;
+  htmlFor?: string;
+  aside?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <SectionLabel>
-          {number}. {title}
-        </SectionLabel>
-        {meta && <span className="font-jetbrains text-[10px] text-[#888888] uppercase">{meta}</span>}
-      </div>
-      {description && <p className="text-xs text-[#777777]">{description}</p>}
-      <div className="pt-1">{children}</div>
-    </div>
-  );
-}
-
-function InspectorCard({ label, tag, children }: { label: string; tag?: string; children: ReactNode }) {
-  return (
-    <div className="space-y-2 border border-[#e5e5e5] bg-white p-4">
-      <div className="flex items-center justify-between gap-2 font-jetbrains text-[10px] text-[#888888] uppercase">
-        <span>{label}</span>
-        {tag && <span className="font-semibold text-black">{tag}</span>}
+    <section>
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <div className="flex items-baseline gap-2">
+          <span className="font-garamond text-2xl leading-[1.35] font-medium text-stone/60 select-none">{number}</span>
+          <label htmlFor={htmlFor} className="text-xs font-semibold tracking-wider text-[#1a1a1a] uppercase">
+            {label}
+          </label>
+        </div>
+        {aside}
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -297,333 +287,318 @@ export default function IndstillingerPage() {
 
 
   const selectedFont = form ? FONT_FAMILIES.find((font) => font.label === form.primary_font) : undefined;
-  const locationLine = form ? [form.city.trim(), form.postal_code.trim() && `(${form.postal_code.trim()})`].filter(Boolean).join(" ") : "";
 
   return (
-    <StitchShell active="brand-settings" previewName={form?.company_name}>
-      {/* Titel + trinindikator */}
-      <section className="border-b border-black/10 bg-white/40 px-4 py-7 sm:px-8">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="max-w-3xl">
-            <div className="mb-1.5 font-jetbrains text-[10px] tracking-widest text-[#71717A] uppercase">
-              Trin 04 <span className="text-black/30">/</span> Firmakonfiguration
+    <EditorialShell active="brand-settings" previewName={form?.company_name}>
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-5 md:px-12">
+        <div className="mx-auto w-full max-w-[760px] py-12">
+          {/* Titel */}
+          <header className="mb-12">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full bg-forest" />
+              <p className="text-xs font-semibold tracking-[0.2em] text-stone uppercase">Trin 04 / Firmakonfiguration</p>
             </div>
-            <h1 className="text-3xl font-bold tracking-[-0.04em] uppercase sm:text-4xl">Indstillinger</h1>
-            <p className="mt-1.5 text-sm text-[#555555]">
-              Firmanavn, brandfarver og tone-of-voice – bruges overalt i appen og i genererede nyhedsbreve
-            </p>
-          </div>
-          <div className="hidden text-right font-jetbrains sm:block">
-            <div className="text-4xl font-bold tracking-tight">
-              04<span className="font-light text-[#a0a0a0]">/04</span>
+            <h1 className="font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-[#1a1a1a] md:text-4xl md:leading-[1.25]">
+              Indstillinger
+            </h1>
+            <div className="mt-4 h-px w-full bg-hairline" />
+          </header>
+
+          {isLoading ? (
+            <p className="text-sm text-stone">Henter indstillinger...</p>
+          ) : loadError ? (
+            <div className="flex max-w-md flex-col gap-3 rounded-sm border border-hairline bg-white p-6">
+              <h2 className="font-garamond text-2xl leading-[1.35] font-medium text-forest">
+                Kunne ikke hente indstillingerne
+              </h2>
+              <p className="text-sm text-red-700">{loadError}</p>
+              <button
+                type="button"
+                onClick={retryLoad}
+                className="w-fit rounded-sm border border-forest px-4 py-2 text-sm font-medium text-forest transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white"
+              >
+                Prøv igen
+              </button>
             </div>
-          </div>
-        </div>
-      </section>
+          ) : form ? (
+            <div className="space-y-12">
+              <FieldBlock
+                number="01"
+                htmlFor="company_name"
+                label={
+                  <>
+                    Firmanavn <span className="align-middle text-red-700">*</span>
+                  </>
+                }
+                aside={
+                  <span className="text-[10px] font-semibold tracking-[0.12em] text-stone">
+                    Påkrævet
+                  </span>
+                }
+              >
+                <input
+                  id="company_name"
+                  value={form.company_name}
+                  onChange={(event) => updateField("company_name", event.target.value)}
+                  placeholder="F.eks. Jysk Plantesalg ApS"
+                  className={`${fieldClassName} h-12 text-base`}
+                />
+              </FieldBlock>
 
-      {isLoading ? (
-        <p className="py-16 text-center font-jetbrains text-xs tracking-wider text-[#71717A] uppercase">
-          Henter indstillinger...
-        </p>
-      ) : loadError ? (
-        <div className="p-4 sm:p-8">
-          <div className="flex max-w-md flex-col gap-3 border border-red-200 bg-white p-6">
-            <SectionLabel>Kunne ikke hente indstillingerne</SectionLabel>
-            <p className="text-sm text-red-600">{loadError}</p>
-            <button
-              type="button"
-              onClick={retryLoad}
-              className="w-fit rounded border border-black/20 bg-white px-4 py-2 font-jetbrains text-xs tracking-wider uppercase hover:border-black"
-            >
-              Prøv igen
-            </button>
-          </div>
-        </div>
-      ) : form ? (
-        <main className="grid flex-1 grid-cols-1 divide-y divide-black/10 lg:grid-cols-12 lg:divide-x lg:divide-y-0">
-          {/* Formular */}
-          <section className="space-y-9 bg-white p-4 sm:p-10 lg:col-span-8">
-            <FieldBlock number="01" title="Firmanavn" meta="Påkrævet">
-              <input
-                id="company_name"
-                aria-label="Firmanavn"
-                value={form.company_name}
-                onChange={(event) => updateField("company_name", event.target.value)}
-                placeholder="F.eks. Jysk Plantesalg ApS"
-                className={`${fieldClassName} font-medium`}
-              />
-            </FieldBlock>
-
-            <FieldBlock
-              number="02"
-              title="Firmaoplysninger (vises i footer)"
-              description="Alle felter er valgfrie – et tomt felt udelades bare pænt fra nyhedsbrevets footer-linje i stedet for at vise et tomt hul."
-            >
-              <div className="space-y-3">
-                <label className="block">
-                  <span className={subLabelClassName}>Adresse</span>
-                  <input
-                    value={form.street_address}
-                    onChange={(event) => updateField("street_address", event.target.value)}
-                    placeholder="F.eks. Skovvej 14"
-                    className={fieldClassName}
-                  />
-                </label>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-                  <label className="block sm:col-span-4">
-                    <span className={subLabelClassName}>Postnr.</span>
+              <FieldBlock
+                number="02"
+                label={
+                  <>
+                    Firmaoplysninger <span className="font-normal text-stone normal-case">(vises i footer)</span>
+                  </>
+                }
+              >
+                {/* Alle felter er valgfrie – et tomt felt udelades bare pænt fra
+                    nyhedsbrevets footer-linje i stedet for at vise et tomt hul. */}
+                <div className="space-y-2 rounded-sm border border-hairline bg-white p-4">
+                  <label className="block">
+                    <span className={subLabelClassName}>Gade &amp; husnummer</span>
                     <input
-                      value={form.postal_code}
-                      onChange={(event) => updateField("postal_code", event.target.value)}
-                      placeholder="F.eks. 8000"
-                      className={`${fieldClassName} font-jetbrains`}
+                      value={form.street_address}
+                      onChange={(event) => updateField("street_address", event.target.value)}
+                      placeholder="F.eks. Skovvej 14"
+                      className={fieldClassName}
                     />
                   </label>
-                  <label className="block sm:col-span-8">
-                    <span className={subLabelClassName}>By</span>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <label className="block">
+                      <span className={subLabelClassName}>Postnummer</span>
+                      <input
+                        value={form.postal_code}
+                        onChange={(event) => updateField("postal_code", event.target.value)}
+                        placeholder="F.eks. 8000"
+                        className={fieldClassName}
+                      />
+                    </label>
+                    <label className="block sm:col-span-2">
+                      <span className={subLabelClassName}>By</span>
+                      <input
+                        value={form.city}
+                        onChange={(event) => updateField("city", event.target.value)}
+                        placeholder="F.eks. Aarhus C"
+                        className={fieldClassName}
+                      />
+                    </label>
+                  </div>
+                  <label className="block">
+                    <span className={subLabelClassName}>CVR-nummer</span>
                     <input
-                      value={form.city}
-                      onChange={(event) => updateField("city", event.target.value)}
-                      placeholder="F.eks. Aarhus C"
+                      value={form.business_registration_number}
+                      onChange={(event) => updateField("business_registration_number", event.target.value)}
+                      placeholder="F.eks. 12 34 56 78"
                       className={fieldClassName}
                     />
                   </label>
                 </div>
-                <label className="block">
-                  <span className={subLabelClassName}>CVR-nummer</span>
-                  <input
-                    value={form.business_registration_number}
-                    onChange={(event) => updateField("business_registration_number", event.target.value)}
-                    placeholder="F.eks. 12 34 56 78"
-                    className={`${fieldClassName} font-jetbrains`}
-                  />
-                </label>
-              </div>
-            </FieldBlock>
+              </FieldBlock>
 
-            <FieldBlock
-              number="03"
-              title="Logo"
-              description="PNG eller JPEG, maks. 500 KB – vises i nyhedsbrevets header og i appens topbar"
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex h-12 w-28 shrink-0 items-center justify-center overflow-hidden border border-dashed border-[#c0c0c0] bg-[#fafafa]">
-                  {form.logo_data ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI, next/image kan ikke optimere den
-                    <img src={form.logo_data} alt="Uploadet logo" className="h-full w-full object-contain p-1" />
-                  ) : (
-                    <span className="font-jetbrains text-xs text-[#888888]">Intet logo</span>
-                  )}
-                </div>
-                <label className="inline-flex w-fit cursor-pointer items-center gap-2 border border-[#333333] bg-white px-4 py-2.5 font-jetbrains text-xs font-medium tracking-tight uppercase transition-colors duration-150 hover:bg-black hover:text-white">
-                  <UploadIcon className="h-3.5 w-3.5" />
-                  {form.logo_data ? "Udskift logo" : "Upload logo"}
-                  <input type="file" accept={LOGO_FILE_ACCEPT} onChange={handleLogoFileChange} className="sr-only" />
-                </label>
-                {form.logo_data && (
-                  <button
-                    type="button"
-                    onClick={removeLogo}
-                    aria-label="Slet logo"
-                    title="Slet logo"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#cfcfcf] bg-white text-[#888888] transition-colors hover:border-red-700 hover:text-red-700"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              {logoError && <p className="pt-2 text-[12px] text-red-600">{logoError}</p>}
-            </FieldBlock>
-
-            <FieldBlock
-              number="04"
-              title="Brandfarver"
-              meta={`${form.brand_colors.filter((color) => HEX_COLOR_PATTERN.test(color)).length}/${MAX_BRAND_COLORS} valgt`}
-              description={`${MIN_BRAND_COLORS}-${MAX_BRAND_COLORS} farver – bruges som farve-swatches i nyhedsbrevets Edit-mode, og de to første som appens egen primær-/sekundærfarve`}
-            >
-              <div className="max-w-xl space-y-2">
-                {form.brand_colors.map((color, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div className="flex min-w-0 flex-1 items-center border border-[#cfcfcf] bg-white p-1.5 focus-within:border-black">
-                      {/* En tom farve (intet valgt endnu) vises som en stiplet
-                          boks – farve-vælgeren ligger usynligt ovenpå, så et
-                          klik stadig åbner den. */}
-                      <span className="relative h-8 w-8 shrink-0">
-                        {!HEX_COLOR_PATTERN.test(color) && (
-                          <span className="pointer-events-none absolute inset-0 border border-dashed border-[#bbbbbb] bg-[#fafafa]" />
-                        )}
-                        <input
-                          type="color"
-                          value={HEX_COLOR_PATTERN.test(color) ? color : "#ffffff"}
-                          onChange={(event) => updateColorAt(index, event.target.value)}
-                          aria-label={`Vælg farve ${index + 1}`}
-                          className={`h-8 w-8 cursor-pointer border border-black/10 bg-transparent p-0 ${
-                            HEX_COLOR_PATTERN.test(color) ? "" : "opacity-0"
-                          }`}
-                        />
-                      </span>
-                      <input
-                        value={color}
-                        onChange={(event) => updateColorAt(index, event.target.value)}
-                        aria-label={`Hex-kode for farve ${index + 1}`}
-                        placeholder={`F.eks. ${COLOR_EXAMPLES[index] ?? COLOR_EXAMPLES[0]}`}
-                        className="w-full min-w-0 border-0 bg-transparent px-3 py-1 font-jetbrains text-xs text-[#222222] uppercase placeholder:normal-case placeholder:text-neutral-400 focus:outline-none"
-                      />
-                      <span className="mr-2 shrink-0 font-jetbrains text-[10px] text-[#999999] uppercase">
-                        {colorRole(index)}
-                      </span>
+              <FieldBlock number="03" label="Logo">
+                <div className="flex flex-col items-center justify-between gap-4 rounded-sm border border-hairline bg-white p-4 sm:flex-row">
+                  <div className="flex w-full items-center gap-4 sm:w-auto">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-hairline bg-cream p-2 text-center">
+                      {form.logo_data ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI, next/image kan ikke optimere den
+                        <img src={form.logo_data} alt="Uploadet logo" className="h-full w-full object-contain" />
+                      ) : (
+                        <span className="text-[10px] tracking-widest text-stone uppercase">Intet logo</span>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeColorAt(index)}
-                      disabled={form.brand_colors.length <= MIN_BRAND_COLORS}
-                      aria-label={`Slet farve ${index + 1}`}
-                      title="Slet farve"
-                      className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#cfcfcf] bg-white text-[#888888] transition-colors hover:border-red-700 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-[#cfcfcf] disabled:hover:text-[#888888]"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                    <div>
+                      <div className={`font-garamond text-base ${form.company_name.trim() ? "text-[#1a1a1a]" : "text-stone/60"}`}>
+                        {form.company_name.trim() || "Firmanavn"}
+                      </div>
+                      <p className="text-xs text-stone">
+                        PNG eller JPEG, maks. 500 KB – vises i nyhedsbrevets header og i appens topbar
+                      </p>
+                      <div className="mt-1 inline-flex items-center gap-1.5">
+                        <span className={`inline-block h-1.5 w-1.5 rounded-full ${form.logo_data ? "bg-forest" : "bg-hairline"}`} />
+                        <span className="text-[10px] text-stone uppercase">
+                          {form.logo_data ? "Aktivt bomærke" : "Intet logo uploadet"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                  <div className="flex w-full items-center gap-1 sm:w-auto">
+                    <label className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-sm border border-forest px-4 text-sm font-medium whitespace-nowrap text-forest transition-colors focus-within:ring-2 focus-within:ring-forest/30 hover:border-plant-hover hover:bg-plant-hover hover:text-white sm:w-auto">
+                      <UploadIcon className="h-[18px] w-[18px]" />
+                      {form.logo_data ? "Udskift logo" : "Upload logo"}
+                      <input type="file" accept={LOGO_FILE_ACCEPT} onChange={handleLogoFileChange} className="sr-only" />
+                    </label>
+                    {form.logo_data && (
+                      <button
+                        type="button"
+                        onClick={removeLogo}
+                        aria-label="Slet logo"
+                        title="Slet logo"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-hairline text-stone transition-colors hover:text-red-700"
+                      >
+                        <TrashIcon className="h-[18px] w-[18px]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {logoError && <p className="pt-2 text-sm text-red-700">{logoError}</p>}
+              </FieldBlock>
+
+              <FieldBlock
+                number="04"
+                label="Brandfarver"
+                aside={
+                  <span className="text-xs text-stone">
+                    {form.brand_colors.filter((color) => HEX_COLOR_PATTERN.test(color)).length} af {MAX_BRAND_COLORS} anvendt
+                  </span>
+                }
+              >
+                <div className="space-y-1 rounded-sm border border-hairline bg-white p-2">
+                  {form.brand_colors.map((color, index) => {
+                    const isValid = HEX_COLOR_PATTERN.test(color);
+                    return (
+                      <div key={index}>
+                        {index > 0 && <div className="mx-2 mb-1 h-px bg-hairline/60" />}
+                        <div className="flex items-center justify-between gap-4 rounded-sm p-2 transition-colors hover:bg-plant-bg">
+                          <div className="flex min-w-0 items-center gap-4">
+                            {/* Farvefeltet: farve-vælgeren ligger usynligt ovenpå, så
+                                et klik åbner den. Ingen farve endnu = stiplet boks. */}
+                            <span
+                              className={`relative inline-block h-8 w-8 shrink-0 rounded-sm shadow-sm ${
+                                isValid ? "border border-black/10" : "border border-dashed border-stone/50"
+                              }`}
+                              style={{ backgroundColor: isValid ? color : undefined }}
+                            >
+                              <input
+                                type="color"
+                                value={isValid ? color : "#ffffff"}
+                                onChange={(event) => updateColorAt(index, event.target.value)}
+                                aria-label={`Vælg farve ${index + 1}`}
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                              />
+                            </span>
+                            <span className="text-sm font-medium text-[#1a1a1a]">
+                              Farve {index + 1}
+                              {index < 2 && (
+                                <span
+                                  className={`ml-2 rounded-xs px-1.5 py-0.5 text-[10px] uppercase ${
+                                    index === 0 ? "bg-mint text-forest" : "bg-track text-stone"
+                                  }`}
+                                >
+                                  {colorRole(index)}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={color}
+                              onChange={(event) => updateColorAt(index, event.target.value)}
+                              aria-label={`Hex-kode for farve ${index + 1}`}
+                              placeholder={COLOR_EXAMPLES[index] ?? COLOR_EXAMPLES[0]}
+                              className="w-[5.5rem] rounded-xs bg-transparent px-2 py-1 text-right font-mono text-xs text-black uppercase placeholder:text-stone/50 focus:ring-1 focus:ring-forest focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeColorAt(index)}
+                              disabled={form.brand_colors.length <= MIN_BRAND_COLORS}
+                              aria-label={`Slet farve ${index + 1}`}
+                              title={
+                                form.brand_colors.length <= MIN_BRAND_COLORS
+                                  ? `Mindst ${MIN_BRAND_COLORS} farver kræves`
+                                  : "Slet farve"
+                              }
+                              className="flex items-center justify-center rounded-sm border border-hairline p-1 text-stone transition-colors hover:bg-plant-bg hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-stone"
+                            >
+                              <XIcon className="h-[18px] w-[18px]" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
                 <button
                   type="button"
                   onClick={addColor}
                   disabled={form.brand_colors.length >= MAX_BRAND_COLORS}
-                  className="mt-2 flex w-full items-center justify-center gap-1.5 border border-dashed border-[#bbbbbb] py-2 font-jetbrains text-xs font-medium text-[#555555] transition-colors hover:border-black hover:bg-neutral-50 hover:text-black disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#bbbbbb] disabled:hover:bg-transparent disabled:hover:text-[#555555]"
+                  title={`${MIN_BRAND_COLORS}-${MAX_BRAND_COLORS} farver – de to første bruges som appens primær-/sekundærfarve`}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-forest px-3 py-1 text-sm font-medium text-forest transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-forest disabled:hover:bg-transparent disabled:hover:text-forest"
                 >
-                  <PlusIcon className="h-3.5 w-3.5" />
+                  <PlusIcon className="h-[18px] w-[18px]" />
                   Tilføj farve
                 </button>
-              </div>
-            </FieldBlock>
+              </FieldBlock>
 
-            <FieldBlock
-              number="05"
-              title="Skrifttype"
-              description="Forvalgt skrifttype for nye nyhedsbreve – kan altid ændres pr. nyhedsbrev i Edit-mode"
-            >
-              <div className="relative max-w-xl">
-                <select
-                  value={form.primary_font}
-                  onChange={(event) => updateField("primary_font", event.target.value)}
-                  aria-label="Skrifttype"
-                  style={{ fontFamily: selectedFont?.value }}
-                  className={`${fieldClassName} cursor-pointer appearance-none bg-white pr-10 ${
-                    form.primary_font ? "" : "text-neutral-400"
-                  }`}
-                >
-                  <option value="" disabled>
-                    Vælg skrifttype – f.eks. Georgia
-                  </option>
-                  {FONT_FAMILIES.map((font) => (
-                    <option key={font.label} value={font.label} className="text-[#111111]">
-                      {font.label}
+              <FieldBlock number="05" label="Skrifttype" htmlFor="primary_font">
+                <div className="relative rounded-sm bg-white">
+                  <select
+                    id="primary_font"
+                    value={form.primary_font}
+                    onChange={(event) => updateField("primary_font", event.target.value)}
+                    style={{ fontFamily: selectedFont?.value }}
+                    className={`h-12 w-full cursor-pointer appearance-none rounded-sm border border-hairline bg-white pr-10 pl-4 transition-colors focus:border-forest focus:outline-none ${
+                      form.primary_font ? "text-[#1a1a1a]" : "text-stone/60"
+                    }`}
+                  >
+                    <option value="" disabled>
+                      Vælg skrifttype – f.eks. Georgia
                     </option>
-                  ))}
-                </select>
-                <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-4 h-3.5 w-3.5 -translate-y-1/2 text-[#555555]" />
-              </div>
-            </FieldBlock>
+                    {FONT_FAMILIES.map((font) => (
+                      <option key={font.label} value={font.label}>
+                        {font.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 text-stone" />
+                </div>
+                <p className="mt-1 text-xs text-stone">
+                  Forvalgt skrifttype for nye nyhedsbreve – kan altid ændres pr. nyhedsbrev i Edit-mode.
+                </p>
+              </FieldBlock>
 
-            <FieldBlock
-              number="06"
-              title="Tone-of-voice"
-              meta="Sproglig retningslinje"
-              description="Bruges i AI-prompten, når nyhedsbreve genereres"
-            >
-              <textarea
-                value={form.brand_tone}
-                onChange={(event) => updateField("brand_tone", event.target.value)}
-                aria-label="Tone-of-voice"
-                placeholder="F.eks. Varm, venlig og faglig – vi fremhæver kvalitet og giver gode råd om pleje"
-                rows={3}
-                className={`${fieldClassName} resize-y p-3.5`}
-              />
-              <div className="flex justify-end pt-1 font-jetbrains text-[10px] text-[#888888]">
-                <span>{form.brand_tone.length} anslag</span>
-              </div>
-            </FieldBlock>
-
-            <div className="flex flex-col gap-3 border-t border-[#e5e5e5] pt-6">
-              {saveError && <p className="text-sm text-red-600">{saveError}</p>}
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="inline-flex w-fit items-center gap-2 bg-black px-7 py-3 font-jetbrains text-xs font-bold tracking-wider text-white uppercase shadow-sm transition-all duration-150 hover:bg-[#222222] active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-neutral-300"
+              <FieldBlock
+                number="06"
+                label="Tone of voice (AI-instruks)"
+                htmlFor="brand_tone"
+                aside={<span className="font-mono text-xs text-stone">{form.brand_tone.length} anslag</span>}
               >
-                {isSaving ? (
-                  <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
-                ) : justSaved ? (
-                  <CheckIcon className="h-3.5 w-3.5" />
-                ) : null}
-                {isSaving ? "Gemmer..." : justSaved ? "Gemt!" : "Gem indstillinger"}
-              </button>
-            </div>
-          </section>
+                <div className="rounded-sm border border-hairline bg-white p-2 transition-colors focus-within:border-forest">
+                  <textarea
+                    id="brand_tone"
+                    value={form.brand_tone}
+                    onChange={(event) => updateField("brand_tone", event.target.value)}
+                    placeholder="F.eks. varm, venlig og faglig – vi fremhæver kvalitet og giver gode råd om pleje"
+                    rows={4}
+                    className="w-full resize-none border-0 bg-transparent p-1 leading-relaxed text-[#1a1a1a] placeholder:text-stone/60 focus:ring-0 focus:outline-none"
+                  />
+                  <div className="mt-2 border-t border-hairline/60 pt-2 text-xs text-stone">
+                    Bruges i AI-prompten, når nyhedsbreve genereres.
+                  </div>
+                </div>
+              </FieldBlock>
 
-          {/* Inspektør: live-overblik over de aktuelle værdier i formularen */}
-          <aside className="space-y-6 bg-[#fbfbfb] p-4 sm:p-8 lg:col-span-4">
-            <div className="border-b border-[#e5e5e5] pb-3">
-              <SectionLabel>Inspektør</SectionLabel>
-            </div>
-
-            <InspectorCard label="01. Brand-identitet">
-              <div className={`text-sm font-bold tracking-tight ${form.company_name.trim() ? "" : "text-black/30"}`}>
-                {form.company_name.trim() || "Logo"}
-              </div>
-              <div className="font-jetbrains text-[11px] leading-relaxed text-[#666666]">
-                CVR: {form.business_registration_number.trim() || "–"}
-                <br />
-                Lokation: {locationLine || "–"}
-              </div>
-            </InspectorCard>
-
-            <InspectorCard
-              label="02. Farvepalet"
-              tag={`${form.brand_colors.filter((color) => HEX_COLOR_PATTERN.test(color)).length} farver`}
-            >
-              <div className="flex items-center gap-1.5 pt-1">
-                {form.brand_colors.map((color, index) =>
-                  HEX_COLOR_PATTERN.test(color) ? (
-                    <div
-                      key={index}
-                      title={color}
-                      className="flex h-9 flex-1 items-end border border-black/10 p-1"
-                      style={{ backgroundColor: color }}
-                    >
-                      <span className="font-jetbrains text-[8px] uppercase" style={{ color: getContrastTextColor(color) }}>
-                        {color.slice(0, 3)}
-                      </span>
-                    </div>
+              <div className="space-y-4 border-t border-hairline pt-8">
+                {saveError && <p className="text-sm text-red-700">{saveError}</p>}
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-sm bg-[#36482e] px-8 text-xs font-semibold tracking-widest text-white uppercase shadow-sm transition-colors hover:bg-plant-hover active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {isSaving ? (
+                    <SpinnerIcon className="h-[18px] w-[18px] animate-spin" />
                   ) : (
-                    <div key={index} title="Ikke valgt" className="h-9 flex-1 border border-dashed border-[#c0c0c0] bg-[#fafafa]" />
-                  ),
-                )}
+                    <CheckIcon className="h-[18px] w-[18px]" />
+                  )}
+                  {isSaving ? "Gemmer..." : justSaved ? "Gemt!" : "Gem indstillinger"}
+                </button>
               </div>
-              <div className="font-jetbrains text-[10px] text-[#777777]">Primær / Sekundær = de to første</div>
-            </InspectorCard>
-
-            <InspectorCard label="03. Skrifttype">
-              <div
-                className={`text-base ${form.primary_font ? "text-[#222222]" : "text-black/30"}`}
-                style={{ fontFamily: selectedFont?.value }}
-              >
-                {form.primary_font || "Ingen skrifttype valgt"}
-              </div>
-              <div className="font-jetbrains text-[11px] text-[#666666]">
-                Forvalgt for nye nyhedsbreve – vist her i sin egen skrift.
-              </div>
-            </InspectorCard>
-
-            <InspectorCard label="04. Tone-of-voice">
-              <div className="border-l-2 border-black bg-[#f5f5f5] p-2.5 font-jetbrains text-xs text-[#333333]">
-                {form.brand_tone.trim() ? `"${form.brand_tone.trim()}"` : "Ingen tone angivet"}
-              </div>
-            </InspectorCard>
-          </aside>
-        </main>
-      ) : null}
-    </StitchShell>
+            </div>
+          ) : null}
+        </div>
+      </main>
+    </EditorialShell>
   );
 }

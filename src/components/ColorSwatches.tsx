@@ -10,6 +10,8 @@ interface ColorSwatchesProps {
   // udregnede farve (onChange("")) – fx header/footer-tekst, hvor "Auto" er
   // sort eller hvid efter baggrunden. Aktivt, når value er tom.
   autoOption?: boolean;
+  // Figma-størrelsen i Preview-panelets "Global tekstfarve" (mindre prikker).
+  compact?: boolean;
 }
 
 // De farve-swatches, brugeren kan vælge imellem overalt i Edit-mode (global
@@ -19,13 +21,13 @@ interface ColorSwatchesProps {
 // (2-5), ingen faste neutrale farver tilføjet automatisk. Ændrer kunden sin
 // farveliste i Indstillinger, opdateres disse swatches automatisk overalt,
 // uden kodeændringer.
-export function ColorSwatches({ value, onChange, label, autoOption = false }: ColorSwatchesProps) {
+export function ColorSwatches({ value, onChange, label, autoOption = false, compact = false }: ColorSwatchesProps) {
   const brand = useBrandSettings();
 
   return (
     <div className="flex items-center gap-3">
       {label && <span className="font-jetbrains text-xs text-neutral-600">{label}:</span>}
-      <div className="flex items-center gap-1.5">
+      <div className={`flex items-center ${compact ? "gap-[4px]" : "gap-1.5"}`}>
         {autoOption && (
           <button
             type="button"
@@ -55,7 +57,7 @@ export function ColorSwatches({ value, onChange, label, autoOption = false }: Co
               aria-label={`Farve: ${swatchLabel}`}
               aria-pressed={isActive}
               title={swatchLabel}
-              className={`h-5 w-5 shrink-0 rounded-full border border-neutral-300 transition-transform hover:scale-110 ${
+              className={`${compact ? "size-[18px] border-black" : "h-5 w-5 border-neutral-300"} shrink-0 rounded-full border transition-transform hover:scale-110 ${
                 isActive ? "ring-2 ring-black ring-offset-1" : ""
               }`}
               style={{ backgroundColor: color }}

@@ -56,6 +56,29 @@
   --font-serif: var(--font-instrument-serif);
   --font-grotesk: var(--font-space-grotesk), sans-serif;
   --font-jetbrains: var(--font-jetbrains-mono), monospace;
+  --font-baskerville: var(--font-libre-baskerville), Georgia, serif;
+  /* SF Pro findes kun som systemskrifttype (Apple) – resten falder tilbage. */
+  --font-sfpro: -apple-system, BlinkMacSystemFont, "SF Pro", "SF Pro Text", system-ui, sans-serif;
+  --color-plant: #36482e;
+  --color-plant-bg: #f9f9f9;
+  /* Hover-farve for alle grønne knapper (Figmas grå). */
+  --color-plant-hover: #505152;
+  --font-garamond: var(--font-eb-garamond), Georgia, serif;
+  /* Stitch-redesignet (forsiden): skovgrøn, hårfine linjer og dæmpet tekst. */
+  --color-forest: #163328;
+  --color-forest-hover: #2d4a3e;
+  --color-hairline: #e3e6df;
+  --color-stone: #5a605b;
+  --color-stone-dark: #424844;
+  --color-ink-deep: #1b1c19;
+  --color-track: #f0eee9;
+  --color-sage: #4e6452;
+  --color-mint: #ebf2ec;
+  --color-cream: #fbf9f4;
+  --color-ash: #eae8e3;
+  --color-sage-light: #b4cdb7;
+  --color-rose-bg: #f2eceb;
+  --color-rose-ink: #7a433b;
 }
 
 /* Reserverer altid plads til den lodrette scrollbar, så indholdet (fx

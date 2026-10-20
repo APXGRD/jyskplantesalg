@@ -11,7 +11,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { inviteUser } from "./actions";
-import { SectionLabel, StitchShell } from "@/components/StitchShell";
+import { EditorialShell } from "@/components/EditorialShell";
+import { SendIcon } from "@/components/icons";
 
 export default async function InviterPage({
   searchParams,
@@ -30,62 +31,66 @@ export default async function InviterPage({
   const { error, success } = await searchParams;
 
   return (
-    <StitchShell>
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Titel */}
-        <section className="border-b border-black/10 bg-white/40 px-4 py-7 sm:px-8">
-          <div className="mb-1.5 font-jetbrains text-[10px] tracking-widest text-[#71717A] uppercase">
-            Brugere <span className="text-black/30">/</span> Adgang
-          </div>
-          <h1 className="text-3xl font-bold tracking-[-0.04em] uppercase sm:text-4xl">Inviter bruger</h1>
-          <p className="mt-1.5 text-sm text-[#555555]">Send en invitation via email til en ny bruger</p>
-        </section>
-
-        {/* Formularen centreret på skærmen */}
-        <main className="flex flex-1 items-center justify-center bg-[#f8f9fa] px-4 py-12 sm:px-8">
-          <form
-            action={inviteUser}
-            className="flex w-full max-w-md flex-col gap-5 rounded-sm border border-black/15 bg-white p-6 shadow-[0_20px_50px_rgba(0,0,0,0.06)] sm:p-8"
-          >
-            <SectionLabel>Ny invitation</SectionLabel>
-
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className="font-jetbrains text-[11px] text-[#666666] uppercase">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                placeholder="F.eks. kollega@firma.dk"
-                className="w-full rounded-xs border border-[#cfcfcf] bg-[#fdfdfd] px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-neutral-400 transition-colors focus:border-black focus:bg-white focus:outline-none"
-              />
-              <p className="text-xs text-[#777777]">
-                Personen modtager et link på mail og vælger selv sin adgangskode.
-              </p>
+    <EditorialShell>
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-5 md:px-12">
+        <div className="mx-auto w-full max-w-[760px] py-12">
+          {/* Titel */}
+          <header className="mb-12">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full bg-forest" />
+              <p className="text-xs font-semibold tracking-[0.2em] text-stone uppercase">Brugere / Adgang</p>
             </div>
+            <h1 className="font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-[#1a1a1a] md:text-4xl md:leading-[1.25]">
+              Inviter bruger
+            </h1>
+            <p className="mt-1 text-sm text-stone">Send en invitation via email til en ny bruger.</p>
+            <div className="mt-4 h-px w-full bg-hairline" />
+          </header>
 
-            {error && (
-              <p className="border-l-2 border-red-600 bg-red-50 px-3 py-2 font-jetbrains text-xs text-red-700">
-                {error}
-              </p>
-            )}
-            {success && (
-              <p className="border-l-2 border-black bg-[#f5f5f5] px-3 py-2 font-jetbrains text-xs text-black">
-                Invitation sendt til {success}.
-              </p>
-            )}
+          <form action={inviteUser} className="space-y-12">
+            <section>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-garamond text-2xl leading-[1.35] font-medium text-stone/60 select-none">01</span>
+                  <label htmlFor="email" className="text-xs font-semibold tracking-wider text-[#1a1a1a] uppercase">
+                    Email <span className="align-middle text-red-700">*</span>
+                  </label>
+                </div>
+                <span className="rounded-sm bg-track px-2 py-0.5 text-[10px] font-semibold tracking-[0.12em] text-stone">
+                  Påkrævet
+                </span>
+              </div>
+              <div className="rounded-sm border border-hairline bg-white p-4">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="F.eks. kollega@firma.dk"
+                  className="h-12 w-full rounded-sm border border-hairline bg-white px-4 text-base text-[#1a1a1a] transition-colors placeholder:text-stone/60 focus:border-forest focus:outline-none"
+                />
+                <div className="mt-3 border-t border-hairline/60 pt-2 text-xs text-stone">
+                  Personen modtager et link på mail og vælger selv sin adgangskode.
+                </div>
+              </div>
+            </section>
 
-            <button
-              type="submit"
-              className="w-full bg-black px-7 py-3 font-jetbrains text-xs font-bold tracking-wider text-white uppercase shadow-sm transition-all hover:bg-[#222222] active:scale-[0.99]"
-            >
-              Send invitation
-            </button>
+            <div className="space-y-4 border-t border-hairline pt-8">
+              {error && <p className="rounded-sm bg-rose-bg px-4 py-2 text-sm text-rose-ink">{error}</p>}
+              {success && (
+                <p className="rounded-sm bg-mint px-4 py-2 text-sm text-forest">Invitation sendt til {success}.</p>
+              )}
+              <button
+                type="submit"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-sm bg-[#36482e] px-8 text-xs font-semibold tracking-widest text-white uppercase shadow-sm transition-colors hover:bg-plant-hover active:translate-y-px sm:w-auto"
+              >
+                <SendIcon className="h-[18px] w-[18px]" />
+                Send invitation
+              </button>
+            </div>
           </form>
-        </main>
-      </div>
-    </StitchShell>
+        </div>
+      </main>
+    </EditorialShell>
   );
 }
