@@ -56,14 +56,30 @@ export type BlockType =
   | "socials";
 
 export type ImageAlignment = "venstre" | "center" | "hoejre";
-export type ImageSize = "lille" | "mellem" | "fuld";
+// "kant" = kant til kant: billedet fylder hele nyhedsbrevets bredde uden
+// sidemargen og uden kortets ramme (se isEdgeToEdgeImage).
+export type ImageSize = "lille" | "mellem" | "fuld" | "kant";
 
 // Fast bredde pr. størrelse, brugt både i Preview og i den kopierede HTML.
 export const IMAGE_SIZE_PX: Record<ImageSize, string> = {
   lille: "200px",
   mellem: "400px",
   fuld: "100%",
+  kant: "100%",
 };
+
+// "1 billede" i størrelsen "Kant til kant" – kun et enkelt billede (ikke
+// galleri-layouts) kan gå helt ud til kanterne.
+export function isEdgeToEdgeImage(block: Pick<NewsletterBlock, "size" | "galleryColumns">): boolean {
+  return block.size === "kant" && !isGalleryLayout(block.galleryColumns);
+}
+
+// Tekstjustering for overskrift/brødtekst/tekst – genbruger blokkens
+// alignment-felt (samme som billeder), men tekst er venstrestillet som
+// standard.
+export function getTextAlign(block: Pick<NewsletterBlock, "alignment">): "left" | "center" | "right" {
+  return IMAGE_ALIGN_CSS[block.alignment ?? "venstre"];
+}
 
 export const IMAGE_ALIGN_CSS: Record<ImageAlignment, "left" | "center" | "right"> = {
   venstre: "left",
@@ -118,7 +134,9 @@ export const PRODUCT_CARD_GAP_PX = 13;
 // "udfyldt" (standard) = baggrundsfarve fra bgColor. "kontur" = ingen
 // baggrund, kun en 2px kant og tekst i bgColor's farve – samme farvefelt
 // genbruges bare med en anden visuel betydning afhængig af stilen.
-export type CtaStyle = "udfyldt" | "kontur";
+// "tekst" (kun sociale medier) = hverken baggrund eller kant – kun selve
+// linket som tekst i bgColor's farve (se SOCIAL_STYLE_OPTIONS).
+export type CtaStyle = "udfyldt" | "kontur" | "tekst";
 
 // Den samlede Billede-/Galleri-blok viser 1-6 billeder – bevidst ingen fri
 // indtastning af antal. "1" er enkelt-billede-layoutet (upload ELLER søgbart
@@ -186,6 +204,10 @@ export function getMediaRowOptions(count: number): number[] {
 // - 2×32px padding. En række kort (inkl. kant) + mellemrum må ikke overskride
 // den – ellers klemmer mail-klienten kortene, så de ikke længere er lige store.
 export const MEDIA_CONTENT_WIDTH_PX = 534;
+// Nyhedsbrevets fulde indre bredde i den kopierede HTML (600px - 2×1px ydre
+// ramme) – bruges af billedblokkens "kant til kant"-visning, som ignorerer
+// indholdets 32px sidepadding.
+export const EMAIL_INNER_WIDTH_PX = 598;
 // Galleri-kort bliver aldrig bredere end dette (fx 2 billeder under hinanden)
 // – ellers ville et enkelt kort fylde hele bredden som et kæmpe kvadrat.
 const MAX_GALLERY_CARD_WIDTH_PX = 260;
@@ -251,6 +273,7 @@ export const SINGLE_CARD_WIDTH_PX: Record<ImageSize, number> = {
   lille: 200,
   mellem: 400,
   fuld: 534,
+  kant: 598,
 };
 
 // Produktet bag et "1 billede"-layout – det produkt, der er valgt via den
@@ -377,6 +400,12 @@ export type MasonryLayout = "fuld" | "masonry";
 // masonry-gitre. Nye blokke starter i "fuld" (se createNewBlock).
 export function getMasonryLayout(block: Pick<NewsletterBlock, "masonryLayout">): MasonryLayout {
   return block.masonryLayout ?? "masonry";
+}
+
+// "Kant til kant": billederne i fuld bredde fylder hele nyhedsbrevets bredde
+// uden sidemargen (som et hero-billede). Gælder kun visningen "fuld".
+export function isMasonryFullBleed(block: Pick<NewsletterBlock, "masonryLayout" | "masonryFullBleed">): boolean {
+  return getMasonryLayout(block) === "fuld" && block.masonryFullBleed === true;
 }
 export const MAX_MASONRY_IMAGES = 12;
 
@@ -600,6 +629,12 @@ export interface NewsletterBlock {
   // baggrund) og baggrunds-bærende struktur-blokke ("header"/"footer").
   // Uden bgColor bruges blokkens eksisterende standardfarve.
   bgColor?: string;
+  // Baggrundsfarven bag HELE blokkens række i nyhedsbrevet. Sættes samlet på
+  // alle blokke af "Baggrundsfarve" i Typografi & Stil (nyhedsbrevets
+  // baggrund) – ligger pr. blok, så den følger med i skabeloner, duplikering
+  // og den kopierede HTML uden en separat nyhedsbrevs-indstilling.
+  // undefined = hvid (standard).
+  sectionBgColor?: string;
   // Blokkens skrifttype-udgangspunkt – kun relevant for tekst-blokke
   // (overskrift/brodtekst/tekst/cta), sat enten af den globale
   // skrifttype-vælger i Edit-mode (se FONT_FAMILIES) ELLER blokkens EGEN
@@ -666,6 +701,9 @@ export interface NewsletterBlock {
   masonryImages?: MasonryImage[];
   // Fuld bredde eller masonry-gitter – se MasonryLayout/getMasonryLayout.
   masonryLayout?: MasonryLayout;
+  // Kun ved "fuld": true = billederne fylder hele bredden fra kant til kant
+  // (ingen sidemargen) – se isMasonryFullBleed. undefined = inden for margen.
+  masonryFullBleed?: boolean;
   // Masonry: antal kolonner. Begge visninger: afstand og hjørner.
   masonryColumns?: MasonryColumns;
   masonryGap?: MasonryGap;
@@ -675,6 +713,10 @@ export interface NewsletterBlock {
   // farve/stil/form genbruger CTA-felterne bgColor/ctaStyle/ctaBorderRadius.
   socialLinks?: Partial<Record<SocialPlatform, string>>;
   socialHeading?: string;
+  // Kun "socials": true = knapperne vises inde i footeren, lige under
+  // firmaoplysningerne (adresse/CVR), i stedet for som egen sektion – se
+  // getFooterSocialsBlock. undefined = egen sektion (standard).
+  socialsInFooter?: boolean;
   // Produktkortenes kant-form og tæthed (se PRODUCT_CARD_RADIUS_PX/
   // PRODUCT_ROW_PADDING_PX) – tætheden gælder også tekstlistens linjer.
   // Farven forbliver bevidst fast sort (se NewsletterCard.tsx/
@@ -972,6 +1014,7 @@ export type TemplateBlock = Pick<
   | "fontSize"
   | "textColor"
   | "bgColor"
+  | "sectionBgColor"
   | "alignment"
   | "size"
   | "ctaPadding"
@@ -984,11 +1027,13 @@ export type TemplateBlock = Pick<
   | "productDensity"
   | "showImage"
   | "masonryLayout"
+  | "masonryFullBleed"
   | "masonryColumns"
   | "masonryGap"
   | "masonryRadius"
   | "socialLinks"
   | "socialHeading"
+  | "socialsInFooter"
 >;
 
 // Bygger den JSON-struktur, "Gem som skabelon" gemmer i Supabase, ud fra det
@@ -1003,6 +1048,7 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     fontSize: block.fontSize,
     textColor: block.textColor,
     bgColor: block.bgColor,
+    sectionBgColor: block.sectionBgColor,
     alignment: block.alignment,
     size: block.size,
     ctaPadding: block.ctaPadding,
@@ -1015,6 +1061,7 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     productDensity: block.productDensity,
     showImage: block.showImage,
     masonryLayout: block.masonryLayout,
+    masonryFullBleed: block.masonryFullBleed,
     masonryColumns: block.masonryColumns,
     masonryGap: block.masonryGap,
     masonryRadius: block.masonryRadius,
@@ -1022,6 +1069,7 @@ export function buildTemplateBlockStructure(blocks: NewsletterBlock[]): Template
     // eller et produktvalg) – de følger med skabelonen.
     socialLinks: block.socialLinks,
     socialHeading: block.socialHeading,
+    socialsInFooter: block.socialsInFooter,
   }));
 }
 
@@ -1073,6 +1121,7 @@ export function createBlocksFromTemplate(
       fontSize: templateBlock.fontSize,
       textColor: isLegacyProductDisplay ? undefined : templateBlock.textColor,
       bgColor: templateBlock.bgColor,
+      sectionBgColor: templateBlock.sectionBgColor,
       alignment: templateBlock.alignment,
       size: templateBlock.size,
       ctaPadding: templateBlock.ctaPadding,
@@ -1080,6 +1129,7 @@ export function createBlocksFromTemplate(
       ctaStyle: templateBlock.ctaStyle,
       socialLinks: templateBlock.socialLinks,
       socialHeading: templateBlock.socialHeading,
+      socialsInFooter: templateBlock.socialsInFooter,
       galleryArrangement: templateBlock.galleryArrangement,
       galleryPerRow: templateBlock.galleryPerRow,
       productBorderRadius: templateBlock.productBorderRadius,
@@ -1128,6 +1178,7 @@ export function createBlocksFromTemplate(
     if (block.type === "billedeblok") {
       block.masonryImages = [];
       block.masonryLayout = templateBlock.masonryLayout;
+      block.masonryFullBleed = templateBlock.masonryFullBleed;
       block.masonryColumns = templateBlock.masonryColumns;
       block.masonryGap = templateBlock.masonryGap;
       block.masonryRadius = templateBlock.masonryRadius;
@@ -1184,4 +1235,21 @@ export function createNewBlock(kind: AddableBlockKind): NewsletterBlock {
     case "skillelinje":
       return { id, type: "skillelinje", hidden: false };
   }
+}
+
+// Socials-blokken, der skal vises INDE i footeren (socialsInFooter) – den
+// første synlige med mindst ét link. Footeren viser da knapperne lige under
+// firmaoplysningerne, og blokken selv vises ikke på sin egen plads.
+export function getFooterSocialsBlock(blocks: NewsletterBlock[]): NewsletterBlock | undefined {
+  const hasVisibleFooter = blocks.some((block) => block.type === "footer" && !block.hidden);
+  if (!hasVisibleFooter) return undefined;
+  return blocks.find(
+    (block) =>
+      block.type === "socials" && !block.hidden && block.socialsInFooter === true && getSocialLinks(block).length > 0,
+  );
+}
+
+// Om en socials-blok vises inde i footeren (og derfor ikke på sin egen plads).
+export function isShownInFooter(block: NewsletterBlock, blocks: NewsletterBlock[]): boolean {
+  return block.type === "socials" && getFooterSocialsBlock(blocks)?.id === block.id;
 }

@@ -26,7 +26,7 @@ export function ColorSwatches({ value, onChange, label, autoOption = false, comp
 
   return (
     <div className="flex items-center gap-3">
-      {label && <span className="font-jetbrains text-xs text-neutral-600">{label}:</span>}
+      {label && <span className="text-xs text-stone-dark">{label}:</span>}
       <div className={`flex items-center ${compact ? "gap-[4px]" : "gap-1.5"}`}>
         {autoOption && (
           <button
@@ -36,10 +36,10 @@ export function ColorSwatches({ value, onChange, label, autoOption = false, comp
             aria-label="Farve: Automatisk"
             aria-pressed={!value}
             title="Automatisk – sort eller hvid efter baggrunden"
-            className={`h-5 shrink-0 border px-1.5 font-jetbrains text-[10px] leading-none transition-colors ${
+            className={`h-5 shrink-0 border px-1.5 text-[10px] leading-none transition-colors ${
               !value
-                ? "border-black bg-neutral-200 font-bold text-black"
-                : "border-neutral-300 bg-neutral-50 text-neutral-600 hover:border-black"
+                ? "border-forest bg-forest font-medium text-white"
+                : "border-hairline bg-white text-stone-dark hover:border-plant-hover hover:bg-plant-hover hover:text-white"
             }`}
           >
             Auto
@@ -57,8 +57,8 @@ export function ColorSwatches({ value, onChange, label, autoOption = false, comp
               aria-label={`Farve: ${swatchLabel}`}
               aria-pressed={isActive}
               title={swatchLabel}
-              className={`${compact ? "size-[18px] border-black" : "h-5 w-5 border-neutral-300"} shrink-0 rounded-full border transition-transform hover:scale-110 ${
-                isActive ? "ring-2 ring-black ring-offset-1" : ""
+              className={`${compact ? "size-[18px]" : "h-6 w-6"} shrink-0 rounded-[5px] border border-black/15 transition-transform hover:scale-110 ${
+                isActive ? "ring-2 ring-forest ring-offset-2" : ""
               }`}
               style={{ backgroundColor: color }}
             />

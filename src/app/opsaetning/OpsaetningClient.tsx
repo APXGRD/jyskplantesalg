@@ -4,15 +4,19 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { EditorialShell } from "@/components/EditorialShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { CheckCircleIcon, FilterIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
+import { CheckCircleIcon, FilterIcon, RefreshIcon, SpinnerIcon, TrashIcon } from "@/components/icons";
 import { BLANK_NEWSLETTER, createBlankBlocks, type NewsletterBlock } from "@/lib/newsletterBlocks";
 import { useNewsletter, type GeneratedNewsletter } from "@/context/NewsletterContext";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
 import type { TemplateSummary } from "@/lib/templates";
+import { formatRelativeTime } from "@/lib/format";
+import { extractPlantForms, isProductCacheStale } from "@/lib/productSync";
 
 interface OpsaetningClientProps {
   initialTemplates: TemplateSummary[];
   initialPlantForms: string[];
+  // Sidste produkt-synkronisering fra Shopify (null = aldrig).
+  initialProductsSyncedAt: string | null;
 }
 
 // Et nummereret trin i Stitch-designet: kort med hårfin kant, kursivt
@@ -95,7 +99,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (che
   );
 }
 
-export function OpsaetningClient({ initialTemplates, initialPlantForms }: OpsaetningClientProps) {
+export function OpsaetningClient({ initialTemplates, initialPlantForms, initialProductsSyncedAt }: OpsaetningClientProps) {
   const router = useRouter();
   const {
     customerType,
@@ -127,9 +131,56 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
   // genindlæsning af siden.
   const [templates, setTemplates] = useState<TemplateSummary[]>(initialTemplates);
   // Samme server-renderede mønster som templates ovenfor – planteform-listen
-  // ændrer sig ikke i løbet af selve besøget (kun ved en fremtidig
-  // produkt-synkronisering), så ingen setter er nødvendig her.
-  const [plantForms] = useState<string[]>(initialPlantForms);
+  // opdateres kun efter en produkt-synkronisering (se syncProducts).
+  const [plantForms, setPlantForms] = useState<string[]>(initialPlantForms);
+
+  // Produkt-cachen (cached_products) er den ENESTE kilde, genereringen søger
+  // i – den opdateres kun ved en synkronisering fra Shopify. Opsætning viser
+  // derfor, hvornår den sidst blev opdateret, har en "Synkroniser produkter"-
+  // knap, og synkroniserer selv automatisk, hvis cachen er over et døgn
+  // gammel (se PRODUCT_CACHE_MAX_AGE_MS), så nye produkter, priser og
+  // slettede varer kommer med i nyhedsbrevene.
+  const [productsSyncedAt, setProductsSyncedAt] = useState<string | null>(initialProductsSyncedAt);
+  const [isSyncingProducts, setIsSyncingProducts] = useState(false);
+  const [productSyncError, setProductSyncError] = useState<string | null>(null);
+  // Tælles op efter hver synkronisering, så produktoptællingen herunder
+  // genberegnes mod de friske produkter.
+  const [productsVersion, setProductsVersion] = useState(0);
+
+  async function syncProducts() {
+    if (isSyncingProducts) return;
+    setIsSyncingProducts(true);
+    setProductSyncError(null);
+    try {
+      const response = await fetch("/api/shopify/sync-products", { method: "POST" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Kunne ikke synkronisere produkter fra Shopify.");
+      }
+      // Planteform-filteret hentes fra de friske produkter.
+      const cachedResponse = await fetch("/api/products/cached");
+      const cached = await cachedResponse.json().catch(() => null);
+      if (cachedResponse.ok && Array.isArray(cached?.products)) {
+        setPlantForms(extractPlantForms(cached.products));
+      }
+      setProductsSyncedAt(typeof data?.syncedAt === "string" ? data.syncedAt : new Date().toISOString());
+      setProductsVersion((version) => version + 1);
+    } catch (err) {
+      setProductSyncError(err instanceof Error ? err.message : "Der skete en uventet fejl.");
+    } finally {
+      setIsSyncingProducts(false);
+    }
+  }
+
+  // Automatisk synkronisering ved sideindlæsning, hvis cachen er forældet.
+  // Startes i en timeout med oprydning: under React Strict Mode's dobbelte
+  // mount (kun i udvikling) annulleres den første, så den kun kører én gang.
+  useEffect(() => {
+    if (!isProductCacheStale(initialProductsSyncedAt)) return;
+    const timeoutId = window.setTimeout(() => void syncProducts(), 0);
+    return () => window.clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- kun ved første indlæsning
+  }, []);
   // Skabelonen, der venter på bekræftelse af sletning i ConfirmDialog
   // herunder – altid den AKTUELT valgte skabelon (sletteknappen findes kun
   // ved siden af selve dropdown'en, ikke pr. liste-punkt), se
@@ -189,7 +240,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [instructions, topicOnlyWithImage, topicMinPrice, topicMaxPrice, topicPlantForm]);
+  }, [instructions, topicOnlyWithImage, topicMinPrice, topicMaxPrice, topicPlantForm, productsVersion]);
 
   const parsedMaxResults = topicMaxResults.trim() ? Number(topicMaxResults) : NaN;
   const hasValidMaxResults = Number.isFinite(parsedMaxResults) && parsedMaxResults >= 1;
@@ -229,7 +280,9 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
   }
 
   async function handleGenerate() {
-    if (!canGenerate || isGenerating) {
+    // Under en produkt-synkronisering er cachen kortvarigt tom (den
+    // erstattes helt) – genereringen venter derfor, til den er færdig.
+    if (!canGenerate || isGenerating || isSyncingProducts) {
       return;
     }
 
@@ -328,12 +381,36 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
               <span className="text-xs font-semibold tracking-[0.12em] text-stone uppercase">Målgruppe</span>
               <span className="text-sm font-medium text-forest">{audienceLabel}</span>
             </div>
-            <div className="hidden h-8 w-px bg-hairline sm:block" />
-            <span className="inline-flex items-center rounded-xs bg-mint px-2 py-1 text-xs font-semibold tracking-[0.12em] text-forest-hover">
-              {canGenerate ? "Klar til generering" : "Afventer beskrivelse"}
-            </span>
           </div>
         </header>
+
+        {/* Produkt-cachens status: hvornår produkterne sidst blev hentet fra
+            Shopify, og en knap til at hente dem nu (fx lige efter nye
+            produkter er lagt ind). */}
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm text-stone">
+          <span aria-live="polite">
+            {isSyncingProducts
+              ? "Henter de nyeste produkter fra Shopify..."
+              : productsSyncedAt
+                ? `Produkter opdateret ${formatRelativeTime(new Date(productsSyncedAt))}`
+                : "Produkterne er endnu ikke hentet fra Shopify"}
+          </span>
+          <button
+            type="button"
+            onClick={() => void syncProducts()}
+            disabled={isSyncingProducts}
+            title="Henter alle produkter fra Shopify igen – nye produkter, priser, billeder og slettede varer"
+            className="inline-flex items-center gap-2 rounded-xs border-[0.5px] border-forest px-3.5 py-2 text-sm text-forest transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-forest disabled:hover:bg-transparent disabled:hover:text-forest"
+          >
+            {isSyncingProducts ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <RefreshIcon className="h-4 w-4" />}
+            {isSyncingProducts ? "Synkroniserer..." : "Synkroniser produkter"}
+          </button>
+        </div>
+        {productSyncError && (
+          <p className="mt-2 text-right text-sm text-red-700">
+            {productSyncError} Nyhedsbrevet bygges på de senest hentede produkter.
+          </p>
+        )}
 
         <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-12">
           {/* Venstre: trinene */}
@@ -480,7 +557,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms }: Opsaet
                   <button
                     type="button"
                     onClick={handleGenerate}
-                    disabled={!canGenerate || isGenerating}
+                    disabled={!canGenerate || isGenerating || isSyncingProducts}
                     className="flex items-center justify-center gap-2 rounded-xs bg-forest px-12 py-3 text-sm font-medium tracking-wider text-white transition-all hover:bg-plant-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-forest"
                   >
                     {isGenerating && <SpinnerIcon className="h-4 w-4 animate-spin" />}

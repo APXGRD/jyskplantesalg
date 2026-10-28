@@ -2,12 +2,12 @@
 
 // Ramme fra Stitch-redesignet ("Jysk Plantesalg Nyhedsbrevgenerator"): lys
 // baggrund, topbar med firmanavn i EB Garamond, navigation i DM Sans med
-// streg under den aktive side, email + log ud + avatar til højre, og en
-// footer med "Inviter bruger". Samme navigation, email og log ud som TopNav.
+// streg under den aktive side, log ud + avatar til højre, og en
+// footer med "Inviter bruger". Samme navigation og log ud som TopNav.
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { HOME_ITEM, NAV_ITEMS, useUserEmail, type TopNavPage } from "@/components/TopNav";
+import { HOME_ITEM, NAV_ITEMS, type TopNavPage } from "@/components/TopNav";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
 import { logout } from "@/app/login/actions";
 import { PlusIcon, UserIcon } from "@/components/icons";
@@ -25,7 +25,6 @@ export function EditorialShell({
 }) {
   const settings = useBrandSettings();
   const companyName = (previewName ?? settings.name).trim();
-  const userEmail = useUserEmail();
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-plant-bg font-sans text-ink-deep antialiased">
@@ -67,7 +66,6 @@ export function EditorialShell({
           </nav>
 
           <div className="flex shrink-0 items-center gap-4">
-            {userEmail && <span className="hidden text-sm text-stone lg:inline">{userEmail}</span>}
             <form action={logout}>
               <button
                 type="submit"

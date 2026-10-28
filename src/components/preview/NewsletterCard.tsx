@@ -4,12 +4,16 @@ import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react"
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { getUnsubscribeUrl } from "@/lib/unsubscribeUrl";
-import { ImagePlaceholderIcon } from "@/components/icons";
+import { ImagePlaceholderIcon, PencilIcon } from "@/components/icons";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
   CTA_BORDER_RADIUS_PX,
   CTA_PADDING_PX,
   IMAGE_SIZE_PX,
+  getTextAlign,
+  getFooterSocialsBlock,
+  isShownInFooter,
+  isEdgeToEdgeImage,
   PRODUCT_CARD_RADIUS_PX,
   PRODUCT_CARD_GAP_PX,
   chunkSocialLinks,
@@ -19,6 +23,7 @@ import {
   isBlankContent,
   getMasonryGapPx,
   getMasonryLayout,
+  isMasonryFullBleed,
   getMasonryRadiusPx,
   PRODUCT_ROW_PADDING_PX,
   getGalleryCardWidth,
@@ -63,22 +68,39 @@ interface NewsletterCardProps {
 // Samme farve-/stil-/form-felter som CTA-knappen (bgColor/ctaStyle/
 // ctaBorderRadius). `asLinks={false}` (sidepanelet) viser knapperne uden at
 // være klikbare links.
-export function SocialButtons({ block, asLinks = true }: { block: NewsletterBlock; asLinks?: boolean }) {
+export function SocialButtons({
+  block,
+  asLinks = true,
+  headingColor = "#1a1a1a",
+}: {
+  block: NewsletterBlock;
+  asLinks?: boolean;
+  // Overskriftens farve – i footeren følger den footerens tekstfarve.
+  headingColor?: string;
+}) {
   const links = getSocialLinks(block);
   const bgColor = block.bgColor || "#111111";
-  const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
-  const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
+  const style = block.ctaStyle ?? "udfyldt";
+  // "kontur" og "tekst" (kun links, ingen kant/baggrund) bruger knapfarven
+  // som tekstfarve.
+  const isOutline = style === "kontur";
+  const isTextOnly = style === "tekst";
+  const textColor = isOutline || isTextOnly ? bgColor : block.textColor || getContrastTextColor(bgColor);
   const buttonStyle: CSSProperties = {
     borderRadius: CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "pille"],
-    padding: "6px 14px",
+    padding: isTextOnly ? "2px 6px" : "6px 14px",
     color: textColor,
-    ...(isOutline ? { backgroundColor: "transparent", border: `2px solid ${bgColor}` } : { backgroundColor: bgColor }),
+    ...(isTextOnly
+      ? { backgroundColor: "transparent" }
+      : isOutline
+        ? { backgroundColor: "transparent", border: `2px solid ${bgColor}` }
+        : { backgroundColor: bgColor }),
   };
   const buttonClassName = "inline-block text-xs font-semibold leading-tight";
   return (
     <div className="flex flex-col items-center gap-2" style={{ fontFamily: block.fontFamily }}>
       {block.socialHeading?.trim() && (
-        <p className="text-[13px] font-semibold" style={{ color: "#1a1a1a" }}>
+        <p className="text-[13px] font-semibold" style={{ color: headingColor }}>
           {block.socialHeading.trim()}
         </p>
       )}
@@ -105,12 +127,19 @@ export function SocialButtons({ block, asLinks = true }: { block: NewsletterBloc
 // og CTA-blokkens forhåndsvisning i editorens sidepanel (EditorBlockList), så
 // de to aldrig kan se forskellige ud. `asLink={false}` (sidepanelet) viser
 // knappen uden at være et klikbart link.
+// Produktvisningens tekst (navn/pris) står direkte på nyhedsbrevets
+// baggrund – sort som standard, ellers kontrastfarven til baggrundsfarven
+// (fx hvid på grøn).
+function productTextColor(block: NewsletterBlock): string {
+  return block.sectionBgColor ? getContrastTextColor(block.sectionBgColor) : "#1a1a1a";
+}
+
 export function CtaButton({ block, asLink = true }: { block: NewsletterBlock; asLink?: boolean }) {
   const bgColor = block.bgColor || "#3a5837";
   const padding = CTA_PADDING_PX[block.ctaPadding ?? "normal"];
   const borderRadius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "afrundet"];
   const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
-  // "kontur": ingen baggrund, kun en 2px kant i bgColor, og knap-teksten
+  // "kontur": ingen baggrund, kun en 0,5px kant i bgColor, og knap-teksten
   // får samme farve som konturen. "udfyldt": knap-TEKSTENS farve følger
   // en global/per-blok textColor-vælger hvis sat, ellers den automatisk
   // udregnede kontrastfarve mod baggrunden.
@@ -124,7 +153,7 @@ export function CtaButton({ block, asLink = true }: { block: NewsletterBlock; as
     paddingLeft: padding.horizontal,
     paddingRight: padding.horizontal,
     color: textColor,
-    ...(isOutline ? { backgroundColor: "transparent", border: `2px solid ${bgColor}` } : { backgroundColor: bgColor }),
+    ...(isOutline ? { backgroundColor: "transparent", border: `0.5px solid ${bgColor}` } : { backgroundColor: bgColor }),
   };
   const className = "inline-flex items-center gap-1 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline";
   const label =
@@ -206,21 +235,32 @@ export function NewsletterCard({
     const compact = viewport !== "mobil" && isCompactCardWidth(getGalleryCardWidth(perRow));
     const textClassName = compact ? "text-[10px]" : "text-xs";
 
+    // "Kant til kant": billedet går helt ud til nyhedsbrevets kanter, uden
+    // runde hjørner. Ellers får selve billedet blokkens hjørne-valg.
+    const edgeToEdge = isEdgeToEdgeImage(block);
+
     function renderCard(card: MediaCard) {
       const text = getMediaCardText(card, customerType);
       const imageElement = card.src ? (
         // eslint-disable-next-line @next/next/no-img-element -- Shopify-hostet billede-URL eller lokal data-URI
-        <img src={card.src} alt={card.alt} className={imageClassName} />
+        <img
+          src={card.src}
+          alt={card.alt}
+          className={imageClassName}
+          style={{ borderRadius: edgeToEdge ? 0 : cardRadius }}
+        />
       ) : (
-        <div className="flex aspect-square w-full items-center justify-center bg-surface-active text-[10px] text-ink-faint">
+        <div
+          className="flex aspect-square w-full items-center justify-center bg-surface-active text-[10px] text-ink-faint"
+          style={{ borderRadius: edgeToEdge ? 0 : cardRadius }}
+        >
           Intet billede
         </div>
       );
       return (
         <div
           key={card.key}
-          className="flex flex-col overflow-hidden border bg-white"
-          style={{ borderColor: "#1a1a1a", borderRadius: cardRadius }}
+          className="flex flex-col overflow-hidden"
         >
           {text.href && card.src ? (
             <a
@@ -241,12 +281,12 @@ export function NewsletterCard({
               style={{ paddingTop: cardPadding, paddingBottom: cardPadding }}
             >
               {text.title && (
-                <p className={`${textClassName} leading-snug font-medium`} style={{ color: "#1a1a1a" }}>
+                <p className={`${textClassName} leading-snug font-medium`} style={{ color: productTextColor(block) }}>
                   {text.title}
                 </p>
               )}
               {text.price && (
-                <p className={`${textClassName} font-semibold`} style={{ color: "#1a1a1a" }}>
+                <p className={`${textClassName} font-semibold`} style={{ color: productTextColor(block) }}>
                   {text.price}
                 </p>
               )}
@@ -259,7 +299,7 @@ export function NewsletterCard({
     if (!isGalleryLayout(layout)) {
       // "1 billede": ét kort, med blokkens justering og størrelse.
       return (
-        <div className={`flex px-8 py-3 ${JUSTIFY_CLASS[block.alignment ?? "center"]}`}>
+        <div className={`flex ${edgeToEdge ? "" : "px-8 py-3"} ${JUSTIFY_CLASS[block.alignment ?? "center"]}`}>
           <div className="max-w-full" style={{ width: IMAGE_SIZE_PX[block.size ?? "fuld"] }}>
             {cards.map(renderCard)}
           </div>
@@ -309,7 +349,7 @@ export function NewsletterCard({
             <li
               key={item.key}
               className="flex items-baseline justify-between gap-4 border-b border-[#e5e5e5] text-[13px]"
-              style={{ paddingTop: rowPadding, paddingBottom: rowPadding, color: "#1a1a1a" }}
+              style={{ paddingTop: rowPadding, paddingBottom: rowPadding, color: productTextColor(block) }}
             >
               {item.href ? (
                 <a
@@ -317,7 +357,7 @@ export function NewsletterCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-medium underline underline-offset-2"
-                  style={{ color: "#1a1a1a" }}
+                  style={{ color: productTextColor(block) }}
                 >
                   {item.title}
                 </a>
@@ -340,7 +380,7 @@ export function NewsletterCard({
       <div className="px-8 py-3">
         <div
           className={`rounded-md border border-dashed border-neutral-300 px-3 py-2 text-neutral-400 italic ${className}`}
-          style={{ fontFamily: block.fontFamily }}
+          style={{ fontFamily: block.fontFamily, textAlign: getTextAlign(block) }}
         >
           {block.placeholder}
         </div>
@@ -374,11 +414,18 @@ export function NewsletterCard({
         if (isBlankContent(block.content) && block.placeholder) {
           return renderTextPlaceholder(block, "font-serif text-[22px] leading-[1.2]");
         }
+        // Lidt ekstra luft over overskriften (28px i stedet for 12px) – samme
+        // som den kopierede mail.
         return (
-          <div className="px-8 py-3">
+          <div className="px-8 pt-7 pb-3">
             <div
               className="font-serif text-[26px] leading-[1.2] text-ink [&_p]:m-0"
-              style={{ fontFamily: block.fontFamily, fontSize: block.fontSize ? `${block.fontSize}px` : undefined, color: block.textColor }}
+              style={{
+                fontFamily: block.fontFamily,
+                fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
+                color: block.textColor,
+                textAlign: getTextAlign(block),
+              }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -392,7 +439,12 @@ export function NewsletterCard({
           <div className="px-8 py-3">
             <div
               className="text-[13px] leading-normal text-card-body-text [&_p]:m-0 [&_p]:mb-3.5 [&_p:last-child]:mb-0"
-              style={{ fontFamily: block.fontFamily, fontSize: block.fontSize ? `${block.fontSize}px` : undefined, color: block.textColor }}
+              style={{
+                fontFamily: block.fontFamily,
+                fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
+                color: block.textColor,
+                textAlign: getTextAlign(block),
+              }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -428,9 +480,11 @@ export function NewsletterCard({
         const gap = getMasonryGapPx(block);
         const radius = getMasonryRadiusPx(block);
         if (getMasonryLayout(block) === "fuld") {
-          // Fuld bredde: hvert billede i hele bredden, under hinanden.
+          // Fuld bredde: hvert billede i hele bredden, under hinanden – enten
+          // inden for nyhedsbrevets margen eller fra kant til kant (ingen
+          // sidemargen eller luft over/under, som et hero-billede).
           return (
-            <div className="flex flex-col px-8 py-3" style={{ gap }}>
+            <div className={`flex flex-col ${isMasonryFullBleed(block) ? "" : "px-8 py-3"}`} style={{ gap }}>
               {images.map((masonryImage) => (
                 // eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI
                 <img
@@ -484,7 +538,10 @@ export function NewsletterCard({
         return (
           <div className="px-8 py-3">
             {/* Skillelinjen er altid sort – samme som den kopierede mail. */}
-            <hr className="border-0 border-t border-solid border-black" />
+            <hr
+              className="border-0 border-t border-solid"
+              style={{ borderColor: block.sectionBgColor ? getContrastTextColor(block.sectionBgColor) : "#000000" }}
+            />
           </div>
         );
 
@@ -496,7 +553,12 @@ export function NewsletterCard({
           <div className="px-8 py-3">
             <div
               className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0"
-              style={{ fontFamily: block.fontFamily, fontSize: block.fontSize ? `${block.fontSize}px` : undefined, color: block.textColor }}
+              style={{
+                fontFamily: block.fontFamily,
+                fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
+                color: block.textColor,
+                textAlign: getTextAlign(block),
+              }}
               dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
             />
           </div>
@@ -528,6 +590,15 @@ export function NewsletterCard({
         );
 
       case "socials":
+        // Vises inde i footeren i stedet for her – i editoren står en lille
+        // markering, så blokken stadig kan vælges og redigeres.
+        if (isShownInFooter(block, blocks)) {
+          return onSelectBlock ? (
+            <div className="px-8 py-2">
+              <p className="text-center text-[10px] text-neutral-400 italic">Sociale medier vises i footeren</p>
+            </div>
+          ) : null;
+        }
         if (getSocialLinks(block).length === 0) {
           return (
             <div className="px-8 py-3">
@@ -544,6 +615,7 @@ export function NewsletterCard({
         );
 
       case "footer": {
+        const footerSocials = getFooterSocialsBlock(blocks);
         const bgColor = block.bgColor || "#f5f7f4";
         // Valgt tekstfarve – ellers automatisk sort/hvid efter baggrunden.
         const textColor = block.textColor || getContrastTextColor(bgColor);
@@ -553,6 +625,12 @@ export function NewsletterCard({
             style={{ backgroundColor: bgColor, color: textColor }}
           >
             <p className="text-[11px] opacity-80">{formatFooterAddressLine(brand)}</p>
+            {/* Sociale medier placeret i footeren: lige under adressen. */}
+            {footerSocials && (
+              <div className="py-2">
+                <SocialButtons block={footerSocials} headingColor={textColor} />
+              </div>
+            )}
             <p className="text-[11px] opacity-80">
               Du modtager dette nyhedsbrev, fordi du er {audience}.
             </p>
@@ -574,7 +652,14 @@ export function NewsletterCard({
       {blocks
         .filter((block) => !block.hidden)
         .map((block) => {
-          if (!onSelectBlock) return <div key={block.id}>{renderBlock(block)}</div>;
+          // Nyhedsbrevets baggrundsfarve ligger bag hele blokkens række.
+          const sectionStyle = block.sectionBgColor ? { backgroundColor: block.sectionBgColor } : undefined;
+          if (!onSelectBlock)
+            return (
+              <div key={block.id} style={sectionStyle}>
+                {renderBlock(block)}
+              </div>
+            );
           const isSelected = block.id === selectedBlockId;
           const label = getBlockLabel?.(block) ?? block.type;
           function select(event: MouseEvent<HTMLDivElement>) {
@@ -601,13 +686,27 @@ export function NewsletterCard({
               aria-label={`${label}${isSelected ? " – valgt" : ""}. Vælg for at redigere blokken`}
               onClick={select}
               onKeyDown={handleKeyDown}
-              className={`relative cursor-pointer outline-offset-[-1px] ${
+              style={sectionStyle}
+              className={`group relative cursor-pointer outline-offset-[-1px] ${
                 isSelected
                   ? "outline-1 outline-black/75 outline-solid"
-                  : "outline-1 outline-transparent outline-dashed hover:outline-neutral-400 focus-visible:outline-2 focus-visible:outline-black"
+                  : "outline-1 outline-transparent outline-dashed hover:outline-forest focus-visible:outline-2 focus-visible:outline-black"
               }`}
             >
               {renderBlock(block)}
+              {/* Hjælpemærke ved hover/fokus, så det er tydeligt, at blokken kan
+                  redigeres. Den valgte blok viser i stedet, at den redigeres. */}
+              <span
+                aria-hidden
+                className={`pointer-events-none absolute top-1.5 right-1.5 z-10 inline-flex items-center gap-1 rounded-xs px-2 py-0.5 font-sans text-[11px] leading-[1.4] font-medium shadow-sm transition-opacity ${
+                  isSelected
+                    ? "bg-black/75 text-white opacity-100"
+                    : "bg-forest text-white opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+                }`}
+              >
+                <PencilIcon className="h-3 w-3" />
+                {isSelected ? `Redigerer · ${label}` : `Klik for at redigere · ${label}`}
+              </span>
             </div>
           );
         })}

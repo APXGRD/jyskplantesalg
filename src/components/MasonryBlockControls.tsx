@@ -15,11 +15,13 @@ import {
 interface MasonryBlockControlsProps {
   images: MasonryImage[];
   layout: MasonryLayout;
+  fullBleed: boolean;
   columns: MasonryColumns;
   gap: MasonryGap;
   radius: CtaBorderRadius;
   onImagesChange: (images: MasonryImage[]) => void;
   onLayoutChange: (layout: MasonryLayout) => void;
+  onFullBleedChange: (fullBleed: boolean) => void;
   onColumnsChange: (columns: MasonryColumns) => void;
   onGapChange: (gap: MasonryGap) => void;
   onRadiusChange: (radius: CtaBorderRadius) => void;
@@ -55,10 +57,10 @@ function OptionButtons<T extends string | number>({
           type="button"
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
-          className={`border px-2 py-1.5 text-center font-jetbrains text-[11px] transition-colors ${
+          className={`border px-2 py-1.5 text-center text-[11px] transition-colors ${
             value === option.value
-              ? "border-black bg-neutral-200 font-bold text-black"
-              : "border-neutral-300 bg-white text-neutral-600 hover:border-black"
+              ? "border-forest bg-forest font-medium text-white"
+              : "border-hairline bg-white text-stone-dark hover:border-plant-hover hover:bg-plant-hover hover:text-white"
           }`}
         >
           {option.label}
@@ -148,11 +150,13 @@ async function prepareMasonryUpload(file: File): Promise<MasonryImage> {
 export function MasonryBlockControls({
   images,
   layout,
+  fullBleed,
   columns,
   gap,
   radius,
   onImagesChange,
   onLayoutChange,
+  onFullBleedChange,
   onColumnsChange,
   onGapChange,
   onRadiusChange,
@@ -210,13 +214,13 @@ export function MasonryBlockControls({
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="font-jetbrains text-xs text-neutral-500">
+      <p className="text-xs text-stone">
         Upload dine egne billeder (fx fra butikken eller et event) – vis dem i fuld bredde eller som et
         masonry-gitter. Har intet med produkterne at gøre.
       </p>
 
       <div className="flex max-w-md flex-col gap-1.5">
-        <span className="font-jetbrains text-xs text-neutral-600">Visning:</span>
+        <span className="text-xs text-stone-dark">Visning:</span>
         <div className="grid grid-cols-2 gap-2">
           {LAYOUT_OPTIONS.map((option) => (
             <button
@@ -225,30 +229,47 @@ export function MasonryBlockControls({
               onClick={() => onLayoutChange(option.value)}
               aria-pressed={layout === option.value}
               title={option.description}
-              className={`flex items-center gap-2.5 border p-2 text-left font-jetbrains text-xs transition-colors ${
+              className={`flex items-center gap-2.5 border p-2 text-left text-xs transition-colors ${
                 layout === option.value
-                  ? "border-black bg-neutral-100 font-semibold text-black"
-                  : "border-neutral-300 bg-white text-neutral-600 hover:border-black"
+                  ? "border-forest bg-[#f5f3ee] font-medium text-forest"
+                  : "border-hairline bg-white text-stone-dark hover:border-plant-hover hover:bg-plant-hover hover:text-white"
               }`}
             >
               <LayoutPreview layout={option.value} />
               <span className="flex flex-col">
                 <span>{option.label}</span>
-                <span className="text-[10px] font-normal text-neutral-500">{option.description}</span>
+                <span className="text-[10px] font-normal text-stone">{option.description}</span>
               </span>
             </button>
           ))}
         </div>
         {layout === "masonry" && images.length === 1 && (
-          <p className="font-jetbrains text-[11px] text-neutral-500">
+          <p className="text-[11px] text-stone">
             Tip: masonry-gitteret giver først mening med flere billeder – upload flere herunder.
           </p>
         )}
       </div>
 
+      {layout === "fuld" && (
+        <div className="flex max-w-md flex-col gap-1.5">
+          <span className="text-xs text-stone-dark">Bredde:</span>
+          <OptionButtons
+            options={[
+              { value: "margen", label: "Inden for margen" },
+              { value: "kant", label: "Kant til kant" },
+            ]}
+            value={fullBleed ? "kant" : "margen"}
+            onChange={(value) => onFullBleedChange(value === "kant")}
+          />
+          <p className="text-[11px] text-stone">
+            Kant til kant: billedet fylder hele nyhedsbrevets bredde uden margen – fx som stort topbillede.
+          </p>
+        </div>
+      )}
+
       {layout === "masonry" && (
         <div className="flex max-w-md flex-col gap-1.5">
-          <span className="font-jetbrains text-xs text-neutral-600">Kolonner:</span>
+          <span className="text-xs text-stone-dark">Kolonner:</span>
           <OptionButtons
             options={MASONRY_COLUMN_OPTIONS.map((option) => ({ value: option, label: `${option} kolonner` }))}
             value={columns}
@@ -259,28 +280,28 @@ export function MasonryBlockControls({
 
       <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <span className="font-jetbrains text-xs text-neutral-600">Afstand mellem billeder:</span>
+          <span className="text-xs text-stone-dark">Afstand mellem billeder:</span>
           <OptionButtons options={GAP_OPTIONS} value={gap} onChange={onGapChange} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className="font-jetbrains text-xs text-neutral-600">Hjørner:</span>
+          <span className="text-xs text-stone-dark">Hjørner:</span>
           <OptionButtons options={RADIUS_OPTIONS} value={radius} onChange={onRadiusChange} />
         </div>
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2 font-jetbrains">
-          <span className="text-xs font-bold tracking-wider text-neutral-800 uppercase">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-semibold tracking-wider text-ink-deep uppercase">
             Billeder ({images.length}/{MAX_MASONRY_IMAGES})
           </span>
-          <span className="text-[11px] text-neutral-500">Nedskaleres automatisk</span>
+          <span className="text-[11px] text-stone">Nedskaleres automatisk</span>
         </div>
 
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={remaining <= 0 || isProcessing}
-          className="flex h-20 items-center justify-center gap-2 border-2 border-dashed border-neutral-400 bg-white font-jetbrains text-xs text-neutral-600 transition-colors hover:border-black hover:text-black disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-400 disabled:hover:text-neutral-600"
+          className="flex h-20 items-center justify-center gap-2 border-2 border-dashed border-hairline bg-white text-xs text-stone-dark transition-colors hover:border-forest hover:text-forest disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-hairline disabled:hover:text-stone-dark"
         >
           {isProcessing ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <UploadIcon className="h-4 w-4" />}
           {isProcessing
@@ -297,31 +318,31 @@ export function MasonryBlockControls({
           onChange={handleFilesChange}
           className="sr-only"
         />
-        {error && <p className="font-jetbrains text-[11px] text-amber-800">{error}</p>}
+        {error && <p className="text-[11px] text-amber-800">{error}</p>}
 
         {images.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-neutral-200 border border-neutral-300 bg-white">
+          <ul className="flex flex-col divide-y divide-hairline border border-hairline bg-white">
             {images.map((image, index) => (
               <li key={image.id} className="flex items-center gap-3 p-2">
-                <span className="w-5 shrink-0 text-center font-jetbrains text-[11px] font-bold text-neutral-500">
+                <span className="w-5 shrink-0 text-center text-[11px] font-semibold text-stone">
                   {index + 1}
                 </span>
                 {/* eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI */}
-                <img src={image.src} alt="" className="h-12 w-12 shrink-0 border border-neutral-200 object-cover" />
+                <img src={image.src} alt="" className="h-12 w-12 shrink-0 border border-hairline object-cover" />
                 <input
                   type="text"
                   value={image.altText ?? ""}
                   onChange={(event) => updateAltText(image.id, event.target.value)}
                   placeholder="Alt-tekst (anbefalet) – beskriv billedet"
                   aria-label={`Alt-tekst for billede ${index + 1}`}
-                  className="min-w-0 flex-1 rounded-none border border-neutral-300 bg-[#fdfdfb] px-2 py-1.5 font-jetbrains text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-black focus:outline-none"
+                  className="min-w-0 flex-1 rounded-xs border border-hairline bg-white px-2 py-1.5 text-xs text-ink-deep placeholder:text-stone/60 focus:border-forest focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => removeImage(image.id)}
                   aria-label={`Fjern billede ${index + 1}`}
                   title="Fjern billede"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-700"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center text-stone transition-colors hover:bg-red-50 hover:text-red-700"
                 >
                   <TrashIcon className="h-3.5 w-3.5" />
                 </button>
@@ -329,7 +350,7 @@ export function MasonryBlockControls({
             ))}
           </ul>
         ) : (
-          <p className="flex items-center gap-2 font-jetbrains text-[11px] text-neutral-400">
+          <p className="flex items-center gap-2 text-[11px] text-stone">
             <ImagePlaceholderIcon className="h-4 w-4" />
             Ingen billeder endnu.
           </p>

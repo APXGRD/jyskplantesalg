@@ -144,16 +144,16 @@ const ADD_BLOCK_OPTIONS: {
 ];
 
 const BADGE_STYLES: Record<BlockBadge, string> = {
-  Struktur: "border-neutral-300 bg-white text-neutral-600",
+  Struktur: "border-hairline bg-white text-stone-dark",
   "AI-tekst": "border-emerald-300 bg-emerald-50 text-emerald-800",
-  Produktdata: "border-black bg-black text-white",
+  Produktdata: "border-forest bg-forest text-white",
   "Egne billeder": "border-sky-300 bg-sky-50 text-sky-800",
 };
 
 function Badge({ type }: { type: BlockBadge }) {
   return (
     <span
-      className={`hidden shrink-0 border px-1.5 py-0.5 font-jetbrains text-[9px] font-semibold tracking-wider uppercase @sm:inline ${BADGE_STYLES[type]}`}
+      className={`hidden shrink-0 border px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase @sm:inline ${BADGE_STYLES[type]}`}
     >
       {type}
     </span>
@@ -161,12 +161,12 @@ function Badge({ type }: { type: BlockBadge }) {
 }
 
 const fieldClassName =
-  "w-full rounded-none border border-neutral-300 bg-[#fdfdfb] px-3 py-2 font-jetbrains text-xs text-neutral-900 focus:border-black focus:outline-none";
+  "w-full rounded-xs border border-hairline bg-white px-3 py-2 text-xs text-ink-deep focus:border-forest focus:outline-none";
 
 // Feltetiketter i blokkene ("Antal billeder:", "Tekstfarve:" …).
-const labelClassName = "font-jetbrains text-xs text-neutral-600";
+const labelClassName = "text-xs text-stone-dark";
 // Beskrivende hjælpetekst øverst i en blok.
-const helpTextClassName = "font-jetbrains text-xs text-neutral-500";
+const helpTextClassName = "text-xs text-stone";
 
 // Kompakt gruppe af gensidigt udelukkende valg (samme mønster som
 // ImageBlockControls' justering/størrelse-knapper) – bruges til CTA-knappens
@@ -190,10 +190,10 @@ function SegmentedButtons<T extends string>({
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           title={option.label}
-          className={`flex min-w-0 items-center justify-center gap-2 border px-2 py-1.5 text-center font-jetbrains text-[11px] leading-tight transition-colors ${
+          className={`flex min-w-0 items-center justify-center gap-2 rounded-xs border px-2 py-1.5 text-center text-[11px] leading-tight transition-colors ${
             value === option.value
-              ? "border-black bg-neutral-200 font-bold text-black"
-              : "border-neutral-300 bg-white text-neutral-600 hover:border-black"
+              ? "border-forest bg-forest font-medium text-white"
+              : "border-hairline bg-white text-stone-dark hover:border-plant-hover hover:bg-plant-hover hover:text-white"
           }`}
         >
           {option.preview}
@@ -204,10 +204,25 @@ function SegmentedButtons<T extends string>({
   );
 }
 
+// Tekstjustering for overskrift/brødtekst/tekst (blokkens alignment-felt).
+const TEXT_ALIGN_OPTIONS: { value: ImageAlignment; label: string }[] = [
+  { value: "venstre", label: "Venstre" },
+  { value: "center", label: "Centreret" },
+  { value: "hoejre", label: "Højre" },
+];
+
 const CTA_PADDING_OPTIONS: { value: CtaPadding; label: string }[] = [
   { value: "kompakt", label: "Kompakt" },
   { value: "normal", label: "Normal" },
   { value: "rummelig", label: "Rummelig" },
+];
+
+// Produktbilledernes hjørner (productBorderRadius) – samme tre værdier som
+// CTA-knappen, men med tekster der passer til et billede.
+const IMAGE_RADIUS_OPTIONS: { value: CtaBorderRadius; label: string }[] = [
+  { value: "skarp", label: "Skarpe" },
+  { value: "afrundet", label: "Let afrundet" },
+  { value: "pille", label: "Afrundet" },
 ];
 
 const CTA_BORDER_RADIUS_OPTIONS: { value: CtaBorderRadius; label: string }[] = [
@@ -219,6 +234,12 @@ const CTA_BORDER_RADIUS_OPTIONS: { value: CtaBorderRadius; label: string }[] = [
 const CTA_STYLE_OPTIONS: { value: CtaStyle; label: string }[] = [
   { value: "udfyldt", label: "Udfyldt" },
   { value: "kontur", label: "Kontur" },
+];
+
+// Sociale medier har desuden "Kun tekst": links uden baggrund og kant.
+const SOCIAL_STYLE_OPTIONS: { value: CtaStyle; label: string }[] = [
+  ...CTA_STYLE_OPTIONS,
+  { value: "tekst", label: "Kun tekst" },
 ];
 
 // Produktkortenes/tekstlistens "Tæthed"-valg (Billede/Galleri) –
@@ -351,9 +372,11 @@ interface BlockContentProps {
   onMasonryImagesChange: (images: MasonryImage[]) => void;
   onMasonryLayoutChange: (layout: MasonryLayout) => void;
   // Billedeblok: kolonner (masonry), afstand og hjørner.
-  onMasonryPatch: (patch: Pick<NewsletterBlock, "masonryColumns" | "masonryGap" | "masonryRadius">) => void;
+  onMasonryPatch: (
+    patch: Pick<NewsletterBlock, "masonryColumns" | "masonryGap" | "masonryRadius" | "masonryFullBleed">,
+  ) => void;
   // Sociale medier: links pr. platform og overskrift.
-  onSocialsPatch: (patch: Pick<NewsletterBlock, "socialLinks" | "socialHeading">) => void;
+  onSocialsPatch: (patch: Pick<NewsletterBlock, "socialLinks" | "socialHeading" | "socialsInFooter">) => void;
   onProductBorderRadiusChange: (borderRadius: CtaBorderRadius) => void;
   onProductDensityChange: (density: ProductListDensity) => void;
   products: ShopifyProduct[];
@@ -421,7 +444,7 @@ function BlockContent({
           {/* Lille forhåndsvisning af headerens farver – samme regel som
               NewsletterCard (valgt farve, ellers auto sort/hvid). */}
           <div
-            className="border border-black/10 p-3 text-center font-jetbrains text-xs tracking-widest uppercase"
+            className="border border-hairline p-3 text-center text-xs tracking-widest uppercase"
             style={{ backgroundColor: headerBgColor, color: block.textColor || getContrastTextColor(headerBgColor) }}
           >
             {brand.name || "Logo"}
@@ -438,11 +461,20 @@ function BlockContent({
             fontFamily={block.fontFamily}
             fontSize={block.fontSize}
             textColor={block.textColor}
+            backgroundColor={block.sectionBgColor}
             onFontFamilyChange={onFontFamilyChange}
             onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
             placeholder={block.placeholder}
           />
+          <div className="flex flex-col gap-1.5">
+            <span className={labelClassName}>Justering:</span>
+            <SegmentedButtons
+              options={TEXT_ALIGN_OPTIONS}
+              value={block.alignment ?? "venstre"}
+              onChange={onAlignmentChange}
+            />
+          </div>
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
         </div>
       );
@@ -456,11 +488,20 @@ function BlockContent({
             fontFamily={block.fontFamily}
             fontSize={block.fontSize}
             textColor={block.textColor}
+            backgroundColor={block.sectionBgColor}
             onFontFamilyChange={onFontFamilyChange}
             onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
             placeholder={block.placeholder}
           />
+          <div className="flex flex-col gap-1.5">
+            <span className={labelClassName}>Justering:</span>
+            <SegmentedButtons
+              options={TEXT_ALIGN_OPTIONS}
+              value={block.alignment ?? "venstre"}
+              onChange={onAlignmentChange}
+            />
+          </div>
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
         </div>
       );
@@ -474,11 +515,20 @@ function BlockContent({
             fontFamily={block.fontFamily}
             fontSize={block.fontSize}
             textColor={block.textColor}
+            backgroundColor={block.sectionBgColor}
             onFontFamilyChange={onFontFamilyChange}
             onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
             placeholder={block.placeholder}
           />
+          <div className="flex flex-col gap-1.5">
+            <span className={labelClassName}>Justering:</span>
+            <SegmentedButtons
+              options={TEXT_ALIGN_OPTIONS}
+              value={block.alignment ?? "venstre"}
+              onChange={onAlignmentChange}
+            />
+          </div>
           <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} />
         </div>
       );
@@ -502,10 +552,10 @@ function BlockContent({
             Vis billeder og produkter – vælg produkter (med navn, pris og link til produktets side) eller upload
             egne billeder.
           </p>
-          <label className="relative flex cursor-pointer items-center justify-between gap-3 border-b border-neutral-200 pb-3">
+          <label className="relative flex cursor-pointer items-center justify-between gap-3 border-b border-hairline pb-3">
             <span className="flex flex-col gap-0.5">
-              <span className="font-jetbrains text-xs font-bold text-neutral-900">Vis billede</span>
-              <span className="font-jetbrains text-[11px] text-neutral-500">
+              <span className="text-xs font-semibold text-ink-deep">Vis billede</span>
+              <span className="text-[11px] text-stone">
                 {showImage
                   ? "Produktkort med billede, navn og pris – billedet linker til produktets side."
                   : "Tekstliste med navn og pris – produktnavnet linker til produktets side."}
@@ -520,12 +570,12 @@ function BlockContent({
             />
             <span
               aria-hidden
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-black peer-focus-visible:ring-offset-1 ${
-                showImage ? "bg-neutral-900" : "bg-neutral-300"
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-forest peer-focus-visible:ring-offset-1 ${
+                showImage ? "bg-forest" : "bg-[#e4e2dd]"
               }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full border border-neutral-300 bg-white transition-transform ${
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full border border-hairline bg-white transition-transform ${
                   showImage ? "translate-x-5 border-white" : ""
                 }`}
               />
@@ -542,10 +592,10 @@ function BlockContent({
                   onClick={() => onGalleryColumnsChange(option)}
                   aria-pressed={layout === option}
                   aria-label={option === 1 ? "1 billede" : `${option} billeder`}
-                  className={`border py-1 text-center font-jetbrains text-xs transition-colors ${
+                  className={`border py-1 text-center text-xs transition-colors ${
                     layout === option
-                      ? "border-black bg-black font-bold text-white"
-                      : "border-neutral-300 bg-white text-neutral-700 hover:border-black"
+                      ? "border-forest bg-forest font-medium text-white"
+                      : "border-hairline bg-white text-stone-dark hover:border-plant-hover hover:bg-plant-hover hover:text-white"
                   }`}
                 >
                   {option}
@@ -607,8 +657,8 @@ function BlockContent({
                     : undefined
                 }
               />
-              <div className="flex flex-col gap-2 border-t border-neutral-200 pt-3">
-                <span className="font-jetbrains text-xs font-bold tracking-wider text-neutral-800 uppercase">
+              <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+                <span className="text-xs font-semibold tracking-wider text-ink-deep uppercase">
                   Eller vælg billede fra et produkt
                 </span>
                 <SearchableProductChecklist
@@ -623,15 +673,15 @@ function BlockContent({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 border-t border-neutral-200 pt-3 @lg:grid-cols-2">
-          {/* Kant-form gælder kun kortene – tekstlisten har ingen kort. */}
+          <div className="grid grid-cols-1 gap-4 border-t border-hairline pt-3 @lg:grid-cols-2">
+          {/* Billedets hjørner gælder kun billederne – tekstlisten har ingen. */}
           {showImage && (
             <div className="flex flex-col gap-1.5">
-              <span className={labelClassName}>Kant-form:</span>
+              <span className={labelClassName}>Billedets hjørner:</span>
               <SegmentedButtons
                 value={block.productBorderRadius ?? "afrundet"}
                 onChange={onProductBorderRadiusChange}
-                options={CTA_BORDER_RADIUS_OPTIONS}
+                options={IMAGE_RADIUS_OPTIONS}
               />
             </div>
           )}
@@ -670,11 +720,13 @@ function BlockContent({
         <MasonryBlockControls
           images={block.masonryImages ?? []}
           layout={getMasonryLayout(block)}
+          fullBleed={block.masonryFullBleed === true}
           columns={getMasonryColumns(block)}
           gap={block.masonryGap ?? "lille"}
           radius={block.masonryRadius ?? "skarp"}
           onImagesChange={onMasonryImagesChange}
           onLayoutChange={onMasonryLayoutChange}
+          onFullBleedChange={(masonryFullBleed) => onMasonryPatch({ masonryFullBleed })}
           onColumnsChange={(masonryColumns: MasonryColumns) => onMasonryPatch({ masonryColumns })}
           onGapChange={(masonryGap: MasonryGap) => onMasonryPatch({ masonryGap })}
           onRadiusChange={(masonryRadius) => onMasonryPatch({ masonryRadius })}
@@ -683,21 +735,40 @@ function BlockContent({
 
     case "socials": {
       const hasLinks = getSocialLinks(block).length > 0;
-      const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
+      const socialStyle = block.ctaStyle ?? "udfyldt";
+      const isOutline = socialStyle === "kontur" || socialStyle === "tekst";
+      const isTextOnly = socialStyle === "tekst";
       return (
         <div className="flex flex-col gap-4">
           {/* Forhåndsvisning – samme rendering som i nyhedsbrevet (SocialButtons). */}
           <div className="flex flex-col gap-1">
             <span className={labelClassName}>Forhåndsvisning:</span>
-            <div className="border border-neutral-200 bg-white px-3 py-4" aria-hidden>
+            <div className="border border-hairline bg-white px-3 py-4" aria-hidden>
               {hasLinks ? (
                 <SocialButtons block={block} asLinks={false} />
               ) : (
-                <p className="text-center font-jetbrains text-[11px] text-neutral-400 italic">
+                <p className="text-center text-[11px] text-stone italic">
                   Udfyld mindst ét link herunder
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className={labelClassName}>Placering:</span>
+            <SegmentedButtons
+              options={[
+                { value: "sektion", label: "Egen sektion" },
+                { value: "footer", label: "I footeren" },
+              ]}
+              value={block.socialsInFooter ? "footer" : "sektion"}
+              onChange={(value) => onSocialsPatch({ socialsInFooter: value === "footer" })}
+            />
+            {block.socialsInFooter && (
+              <p className={helpTextClassName}>
+                Knapperne vises i footeren lige under firmaoplysningerne – kræver at footeren er synlig.
+              </p>
+            )}
           </div>
 
           <label className="flex flex-col gap-1">
@@ -716,7 +787,7 @@ function BlockContent({
             </legend>
             {SOCIAL_PLATFORMS.map((platform) => (
               <label key={platform.id} className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-2">
-                <span className="font-jetbrains text-xs text-neutral-800">{platform.label}</span>
+                <span className="text-xs text-ink-deep">{platform.label}</span>
                 <input
                   type="url"
                   inputMode="url"
@@ -735,25 +806,30 @@ function BlockContent({
           <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
             <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
             {isOutline ? (
-              <p className="font-jetbrains text-[11px] text-neutral-400">
-                I kontur-stil bruges knapfarven til både kant og tekst.
+              <p className="text-[11px] text-stone">
+                {isTextOnly
+                  ? "I kun tekst-stil bruges knapfarven som linkenes tekstfarve."
+                  : "I kontur-stil bruges knapfarven til både kant og tekst."}
               </p>
             ) : (
               <ColorSwatches label="Tekstfarve" value={block.textColor} onChange={onTextColorChange} autoOption />
             )}
           </div>
           <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <span className={labelClassName}>Form:</span>
-              <SegmentedButtons
-                options={CTA_BORDER_RADIUS_OPTIONS}
-                value={block.ctaBorderRadius ?? "pille"}
-                onChange={onCtaBorderRadiusChange}
-              />
-            </div>
+            {/* Formen giver ingen mening uden baggrund/kant. */}
+            {!isTextOnly && (
+              <div className="flex flex-col gap-1.5">
+                <span className={labelClassName}>Form:</span>
+                <SegmentedButtons
+                  options={CTA_BORDER_RADIUS_OPTIONS}
+                  value={block.ctaBorderRadius ?? "pille"}
+                  onChange={onCtaBorderRadiusChange}
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <span className={labelClassName}>Stil:</span>
-              <SegmentedButtons options={CTA_STYLE_OPTIONS} value={block.ctaStyle ?? "udfyldt"} onChange={onCtaStyleChange} />
+              <SegmentedButtons options={SOCIAL_STYLE_OPTIONS} value={socialStyle} onChange={onCtaStyleChange} />
             </div>
           </div>
         </div>
@@ -777,7 +853,7 @@ function BlockContent({
               farver, padding, form og stil herunder. */}
           <div className="flex flex-col gap-1">
             <span className={labelClassName}>Forhåndsvisning:</span>
-            <div className="flex justify-center border border-neutral-200 bg-white px-3 py-4" aria-hidden>
+            <div className="flex justify-center border border-hairline bg-white px-3 py-4" aria-hidden>
               <CtaButton block={block} asLink={false} />
             </div>
           </div>
@@ -807,7 +883,7 @@ function BlockContent({
           <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
             <ColorSwatches label="Knapfarve" value={block.bgColor} onChange={onBgColorChange} />
             {(block.ctaStyle ?? "udfyldt") === "kontur" ? (
-              <p className="font-jetbrains text-[11px] text-neutral-400">
+              <p className="text-[11px] text-stone">
                 I kontur-stil bruges knapfarven til både kant og tekst.
               </p>
             ) : (
@@ -835,10 +911,10 @@ function BlockContent({
           {/* Lille forhåndsvisning af footerens farver og firmaoplysninger –
               samme regel som NewsletterCard. */}
           <div
-            className="space-y-1 border border-neutral-200 p-3 text-center font-jetbrains text-[11px]"
+            className="space-y-1 border border-hairline p-3 text-center text-[11px]"
             style={{ backgroundColor: footerBgColor, color: block.textColor || getContrastTextColor(footerBgColor) }}
           >
-            <p className="font-bold">{formatFooterAddressLine(brand) || "Ingen firmaoplysninger udfyldt"}</p>
+            <p className="font-semibold">{formatFooterAddressLine(brand) || "Ingen firmaoplysninger udfyldt"}</p>
             <p className="opacity-80">Du modtager dette nyhedsbrev … · Afmeld nyhedsbrevet</p>
           </div>
         </div>
@@ -1442,12 +1518,12 @@ export function EditorBlockList({
 
   function handleMasonryPatch(
     id: string,
-    patch: Pick<NewsletterBlock, "masonryColumns" | "masonryGap" | "masonryRadius">,
+    patch: Pick<NewsletterBlock, "masonryColumns" | "masonryGap" | "masonryRadius" | "masonryFullBleed">,
   ) {
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ...patch } : block)));
   }
 
-  function handleSocialsPatch(id: string, patch: Pick<NewsletterBlock, "socialLinks" | "socialHeading">) {
+  function handleSocialsPatch(id: string, patch: Pick<NewsletterBlock, "socialLinks" | "socialHeading" | "socialsInFooter">) {
     onBlocksChange(blocks.map((block) => (block.id === id ? { ...block, ...patch } : block)));
   }
 
@@ -1498,6 +1574,29 @@ export function EditorBlockList({
     );
   }
 
+  // Nyhedsbrevets baggrundsfarve: sættes på ALLE blokke (sectionBgColor),
+  // og header/footer får samme farve, så hele mailen står i én flade. Teksten
+  // i tekstblokkene (ikke CTA-knappen, hvis tekst står på knappens egen farve)
+  // skiftes til en læsbar kontrastfarve – den kan bagefter ændres med "Global
+  // tekstfarve". undefined = tilbage til hvid baggrund og standardfarver.
+  function handleGlobalBgChange(color: string | undefined) {
+    const contrast = color ? getContrastTextColor(color) : undefined;
+    onBlocksChange(
+      blocks.map((block) => {
+        const next: NewsletterBlock = { ...block, sectionBgColor: color };
+        if (block.type === "header" || block.type === "footer") {
+          next.bgColor = color;
+          next.textColor = undefined;
+        }
+        if (RICH_TEXT_BLOCK_TYPES.includes(block.type) && block.type !== "cta") {
+          next.textColor = contrast;
+          next.content = block.content ? stripColorStyles(block.content) : block.content;
+        }
+        return next;
+      }),
+    );
+  }
+
   function handleDuplicate(id: string) {
     const index = blocks.findIndex((block) => block.id === id);
     if (index === -1) return;
@@ -1520,6 +1619,16 @@ export function EditorBlockList({
   // Den nye blok vælges med det samme, så dens kontroller vises i panelet.
   function handleAddBlock(kind: AddableBlockKind) {
     const newBlock = createNewBlock(kind);
+    // En ny blok arver nyhedsbrevets baggrundsfarve (og tekstblokke den
+    // aktuelle globale tekstfarve), så den passer ind med det samme.
+    const sectionBgColor = blocks[0]?.sectionBgColor;
+    if (sectionBgColor) {
+      newBlock.sectionBgColor = sectionBgColor;
+      if (RICH_TEXT_BLOCK_TYPES.includes(newBlock.type) && newBlock.type !== "cta") {
+        newBlock.textColor = blocks.find((block) => RICH_TEXT_BLOCK_TYPES.includes(block.type) && block.type !== "cta")
+          ?.textColor;
+      }
+    }
     onBlocksChange([...blocks, newBlock]);
     onSelectBlock(newBlock.id);
   }
@@ -1545,6 +1654,8 @@ export function EditorBlockList({
   const firstTextBlock = blocks.find((block) => RICH_TEXT_BLOCK_TYPES.includes(block.type));
   const globalFontFamily = firstTextBlock?.fontFamily ?? "";
   const globalTextColor = firstTextBlock?.textColor;
+  // Baggrundsfarven sættes altid samlet på alle blokke – aflæses fra den første.
+  const globalBgColor = blocks[0]?.sectionBgColor;
 
   // Den valgte bloks kontroller – de eksisterende kontrol-komponenter
   // (BlockContent), uændret, blot vist i sidepanelet for én blok ad gangen.
@@ -1734,13 +1845,52 @@ export function EditorBlockList({
                   aria-pressed={isActive}
                   aria-label={`Tekstfarve ${color.toUpperCase()}`}
                   title={color.toUpperCase()}
-                  className={`h-7 w-7 shrink-0 rounded-[5px] border border-black/15 transition-transform hover:scale-110 ${
+                  className={`h-7 w-7 shrink-0 rounded-[5px] border border-hairline transition-transform hover:scale-110 ${
                     isActive ? "ring-2 ring-forest ring-offset-2" : ""
                   }`}
                   style={{ backgroundColor: color }}
                 />
               );
             })}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className={fieldLabelClassName}>Baggrundsfarve</span>
+          {/* Hele nyhedsbrevets baggrund vælges frit i farvepaletten (den
+              native farvevælger) – kun her; resten af editoren bruger
+              brandfarverne. */}
+          <div role="group" aria-label="Baggrundsfarve for hele nyhedsbrevet" className="flex flex-wrap items-center gap-2">
+            {/* Den native farvevælger ligger usynligt ovenpå en firkant i den
+                aktuelle baggrundsfarve (hvid, når ingen er valgt). */}
+            <label
+              title={globalBgColor ? `Baggrundsfarve ${globalBgColor.toUpperCase()}` : "Vælg baggrundsfarve"}
+              className={`relative h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-[5px] border border-hairline transition-transform focus-within:ring-2 focus-within:ring-forest/40 hover:scale-110 ${
+                "ring-2 ring-forest ring-offset-2"
+              }`}
+              style={{ backgroundColor: globalBgColor ?? "#ffffff" }}
+            >
+              <input
+                type="color"
+                aria-label="Vælg baggrundsfarve"
+                value={globalBgColor ?? "#ffffff"}
+                onChange={(event) => handleGlobalBgChange(event.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
+            {globalBgColor ? (
+              <>
+                <span className="ml-1 font-mono text-xs text-stone uppercase">{globalBgColor}</span>
+                <button
+                  type="button"
+                  onClick={() => handleGlobalBgChange(undefined)}
+                  className="ml-1 text-xs text-stone underline decoration-hairline underline-offset-2 hover:text-forest"
+                >
+                  Nulstil til hvid
+                </button>
+              </>
+            ) : (
+              <span className="ml-1 text-xs text-stone">Hvid (standard)</span>
+            )}
           </div>
         </div>
       </section>

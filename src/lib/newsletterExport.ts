@@ -5,6 +5,8 @@ import {
   CTA_BORDER_RADIUS_PX,
   CTA_PADDING_PX,
   IMAGE_ALIGN_CSS,
+  getTextAlign,
+  getFooterSocialsBlock,
   PRODUCT_CARD_GAP_PX,
   RICH_TEXT_BLOCK_TYPES,
   chunkSocialLinks,
@@ -14,11 +16,14 @@ import {
   getMasonryColumns,
   getMasonryGapPx,
   getMasonryLayout,
+  isMasonryFullBleed,
+  EMAIL_INNER_WIDTH_PX,
   getMasonryRadiusPx,
   MEDIA_CONTENT_WIDTH_PX,
   PRODUCT_CARD_RADIUS_PX,
   PRODUCT_ROW_PADDING_PX,
   SINGLE_CARD_WIDTH_PX,
+  isEdgeToEdgeImage,
   getGalleryCardWidth,
   getMediaRowSize,
   isCompactCardWidth,
@@ -121,11 +126,18 @@ function sizedImageSrc(src: string, width: number, square: boolean): string {
 // Preview):
 // - galleri-billederne beskæres kvadratisk i fast størrelse (sizedImageSrc,
 //   plus width/height-attributter),
-// - hvert kort er selve <td>'en med kanten (ikke en selvstændig tabel inde i
-//   en celle), så alle kort i samme <tr> får samme højde, uanset hvor mange
+// - hvert kort er selve <td>'en (ikke en selvstændig tabel inde i en
+//   celle), så alle kort i samme <tr> får samme højde, uanset hvor mange
 //   linjer produktnavnet fylder,
-// - kanten regnes MED i kortets bredde, så en fuld række fylder præcis de
-//   534px, der er plads til – ellers klemmer mail-klienten kortene.
+// - kortene har ingen kant; en fuld række fylder præcis de 534px, der er
+//   plads til – ellers klemmer mail-klienten kortene.
+// Produktvisningens tekst (navn/pris) står direkte på nyhedsbrevets
+// baggrund – sort som standard, ellers kontrastfarven til baggrundsfarven
+// (samme som Preview).
+function productTextColor(block: NewsletterBlock): string {
+  return block.sectionBgColor ? getContrastTextColor(block.sectionBgColor) : "#1a1a1a";
+}
+
 function renderMediaCardsHtml(
   block: NewsletterBlock,
   image: GeneratedNewsletter["image"],
@@ -141,20 +153,21 @@ function renderMediaCardsHtml(
   // "1 billede": ét kort i blokkens størrelse (Lille/Mellem/Fuld bredde).
   const cardsPerRow = isGallery ? getMediaRowSize(block) : 1;
   const cardWidth = isGallery ? getGalleryCardWidth(cardsPerRow) : SINGLE_CARD_WIDTH_PX[block.size ?? "fuld"];
-  // Kortets indhold (billedet) er kortet minus 1px kant i hver side.
-  const innerWidth = cardWidth - 2;
+  // "Kant til kant": hele mailens indre bredde, uden kortets ramme/radius
+  // og uden blokkens sidepadding (se isEdgeToEdgeImage).
+  const edgeToEdge = isEdgeToEdgeImage(block);
+  // Kortene har ingen kant – billedet fylder hele kortets bredde.
+  const innerWidth = cardWidth;
   const compact = isCompactCardWidth(cardWidth);
   const textSize = compact ? 11 : 13;
   const textPaddingX = compact ? 6 : 12;
-  const cardRadius = PRODUCT_CARD_RADIUS_PX[block.productBorderRadius ?? "afrundet"];
+  const cardRadius = edgeToEdge ? 0 : PRODUCT_CARD_RADIUS_PX[block.productBorderRadius ?? "afrundet"];
   const cardPadding = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
-  // Et kort uden tekst har billedet helt ned til bunden – da skal alle fire
-  // hjørner afrundes, ellers kun de to øverste. Kortets egen radius minus
-  // kanten, så billedets hjørne følger kantens indre bue.
-  function imageRadius(hasText: boolean): string {
-    const radius = Math.max(cardRadius - 1, 0);
-    if (radius === 0) return "";
-    return hasText ? `border-radius:${radius}px ${radius}px 0 0;` : `border-radius:${radius}px;`;
+  const textColor = productTextColor(block);
+  // Hjørne-valget gælder selve billedet (alle fire hjørner) – kortet har
+  // ingen kant eller afrunding.
+  function imageRadius(): string {
+    return cardRadius === 0 ? "" : `border-radius:${cardRadius}px;`;
   }
 
   // Mail-klienter gengiver typisk kun to skrift-vægte pålideligt
@@ -168,7 +181,7 @@ function renderMediaCardsHtml(
     const heightAttr = imageHeight ? ` height="${imageHeight}"` : "";
     const heightStyle = imageHeight ? `height:${imageHeight}px;object-fit:cover;` : "height:auto;";
     const img = card.src
-      ? `<img src="${escapeAttr(sizedImageSrc(card.src, innerWidth, isGallery))}" alt="${escapeAttr(card.alt)}" width="${innerWidth}"${heightAttr} style="width:${innerWidth}px;max-width:100%;${heightStyle}display:block;border:0;${imageRadius(hasText)}" />`
+      ? `<img src="${escapeAttr(sizedImageSrc(card.src, innerWidth, isGallery))}" alt="${escapeAttr(card.alt)}" width="${innerWidth}"${heightAttr} style="width:${innerWidth}px;max-width:100%;${heightStyle}display:block;border:0;${imageRadius()}" />`
       : "";
     const placeholderHeight = imageHeight ?? innerWidth;
     const imageHtml = !card.src
@@ -177,15 +190,15 @@ function renderMediaCardsHtml(
         ? `<a href="${escapeAttr(cardText.href)}" target="_blank" style="display:block;text-decoration:none;">${img}</a>`
         : img;
     const titleHtml = cardText.title
-      ? `<div style="font-weight:normal;color:#1a1a1a;font-size:${textSize}px;line-height:1.35;">${escapeHtml(cardText.title)}</div>`
+      ? `<div style="font-weight:normal;color:${textColor};font-size:${textSize}px;line-height:1.35;">${escapeHtml(cardText.title)}</div>`
       : "";
     const priceHtml = cardText.price
-      ? `<div style="font-weight:bold;color:#1a1a1a;font-size:${textSize}px;${cardText.title ? "padding-top:2px;" : ""}">${escapeHtml(cardText.price)}</div>`
+      ? `<div style="font-weight:bold;color:${textColor};font-size:${textSize}px;${cardText.title ? "padding-top:2px;" : ""}">${escapeHtml(cardText.price)}</div>`
       : "";
     const textRow = hasText
       ? `<tr><td align="center" style="padding:${cardPadding}px ${textPaddingX}px;text-align:center;font-family:${DEFAULT_FONT_FAMILY};">${titleHtml}${priceHtml}</td></tr>`
       : "";
-    return `<td valign="top" width="${innerWidth}" bgcolor="#ffffff" style="width:${innerWidth}px;padding:0;border:1px solid #1a1a1a;border-radius:${cardRadius}px;background:#ffffff;">
+    return `<td valign="top" width="${innerWidth}" style="width:${innerWidth}px;padding:0;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr><td style="padding:0;">${imageHtml}</td></tr>
                 ${textRow}
@@ -213,7 +226,7 @@ function renderMediaCardsHtml(
           </table>`;
     })
     .join("");
-  return `<tr><td style="padding:12px 32px;">
+  return `<tr><td align="${tableAlign}" style="padding:${edgeToEdge ? "0" : "12px 32px"};text-align:${tableAlign};">
         ${tables}
       </td></tr>`;
 }
@@ -232,17 +245,18 @@ function renderMediaListHtml(
   const listItems = resolveMediaListItems(block, products, customerType);
   if (listItems.length === 0) return ""; // Tom blok (intet billede/produkt valgt) – udelades af mailen.
   const rowPadding = PRODUCT_ROW_PADDING_PX[block.productDensity ?? "normal"];
+  const textColor = productTextColor(block);
   const rows = listItems
     .map((item) => {
       const title = item.title ? escapeHtml(item.title) : "";
       const titleHtml = item.href
-        ? `<a href="${escapeAttr(item.href)}" target="_blank" style="color:#1a1a1a;text-decoration:underline;font-family:${DEFAULT_FONT_FAMILY};">${title}</a>`
-        : `<span style="color:#1a1a1a;font-family:${DEFAULT_FONT_FAMILY};">${title}</span>`;
+        ? `<a href="${escapeAttr(item.href)}" target="_blank" style="color:${textColor};text-decoration:underline;font-family:${DEFAULT_FONT_FAMILY};">${title}</a>`
+        : `<span style="color:${textColor};font-family:${DEFAULT_FONT_FAMILY};">${title}</span>`;
       return `<tr>
             <td style="padding:${rowPadding}px 0;border-bottom:1px solid #e5e5e5;font-family:${DEFAULT_FONT_FAMILY};font-size:13px;">
               ${titleHtml}
             </td>
-            <td align="right" style="padding:${rowPadding}px 0 ${rowPadding}px 16px;border-bottom:1px solid #e5e5e5;font-family:${DEFAULT_FONT_FAMILY};font-size:13px;font-weight:bold;color:#1a1a1a;white-space:nowrap;text-align:right;">${item.price ? escapeHtml(item.price) : ""}</td>
+            <td align="right" style="padding:${rowPadding}px 0 ${rowPadding}px 16px;border-bottom:1px solid #e5e5e5;font-family:${DEFAULT_FONT_FAMILY};font-size:13px;font-weight:bold;color:${textColor};white-space:nowrap;text-align:right;">${item.price ? escapeHtml(item.price) : ""}</td>
           </tr>`;
     })
     .join("");
@@ -258,32 +272,44 @@ function renderMediaListHtml(
 // (Outlook) og style (øvrige klienter) og et <a> indeni – samme bulletproof-
 // teknik som CTA-knappen. Højst SOCIALS_PER_ROW knapper pr. række, ens med
 // Preview. Uden udfyldte links udelades blokken.
-function renderSocialsHtml(block: NewsletterBlock): string {
+// Selve knap-rækkerne (centrerede tabeller) – bruges både af socials-blokken
+// og af footeren, når knapperne er placeret dér.
+function renderSocialButtonTables(block: NewsletterBlock): string {
   const links = getSocialLinks(block);
-  if (links.length === 0) return "";
   const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
   const bgColor = block.bgColor || "#111111";
-  const isOutline = (block.ctaStyle ?? "udfyldt") === "kontur";
-  const textColor = isOutline ? bgColor : block.textColor || getContrastTextColor(bgColor);
+  const style = block.ctaStyle ?? "udfyldt";
+  // "kontur" og "tekst" (kun links, ingen kant/baggrund) bruger knapfarven
+  // som tekstfarve.
+  const isOutline = style === "kontur";
+  const isTextOnly = style === "tekst";
+  const textColor = isOutline || isTextOnly ? bgColor : block.textColor || getContrastTextColor(bgColor);
   const radius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "pille"];
-  const cellBgcolorAttr = isOutline ? "" : ` bgcolor="${bgColor}"`;
-  const cellFill = isOutline ? `border:2px solid ${bgColor};` : `background:${bgColor};`;
-  const heading = block.socialHeading?.trim();
-  const headingRow = heading
-    ? `<tr><td style="padding:12px 32px 0;text-align:center;font-family:${fontFamily};font-size:13px;font-weight:bold;color:#1a1a1a;">${escapeHtml(heading)}</td></tr>`
-    : "";
-  const rows = chunkSocialLinks(links)
+  const cellBgcolorAttr = isOutline || isTextOnly ? "" : ` bgcolor="${bgColor}"`;
+  const cellFill = isTextOnly ? "" : isOutline ? `border:2px solid ${bgColor};` : `background:${bgColor};`;
+  const cellPadding = isTextOnly ? "2px 6px" : "6px 14px";
+  return chunkSocialLinks(links)
     .map((row, rowIndex) => {
       const cells = row
         .map(
           (link) =>
-            `<td${cellBgcolorAttr} align="center" style="${cellFill}border-radius:${radius}px;padding:6px 14px;font-family:${fontFamily};"><a href="${escapeAttr(link.url)}" target="_blank" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-size:12px;font-weight:bold;line-height:1.25;display:inline-block;">${escapeHtml(link.label)}</a></td>`,
+            `<td${cellBgcolorAttr} align="center" style="${cellFill}border-radius:${radius}px;padding:${cellPadding};font-family:${fontFamily};"><a href="${escapeAttr(link.url)}" target="_blank" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-size:12px;font-weight:bold;line-height:1.25;display:inline-block;">${escapeHtml(link.label)}</a></td>`,
         )
         .join(`<td width="8" style="width:8px;font-size:0;line-height:0;">&nbsp;</td>`);
       return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:${rowIndex === 0 ? "0" : "8px"} auto 0;border-collapse:separate;"><tr>${cells}</tr></table>`;
     })
     .join("");
-  return `${headingRow}<tr><td style="padding:${heading ? "8px" : "12px"} 32px 12px;">${rows}</td></tr>`;
+}
+
+function renderSocialsHtml(block: NewsletterBlock): string {
+  const links = getSocialLinks(block);
+  if (links.length === 0) return "";
+  const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
+  const heading = block.socialHeading?.trim();
+  const headingRow = heading
+    ? `<tr><td style="padding:12px 32px 0;text-align:center;font-family:${fontFamily};font-size:13px;font-weight:bold;color:#1a1a1a;">${escapeHtml(heading)}</td></tr>`
+    : "";
+  return `${headingRow}<tr><td style="padding:${heading ? "8px" : "12px"} 32px 12px;">${renderSocialButtonTables(block)}</td></tr>`;
 }
 
 // Billedeblokken: masonry-gitter af egne uploadede billeder. Outlook
@@ -299,16 +325,20 @@ function renderMasonryHtml(block: NewsletterBlock): string {
   const gap = getMasonryGapPx(block);
   const radius = getMasonryRadiusPx(block);
   const radiusStyle = radius > 0 ? `border-radius:${radius}px;` : "";
-  // Fuld bredde: hvert billede i hele indholdsbredden, under hinanden.
+  // Fuld bredde: hvert billede i hele indholdsbredden, under hinanden – eller
+  // "kant til kant" i hele mailens indre bredde uden padding (se
+  // isMasonryFullBleed).
   if (getMasonryLayout(block) === "fuld") {
+    const fullBleed = isMasonryFullBleed(block);
+    const imageWidth = fullBleed ? EMAIL_INNER_WIDTH_PX : MEDIA_CONTENT_WIDTH_PX;
     const rows = images
       .map((masonryImage, index) => {
-        const height = Math.round((masonryImage.height / masonryImage.width) * MEDIA_CONTENT_WIDTH_PX);
+        const height = Math.round((masonryImage.height / masonryImage.width) * imageWidth);
         const paddingBottom = index === images.length - 1 ? 0 : gap;
-        return `<tr><td style="padding:0 0 ${paddingBottom}px 0;"><img src="${escapeAttr(masonryImage.src)}" alt="${escapeAttr(masonryImage.altText ?? "")}" width="${MEDIA_CONTENT_WIDTH_PX}" height="${height}" style="width:${MEDIA_CONTENT_WIDTH_PX}px;max-width:100%;height:auto;display:block;border:0;${radiusStyle}" /></td></tr>`;
+        return `<tr><td style="padding:0 0 ${paddingBottom}px 0;"><img src="${escapeAttr(masonryImage.src)}" alt="${escapeAttr(masonryImage.altText ?? "")}" width="${imageWidth}" height="${height}" style="width:${imageWidth}px;max-width:100%;height:auto;display:block;border:0;${radiusStyle}" /></td></tr>`;
       })
       .join("");
-    return `<tr><td style="padding:12px 32px;">
+    return `<tr><td style="padding:${fullBleed ? "0" : "12px 32px"};">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table>
       </td></tr>`;
   }
@@ -353,6 +383,8 @@ function renderBlockHtml(
   customerType: CustomerType,
   products: ShopifyProduct[],
   brand: BrandSettings,
+  // Socials-blokken, der vises inde i footeren (se getFooterSocialsBlock).
+  footerSocials?: NewsletterBlock,
 ): string {
   switch (block.type) {
     case "header": {
@@ -380,14 +412,14 @@ function renderBlockHtml(
       // CSS-regel (`[&_p]:m-0`), som ikke findes i det kopierede HTML-fragment
       // (ingen <style>-blok) – sat eksplicit her i stedet, så det matcher.
       const heading = (block.content ?? "").replace(/<p>/g, '<p style="margin:0">');
-      return `<tr><td style="padding:12px 32px;"><div style="color:#3a5837;font-size:${fontSize};font-family:${fontFamily};${colorStyle}">${heading}</div></td></tr>`;
+      return `<tr><td style="padding:28px 32px 12px;text-align:${getTextAlign(block)};"><div style="color:#3a5837;font-size:${fontSize};font-family:${fontFamily};text-align:${getTextAlign(block)};${colorStyle}">${heading}</div></td></tr>`;
     }
 
     case "brodtekst": {
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
       const fontSize = block.fontSize ? `${block.fontSize}px` : "14px";
       const colorStyle = block.textColor ? `color:${block.textColor};` : "";
-      return `<tr><td style="padding:12px 32px;color:#4a5565;font-size:${fontSize};line-height:1.5;font-family:${fontFamily};${colorStyle}">${styleBrodtekstParagraphs(block.content ?? "")}</td></tr>`;
+      return `<tr><td style="padding:12px 32px;color:#4a5565;font-size:${fontSize};line-height:1.5;font-family:${fontFamily};text-align:${getTextAlign(block)};${colorStyle}">${styleBrodtekstParagraphs(block.content ?? "")}</td></tr>`;
     }
 
     // "billede" er den eneste type, ny kode fra nu af producerer; "img" og
@@ -408,14 +440,15 @@ function renderBlockHtml(
       return renderSocialsHtml(block);
 
     case "skillelinje":
-      // Skillelinjen er altid sort (samme som Preview).
-      return `<tr><td style="padding:12px 32px;"><hr style="border:none;border-top:1px solid #000000;margin:0;" /></td></tr>`;
+      // Skillelinjen er sort – eller kontrastfarven på en mørk baggrund
+      // (samme som Preview).
+      return `<tr><td style="padding:12px 32px;"><hr style="border:none;border-top:1px solid ${block.sectionBgColor ? getContrastTextColor(block.sectionBgColor) : "#000000"};margin:0;" /></td></tr>`;
 
     case "tekst": {
       const fontFamily = block.fontFamily || DEFAULT_FONT_FAMILY;
       const fontSize = block.fontSize ? `${block.fontSize}px` : "14px";
       const colorStyle = block.textColor ? `color:${block.textColor};` : "";
-      return `<tr><td style="padding:12px 32px;"><div style="color:#4a5565;font-size:${fontSize};line-height:1.6;font-family:${fontFamily};${colorStyle}">${block.content ?? ""}</div></td></tr>`;
+      return `<tr><td style="padding:12px 32px;text-align:${getTextAlign(block)};"><div style="color:#4a5565;font-size:${fontSize};line-height:1.6;font-family:${fontFamily};text-align:${getTextAlign(block)};${colorStyle}">${block.content ?? ""}</div></td></tr>`;
     }
 
     case "produkt": {
@@ -449,12 +482,12 @@ function renderBlockHtml(
       // jf. opgavebeskrivelsen).
       const radiusStyle = `border-radius:${borderRadius}px;`;
       // "kontur": ingen baggrund (så intet bgcolor-attribut heller, kun en
-      // 2px kant i bgColor). "udfyldt": bgcolor-attribut BÅDE som attribut
+      // 0,5px kant i bgColor). "udfyldt": bgcolor-attribut BÅDE som attribut
       // (for Outlook) og som style (for alt andet) – samme mønster som
       // header/footer.
       const cellBgcolorAttr = isOutline ? "" : ` bgcolor="${bgColor}"`;
       const cellFillStyle = isOutline
-        ? `border:2px solid ${bgColor};`
+        ? `border:0.5px solid ${bgColor};`
         : `background:${bgColor};`;
       // Knap-TEKSTENS farve: i kontur-stil er den altid selve kant-farven
       // (bgColor); i udfyldt stil følger den en global/per-blok
@@ -480,14 +513,24 @@ function renderBlockHtml(
       // "inline-block"-knappens højde markant op (bekræftet: uden denne
       // fix blev den fulde knap 63px høj mod Previews 39,5px).
       const label = (block.content ?? "").replace(/<\/?p[^>]*>/g, "");
-      return `<tr><td style="padding:12px 32px;text-align:center;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
+      // align="center" også som ATTRIBUT på cellen – flere mobile mailapps
+      // (Gmail/Outlook-appen) ignorerer CSS-centrering og margin:auto, så
+      // knappen ellers lægger sig i venstre side på mobil.
+      // Centrering via tre celler: to tomme sideceller på 50 % hver og knappen
+      // i midtercellen, som krymper til knappens egen bredde. Tabel-layoutet
+      // fordeler den ledige plads ligeligt på begge sider, så knappen står i
+      // midten UDEN at være afhængig af align/text-align/margin:auto – som
+      // Gmail-appen på iPhone ikke respekterer for knappen (den lagde sig i
+      // venstre side, mens al tekst stod korrekt i midten).
+      const href = escapeAttr(block.ctaUrl || "#");
+      return `<tr><td style="padding:12px 32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:separate;border-spacing:0;">
           <tr>
-            <td${cellBgcolorAttr} style="${cellFillStyle}${radiusStyle}${paddingStyle}font-family:${fontFamily};" align="center">
-              <a href="${escapeAttr(block.ctaUrl || "#")}" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-weight:600;font-size:${fontSize};line-height:19.5px;display:inline-block;">
-                ${label}
-              </a>
+            <td width="50%" style="width:50%;font-size:0;line-height:0;">&nbsp;</td>
+            <td${cellBgcolorAttr} align="center" style="${cellFillStyle}${radiusStyle}${paddingStyle}font-family:${fontFamily};white-space:nowrap;text-align:center;">
+              <a href="${href}" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-weight:600;font-size:${fontSize};line-height:19.5px;display:inline-block;white-space:nowrap;">${label}</a>
             </td>
+            <td width="50%" style="width:50%;font-size:0;line-height:0;">&nbsp;</td>
           </tr>
         </table>
       </td></tr>`;
@@ -497,8 +540,17 @@ function renderBlockHtml(
       const bgColor = block.bgColor || "#f5f7f4";
       // Valgt tekstfarve – ellers automatisk sort/hvid efter baggrunden.
       const textColor = block.textColor || getContrastTextColor(bgColor);
-      return `<tr><td bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">
-        ${escapeHtml(formatFooterAddressLine(brand))}<br/>
+      // Sociale medier placeret i footeren: lige under adressen.
+      const socialsHeading = footerSocials?.socialHeading?.trim();
+      const socialsHtml = footerSocials
+        ? `<div align="center" style="padding:10px 0 12px;text-align:center;">${
+            socialsHeading
+              ? `<div style="font-family:${footerSocials.fontFamily || DEFAULT_FONT_FAMILY};font-size:13px;font-weight:bold;color:${textColor};padding-bottom:8px;">${escapeHtml(socialsHeading)}</div>`
+              : ""
+          }${renderSocialButtonTables(footerSocials)}</div>`
+        : "<br/>";
+      return `<tr><td align="center" bgcolor="${bgColor}" style="background:${bgColor};color:${textColor};border-top:1px solid #d2ddd1;padding:20px 32px;text-align:center;font-size:11px;font-family:${DEFAULT_FONT_FAMILY};">
+        ${escapeHtml(formatFooterAddressLine(brand))}${socialsHtml}
         Du modtager dette nyhedsbrev, fordi du er ${escapeHtml(audienceFor(customerType))}.<br/>
         <a href="${escapeAttr(getUnsubscribeUrl())}" style="color:${textColor};font-family:${DEFAULT_FONT_FAMILY};">Afmeld nyhedsbrevet</a>
       </td></tr>`;
@@ -597,14 +649,33 @@ export function buildNewsletterHtml(
   products: ShopifyProduct[],
   brand: BrandSettings,
 ): string {
+  const footerSocials = getFooterSocialsBlock(blocks);
   const rows = blocks
     .filter(isExportable)
-    .map((block) => renderBlockHtml(block, image, customerType, products, brand))
+    // En socials-blok placeret i footeren vises dér, ikke på sin egen plads.
+    .filter((block) => block.id !== footerSocials?.id)
+    .map((block) => {
+      const html = renderBlockHtml(block, image, customerType, products, brand, footerSocials);
+      // Nyhedsbrevets baggrundsfarve: blokkens rækker pakkes i én celle med
+      // baggrunden (både bgcolor-attribut og CSS, som Outlook kræver).
+      if (!block.sectionBgColor || !html) return html;
+      const color = block.sectionBgColor;
+      return `<tr><td bgcolor="${color}" style="background:${color};padding:0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="${color}" style="background:${color};"><tbody>${html}</tbody></table>
+      </td></tr>`;
+    })
     .join("\n");
 
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:100%;margin:0 auto;border:1px solid #d2ddd1;border-radius:16px;border-collapse:separate;border-spacing:0;overflow:hidden;font-family:${DEFAULT_FONT_FAMILY};">
+  // Flydende bredde: 100 % af skærmen, men højst 600px. En fast width="600"
+  // gør mailen bredere end en mobilskærm (tabeller ignorerer ofte
+  // max-width), så Gmail-appen skalerer den på sin egen måde, og indhold
+  // som CTA-knappen lander skævt. Outlook på Windows forstår ikke max-width
+  // og får derfor en fast 600px-ramme via en betinget kommentar.
+  return `<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" align="center"><tr><td><![endif]-->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:600px;margin:0 auto;border:1px solid #d2ddd1;border-radius:16px;border-collapse:separate;border-spacing:0;overflow:hidden;font-family:${DEFAULT_FONT_FAMILY};">
     <tbody>${rows}</tbody>
-  </table>`.trim();
+  </table>
+  <!--[if mso]></td></tr></table><![endif]-->`.trim();
 }
 
 // Ren tekst-udgave, brugt som fallback ("text/plain") for udklipsholdere/felter der

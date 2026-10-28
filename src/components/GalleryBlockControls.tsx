@@ -86,7 +86,7 @@ function GallerySlotUpload({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden border border-dashed border-neutral-400 bg-white text-neutral-400 hover:border-black"
+          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden border border-dashed border-hairline bg-white text-stone hover:border-forest"
           aria-label={upload.imageUrl ? "Udskift billede" : "Vælg billede"}
         >
           {upload.imageUrl ? (
@@ -99,24 +99,24 @@ function GallerySlotUpload({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="border border-neutral-300 bg-white px-2.5 py-1 font-jetbrains text-xs text-neutral-700 hover:border-black"
+          className="rounded-xs border border-hairline bg-white px-2.5 py-1 text-xs text-stone-dark hover:border-plant-hover hover:bg-plant-hover hover:text-white"
         >
           {upload.imageUrl ? "Udskift billede" : "Upload billede"}
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="sr-only" />
       </div>
-      {error && <p className="font-jetbrains text-[11px] text-red-600">{error}</p>}
+      {error && <p className="text-[11px] text-red-600">{error}</p>}
       <label className="flex flex-col gap-1">
-        <span className="font-jetbrains text-[11px] text-neutral-600">
-          Alt-tekst <span className="text-neutral-400">(Anbefalet)</span>
+        <span className="text-[11px] text-stone-dark">
+          Alt-tekst <span className="text-stone">(Anbefalet)</span>
         </span>
         <input
           type="text"
           value={upload.altText ?? ""}
           onChange={(event) => onChange({ ...upload, altText: event.target.value })}
           placeholder="Beskriv billedet (vises hvis billedet ikke indlæses)"
-          className={`rounded-none border bg-white px-2 py-1.5 font-jetbrains text-xs text-neutral-900 focus:border-black focus:outline-none ${
-            upload.altText ? "border-neutral-300" : "border-amber-300"
+          className={`rounded-xs border bg-white px-2 py-1.5 text-xs text-ink-deep focus:border-forest focus:outline-none ${
+            upload.altText ? "border-hairline" : "border-amber-300"
           }`}
         />
       </label>
@@ -169,7 +169,7 @@ export function GalleryBlockControls({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <span className="font-jetbrains text-xs font-bold tracking-wider text-neutral-700 uppercase">Billedpladser:</span>
+        <span className="text-xs font-semibold tracking-wider text-stone-dark uppercase">Billedpladser:</span>
         {slots.map((slot) => {
           const product =
             slot.kind === "product" ? products.find((item) => item.id === slot.productId) : undefined;
@@ -178,18 +178,18 @@ export function GalleryBlockControls({
           // uændret.
           const [productName, ...productVariant] = product ? product.title.split(" - ") : [];
           return (
-            <div key={slot.index} className="flex flex-col gap-3 border border-neutral-300 bg-[#fafaf8] p-3">
+            <div key={slot.index} className="flex flex-col gap-3 border border-hairline bg-white p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center bg-black font-jetbrains text-xs font-bold text-white">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xs bg-forest text-xs font-semibold text-white">
                     {slot.index + 1}
                   </span>
                   <div className="min-w-0">
-                    <span className="block truncate font-jetbrains text-xs font-bold text-neutral-900">
+                    <span className="block truncate text-xs font-semibold text-ink-deep">
                       Plads {slot.index + 1}:{" "}
                       {slot.kind === "upload" ? "Eget billede" : (productName ?? "Intet produkt valgt")}
                     </span>
-                    <span className="block truncate font-jetbrains text-[11px] text-neutral-500">
+                    <span className="block truncate text-[11px] text-stone">
                       {slot.kind === "upload"
                         ? "Upload et billede herunder"
                         : product
@@ -200,7 +200,7 @@ export function GalleryBlockControls({
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   {product && (
-                    <span className="mr-1 font-jetbrains text-xs font-bold whitespace-nowrap text-neutral-900 tabular-nums">
+                    <span className="mr-1 text-xs font-semibold whitespace-nowrap text-ink-deep tabular-nums">
                       {formatPriceForCustomer(product.price, customerType)}
                     </span>
                   )}
@@ -210,10 +210,10 @@ export function GalleryBlockControls({
                       type="button"
                       onClick={() => onSlotModeChange(slot.index, option.value)}
                       aria-pressed={slot.kind === option.value}
-                      className={`border px-2.5 py-1 font-jetbrains text-xs transition-colors ${
+                      className={`border px-2.5 py-1 text-xs transition-colors ${
                         slot.kind === option.value
-                          ? "border-black bg-white font-medium text-black"
-                          : "border-neutral-300 bg-white text-neutral-500 hover:border-black"
+                          ? "border-forest bg-white font-medium text-forest"
+                          : "border-hairline bg-white text-stone hover:border-plant-hover hover:bg-plant-hover hover:text-white"
                       }`}
                     >
                       {option.label}
@@ -234,18 +234,18 @@ export function GalleryBlockControls({
 
       {productSlotCount > 0 &&
         (!hasEnoughProducts ? (
-          <p className="border border-amber-300 bg-amber-50 px-2.5 py-2 font-jetbrains text-[11px] text-amber-800">
+          <p className="border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
             Du har kun valgt {availableProducts.length}{" "}
             {availableProducts.length === 1 ? "produkt" : "produkter"} med billede på &quot;Vælg produkter&quot;-siden
             – vælg mindst {productSlotCount} dér, eller brug &quot;Upload eget billede&quot; på flere pladser.
           </p>
         ) : (
-          <div className="flex flex-col gap-2 border-t border-neutral-200 pt-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 font-jetbrains">
-              <span className="text-xs font-bold tracking-wider text-neutral-800 uppercase">
+          <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold tracking-wider text-ink-deep uppercase">
                 Vælg produkter ({selectedProductIds.length}/{productSlotCount} valgt)
               </span>
-              <span className="text-[11px] text-neutral-500 uppercase">{availableProducts.length} matchede produkter</span>
+              <span className="text-[11px] text-stone uppercase">{availableProducts.length} matchede produkter</span>
             </div>
             <SearchableProductChecklist
               products={availableProducts}
