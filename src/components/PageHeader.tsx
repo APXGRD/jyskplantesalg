@@ -6,12 +6,14 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, rightSlot }: PageHeaderProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-4 md:px-8 md:py-5">
+    <section className="flex flex-col justify-between gap-4 pt-8 pb-6 md:flex-row md:items-end">
       <div>
-        <h1 className="text-[17px] font-semibold text-ink">{title}</h1>
-        {subtitle && <p className="pt-0.5 text-[13px] text-ink-muted">{subtitle}</p>}
+        <h1 className="font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-forest md:text-4xl md:leading-[1.25]">
+          {title}
+        </h1>
+        {subtitle && <p className="pt-1 text-sm text-stone">{subtitle}</p>}
       </div>
       {rightSlot && <div className="flex flex-wrap items-center gap-3">{rightSlot}</div>}
-    </div>
+    </section>
   );
 }

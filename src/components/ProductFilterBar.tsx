@@ -15,7 +15,7 @@ interface ProductFilterBarProps {
 }
 
 const selectClassName =
-  "w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-8 text-[13px] text-ink-muted focus:outline-none";
+  "h-11 w-full min-w-[160px] cursor-pointer appearance-none rounded-xs border-[0.5px] border-forest bg-white pr-8 pl-3.5 text-sm text-ink-deep focus:ring-1 focus:ring-forest/30 focus:outline-none";
 
 export function ProductFilterBar({
   search,
@@ -30,15 +30,15 @@ export function ProductFilterBar({
   onOnlyWithImageChange,
 }: ProductFilterBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-3.5 md:px-8">
-      <div className="relative min-w-40 flex-1 sm:min-w-55">
-        <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
+    <section className="mb-6 flex w-full flex-wrap items-center gap-2 rounded-xs border border-hairline bg-white p-2">
+      <div className="relative min-w-40 grow sm:min-w-55">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-stone" />
         <input
           type="text"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Søg efter produktnavn..."
-          className="w-full rounded-lg border border-border bg-surface py-2 pr-4 pl-9 text-[13px] text-ink-muted placeholder:text-ink-faint focus:outline-none"
+          className="h-11 w-full rounded-xs border border-transparent bg-transparent pr-4 pl-10 text-sm text-ink-deep transition-all placeholder:text-stone focus:border-forest focus:outline-none"
         />
       </div>
 
@@ -55,7 +55,7 @@ export function ProductFilterBar({
             </option>
           ))}
         </select>
-        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-3 w-3 -translate-y-1/2 text-ink-muted" />
+        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-3 w-3 -translate-y-1/2 text-forest" />
       </div>
 
       <div className="relative">
@@ -67,10 +67,10 @@ export function ProductFilterBar({
             </option>
           ))}
         </select>
-        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-3 w-3 -translate-y-1/2 text-ink-muted" />
+        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-3 w-3 -translate-y-1/2 text-forest" />
       </div>
 
       <OnlyWithImageCheckbox checked={onlyWithImage} onChange={onOnlyWithImageChange} />
-    </div>
+    </section>
   );
 }

@@ -3,23 +3,23 @@
 // Ramme fra Stitch-redesignet ("Jysk Plantesalg Nyhedsbrevgenerator"): lys
 // baggrund, topbar med firmanavn i EB Garamond, navigation i DM Sans med
 // streg under den aktive side, log ud + avatar til højre, og en
-// footer med "Inviter bruger". Samme navigation og log ud som TopNav.
+// footer med "Inviter bruger".
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { HOME_ITEM, NAV_ITEMS, type TopNavPage } from "@/components/TopNav";
+import { HOME_ITEM, NAV_ITEMS, type NavPage } from "@/components/navItems";
 import { useBrandSettings } from "@/context/BrandSettingsContext";
 import { logout } from "@/app/login/actions";
 import { PlusIcon, UserIcon } from "@/components/icons";
 
 // previewName: live-forhåndsvisning af firmanavnet, mens det skrives på
-// Indstillinger-siden (før gem) – samme som TopNav/PlantShell.
+// Indstillinger-siden (før gem).
 export function EditorialShell({
   active,
   previewName,
   children,
 }: {
-  active?: TopNavPage;
+  active?: NavPage;
   previewName?: string;
   children: ReactNode;
 }) {

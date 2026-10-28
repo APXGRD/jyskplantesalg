@@ -1,6 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import {
+  dialogCancelButtonClassName,
+  dialogDescriptionClassName,
+  dialogErrorClassName,
+  dialogFieldClassName,
+  dialogLabelClassName,
+  dialogOverlayClassName,
+  dialogPanelClassName,
+  dialogPrimaryButtonClassName,
+  dialogTitleClassName,
+} from "@/components/dialogStyles";
 
 interface SaveTemplateDialogProps {
   onClose: () => void;
@@ -32,52 +43,52 @@ export function SaveTemplateDialog({ onClose, onSave }: SaveTemplateDialogProps)
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center px-4">
-      <button type="button" aria-label="Luk" onClick={onClose} className="absolute inset-0 bg-black/30" />
+      <button type="button" aria-label="Luk" onClick={onClose} className={dialogOverlayClassName} />
 
-      <div className="relative w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
-        <h2 className="text-[15px] font-semibold text-ink">Gem som skabelon</h2>
-        <p className="pt-1 text-[13px] text-ink-muted">
+      <div className={dialogPanelClassName}>
+        <h2 className={dialogTitleClassName}>Gem som skabelon</h2>
+        <p className={dialogDescriptionClassName}>
           Gemmer kun blokkenes opbygning og styling – ikke den konkrete AI-tekst eller de valgte produkter.
         </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 pt-5">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-medium text-ink-muted">Navn</span>
+            <span className={dialogLabelClassName}>Navn</span>
             <input
               required
               autoFocus
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="F.eks. 'Grøn kampagne med galleri'"
-              className="w-full rounded-lg border border-border px-3 py-2 text-[13px] text-ink focus:outline-none focus:border-ink-faintest"
+              className={dialogFieldClassName}
             />
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-medium text-ink-muted">Beskrivelse (valgfri)</span>
+            <span className={dialogLabelClassName}>Beskrivelse (valgfri)</span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={3}
-              className="w-full resize-none rounded-lg border border-border px-3 py-2 text-[13px] text-ink focus:outline-none focus:border-ink-faintest"
+              className={`${dialogFieldClassName} resize-none`}
             />
           </label>
 
-          {error && <p className="text-[12px] text-red-600">{error}</p>}
+          {error && <p className={dialogErrorClassName}>{error}</p>}
 
           <div className="flex items-center gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="flex-1 px-4 py-2.5 rounded border border-neutral-300 bg-white font-jetbrains text-xs tracking-wider text-neutral-800 uppercase shadow-xs transition-colors hover:border-black hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className={dialogCancelButtonClassName}
             >
               Annullér
             </button>
             <button
               type="submit"
               disabled={!name.trim() || isSaving}
-              className="flex-1 px-4 py-2.5 rounded bg-black font-jetbrains text-xs font-semibold tracking-wider text-white uppercase transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300"
+              className={dialogPrimaryButtonClassName}
             >
               {isSaving ? "Gemmer..." : "Gem skabelon"}
             </button>
