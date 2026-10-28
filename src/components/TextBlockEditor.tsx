@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type FocusEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FocusEvent } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { Placeholder } from "@tiptap/extensions";
 import { ColorSwatches } from "@/components/ColorSwatches";
 import { FONT_FAMILIES } from "@/lib/fontFamilies";
+import { DARK_TEXT_COLOR, getContrastTextColor } from "@/lib/brandColors";
 import { BoldIcon, ChevronDownIcon, ItalicIcon, MinusIcon, PlusIcon, UnderlineIcon } from "@/components/icons";
 
 interface TextBlockEditorProps {
@@ -24,6 +25,11 @@ interface TextBlockEditorProps {
   fontFamily?: string;
   fontSize?: number;
   textColor?: string;
+  // Fladen bag teksten i editoren – typisk nyhedsbrevets baggrundsfarve
+  // (sectionBgColor), så teksten ses på samme baggrund som i nyhedsbrevet.
+  // Uden den, men med en lys tekstfarve (fx hvid), bruges en mørk flade, så
+  // teksten altid kan læses (se editorSurface).
+  backgroundColor?: string;
   // Sat af værktøjslinjens skrifttype-dropdown/størrelse-stepper herunder –
   // opdaterer HELE blokkens fontFamily/fontSize-felt med det samme (samme
   // mønster som textColor, se ColorSwatches-brugen ved kalderen i
@@ -51,7 +57,7 @@ const MAX_FONT_SIZE = 36;
 
 const toolbarIconButtonClassName = (active: boolean) =>
   `flex h-7 w-7 items-center justify-center ${
-    active ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-100 hover:text-black"
+    active ? "bg-forest text-white" : "text-stone-dark hover:bg-track hover:text-forest"
   }`;
 
 const EDITOR_EXTENSIONS = [
@@ -72,12 +78,28 @@ const EDITOR_EXTENSIONS = [
   Color,
 ];
 
+const HEX_COLOR = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+// Mørk, neutral flade til lys tekst uden en valgt baggrundsfarve.
+const DARK_EDITOR_SURFACE = "#3d4540";
+
+// Baggrunden bag teksten i editoren: nyhedsbrevets baggrundsfarve, hvis den
+// er sat – ellers en mørk flade, når tekstfarven er så lys, at den ikke kan
+// ses på den lyse standardflade (fx hvid tekst). undefined = standardfladen.
+function editorSurface(textColor: string | undefined, backgroundColor: string | undefined): string | undefined {
+  if (backgroundColor) return backgroundColor;
+  if (textColor && HEX_COLOR.test(textColor) && getContrastTextColor(textColor) === DARK_TEXT_COLOR) {
+    return DARK_EDITOR_SURFACE;
+  }
+  return undefined;
+}
+
 export function TextBlockEditor({
   content,
   onChange,
   fontFamily,
   fontSize,
   textColor,
+  backgroundColor,
   onFontFamilyChange,
   onFontSizeChange,
   showColorPicker = true,
@@ -111,7 +133,7 @@ export function TextBlockEditor({
           // fejl, ser det bare ud som om den per-blok størrelse-/
           // farve-vælger ikke gør noget i selve Edit-mode-listen.
           class:
-            "outline-none leading-relaxed border border-neutral-300 bg-[#fdfdfb] p-3 focus:border-black transition-colors",
+            "outline-none leading-relaxed border border-hairline bg-[var(--editor-surface,#ffffff)] p-3 focus:border-forest transition-colors",
         },
       },
       onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -225,16 +247,23 @@ export function TextBlockEditor({
       // her ville selve tekstfeltet (nu uden sin tidligere faste
       // text-[13px]-class, se editorProps ovenfor) i stedet arve
       // block-kortets egen, langt større skriftstørrelse.
-      style={{ fontFamily, fontSize: `${fontSize ?? DEFAULT_FONT_SIZE}px`, color: textColor || "var(--ink)" }}
+      style={
+        {
+          fontFamily,
+          fontSize: `${fontSize ?? DEFAULT_FONT_SIZE}px`,
+          color: textColor || "var(--ink)",
+          "--editor-surface": editorSurface(textColor, backgroundColor),
+        } as CSSProperties
+      }
     >
       {isFocused && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 flex h-11 w-fit items-center gap-0.5 border border-black bg-white px-2 font-jetbrains shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)]">
+        <div className="absolute bottom-full left-0 z-10 mb-2 flex h-11 w-fit items-center gap-0.5 border border-hairline bg-white px-2 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)]">
           <div className="relative flex items-center">
             <select
               value={fontFamily ?? ""}
               onChange={(event) => onFontFamilyChange(event.target.value)}
               aria-label="Skrifttype"
-              className="appearance-none rounded-none bg-transparent py-1 pr-5 pl-2 text-xs text-neutral-700 hover:bg-neutral-100 focus:outline-none"
+              className="appearance-none rounded-xs bg-transparent py-1 pr-5 pl-2 text-xs text-stone-dark hover:bg-track focus:outline-none"
             >
               <option value="">Skrifttype</option>
               {FONT_FAMILIES.map((font) => (
@@ -243,10 +272,10 @@ export function TextBlockEditor({
                 </option>
               ))}
             </select>
-            <ChevronDownIcon className="pointer-events-none absolute right-1.5 h-2.5 w-2.5 text-neutral-500" />
+            <ChevronDownIcon className="pointer-events-none absolute right-1.5 h-2.5 w-2.5 text-stone" />
           </div>
 
-          <div className="mx-1 h-5 w-px bg-neutral-300" />
+          <div className="mx-1 h-5 w-px bg-hairline" />
 
           <div className="flex items-center gap-0.5" aria-label="Skriftstørrelse">
             <button
@@ -254,11 +283,11 @@ export function TextBlockEditor({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => stepFontSize(-1)}
               aria-label="Mindre skrift"
-              className="flex h-6 w-6 items-center justify-center text-neutral-600 hover:bg-neutral-100 hover:text-black"
+              className="flex h-6 w-6 items-center justify-center text-stone-dark hover:bg-track hover:text-forest"
             >
               <MinusIcon className="h-3 w-3" />
             </button>
-            <span className="w-4 text-center text-[11px] tabular-nums text-neutral-700">
+            <span className="w-4 text-center text-[11px] tabular-nums text-stone-dark">
               {fontSize ?? DEFAULT_FONT_SIZE}
             </span>
             <button
@@ -266,13 +295,13 @@ export function TextBlockEditor({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => stepFontSize(1)}
               aria-label="Større skrift"
-              className="flex h-6 w-6 items-center justify-center text-neutral-600 hover:bg-neutral-100 hover:text-black"
+              className="flex h-6 w-6 items-center justify-center text-stone-dark hover:bg-track hover:text-forest"
             >
               <PlusIcon className="h-3 w-3" />
             </button>
           </div>
 
-          <div className="mx-1 h-5 w-px bg-neutral-300" />
+          <div className="mx-1 h-5 w-px bg-hairline" />
 
           <button
             type="button"
@@ -310,7 +339,7 @@ export function TextBlockEditor({
 
           {showColorPicker && (
             <>
-              <div className="mx-1 h-5 w-px bg-neutral-300" />
+              <div className="mx-1 h-5 w-px bg-hairline" />
 
               <ColorSwatches
                 value={activeState.color}

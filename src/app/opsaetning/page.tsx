@@ -10,12 +10,16 @@
 // useEffect havde.
 
 import { getTemplateSummaries, type TemplateSummary } from "@/lib/templates";
-import { getCachedPlantForms } from "@/lib/cachedProducts";
+import { getCachedProducts } from "@/lib/cachedProducts";
+import { extractPlantForms } from "@/lib/productSync";
 import { OpsaetningClient } from "./OpsaetningClient";
 
 export default async function OpsaetningPage() {
   let initialTemplates: TemplateSummary[] = [];
   let initialPlantForms: string[] = [];
+  // Tidspunktet for sidste produkt-synkronisering fra Shopify – Opsætning
+  // viser det og synkroniserer automatisk, hvis det er over et døgn gammelt.
+  let initialProductsSyncedAt: string | null = null;
 
   try {
     initialTemplates = await getTemplateSummaries();
@@ -24,10 +28,18 @@ export default async function OpsaetningPage() {
   }
 
   try {
-    initialPlantForms = await getCachedPlantForms();
+    const { products, syncedAt } = await getCachedProducts();
+    initialPlantForms = extractPlantForms(products);
+    initialProductsSyncedAt = syncedAt;
   } catch (err) {
     console.error("Kunne ikke hente planteformer fra Supabase:", err);
   }
 
-  return <OpsaetningClient initialTemplates={initialTemplates} initialPlantForms={initialPlantForms} />;
+  return (
+    <OpsaetningClient
+      initialTemplates={initialTemplates}
+      initialPlantForms={initialPlantForms}
+      initialProductsSyncedAt={initialProductsSyncedAt}
+    />
+  );
 }

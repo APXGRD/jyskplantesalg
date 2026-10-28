@@ -34,6 +34,7 @@ const SIZE_OPTIONS: { value: ImageSize; label: string }[] = [
   { value: "lille", label: "Lille" },
   { value: "mellem", label: "Mellem" },
   { value: "fuld", label: "Fuld bredde" },
+  { value: "kant", label: "Kant til kant" },
 ];
 
 export function ImageBlockControls({
@@ -91,13 +92,13 @@ export function ImageBlockControls({
   return (
     <div ref={containerRef} onFocus={handleFocus} onBlur={handleBlur} className="relative">
       {isFocused && (
-        <div className="absolute bottom-full left-0 z-10 mb-2 w-80 border border-black bg-white p-3 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)]">
+        <div className="absolute bottom-full left-0 z-10 mb-2 w-80 border border-forest bg-white p-3 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.15)]">
           <div className="flex flex-col gap-3">
             <div>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full border border-black bg-white px-3 py-1.5 font-jetbrains text-xs font-medium text-black hover:bg-neutral-100"
+                className="w-full border border-forest bg-white px-3 py-1.5 text-xs font-medium text-forest hover:bg-track"
               >
                 Udskift billede
               </button>
@@ -111,16 +112,16 @@ export function ImageBlockControls({
             </div>
 
             <label className="flex flex-col gap-1">
-              <span className="font-jetbrains text-[11px] text-neutral-600">
-                Alt-tekst <span className="text-neutral-400">(Anbefalet)</span>
+              <span className="text-[11px] text-stone-dark">
+                Alt-tekst <span className="text-stone">(Anbefalet)</span>
               </span>
               <input
                 type="text"
                 value={altText ?? ""}
                 onChange={(event) => onAltTextChange(event.target.value)}
                 placeholder="Beskriv billedet (vises hvis billedet ikke indlæses)"
-                className={`rounded-none border bg-white px-2 py-1.5 font-jetbrains text-xs text-neutral-900 focus:border-black focus:outline-none ${
-                  altText ? "border-neutral-300" : "border-amber-300"
+                className={`rounded-xs border bg-white px-2 py-1.5 text-xs text-ink-deep focus:border-forest focus:outline-none ${
+                  altText ? "border-hairline" : "border-amber-300"
                 }`}
               />
             </label>
@@ -135,7 +136,7 @@ export function ImageBlockControls({
             )}
 
             <div className="flex flex-col gap-1">
-              <span className="font-jetbrains text-[11px] text-neutral-600">Justering:</span>
+              <span className="text-[11px] text-stone-dark">Justering:</span>
               <div className="flex gap-1">
                 {ALIGNMENT_OPTIONS.map((option) => (
                   <button
@@ -143,10 +144,10 @@ export function ImageBlockControls({
                     type="button"
                     onClick={() => onAlignmentChange(option.value)}
                     aria-pressed={alignment === option.value}
-                    className={`flex-1 border px-2 py-1 font-jetbrains text-[11px] ${
+                    className={`flex-1 border px-2 py-1 text-[11px] ${
                       alignment === option.value
-                        ? "border-black bg-neutral-200 font-bold text-black"
-                        : "border-neutral-300 bg-white text-neutral-600 hover:border-black"
+                        ? "border-forest bg-forest font-medium text-white"
+                        : "border-hairline bg-white text-stone-dark hover:border-plant-hover hover:bg-plant-hover hover:text-white"
                     }`}
                   >
                     {option.label}
@@ -156,7 +157,7 @@ export function ImageBlockControls({
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="font-jetbrains text-[11px] text-neutral-600">Størrelse:</span>
+              <span className="text-[11px] text-stone-dark">Størrelse:</span>
               <div className="flex gap-1">
                 {SIZE_OPTIONS.map((option) => (
                   <button
@@ -164,10 +165,10 @@ export function ImageBlockControls({
                     type="button"
                     onClick={() => onSizeChange(option.value)}
                     aria-pressed={size === option.value}
-                    className={`flex-1 border px-2 py-1 font-jetbrains text-[11px] ${
+                    className={`flex-1 border px-2 py-1 text-[11px] ${
                       size === option.value
-                        ? "border-black bg-neutral-200 font-bold text-black"
-                        : "border-neutral-300 bg-white text-neutral-600 hover:border-black"
+                        ? "border-forest bg-forest font-medium text-white"
+                        : "border-hairline bg-white text-stone-dark hover:border-plant-hover hover:bg-plant-hover hover:text-white"
                     }`}
                   >
                     {option.label}
@@ -187,10 +188,10 @@ export function ImageBlockControls({
         {imageUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element -- lokal base64 data-URI, next/image kan ikke optimere den */}
-            <img src={imageUrl} alt={altText ?? ""} className="h-32 w-full border border-neutral-300 object-cover" />
+            <img src={imageUrl} alt={altText ?? ""} className="h-32 w-full border border-hairline object-cover" />
             {/* Vises ved hover/fokus, så det er tydeligt, at billedet kan klikkes. */}
             <span
-              className={`absolute inset-0 flex items-center justify-center gap-1.5 bg-black/50 font-jetbrains text-xs font-medium text-white transition-opacity ${
+              className={`absolute inset-0 flex items-center justify-center gap-1.5 bg-black/50 text-xs font-medium text-white transition-opacity ${
                 isFocused ? "opacity-0" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
               }`}
             >
@@ -199,14 +200,14 @@ export function ImageBlockControls({
             </span>
           </>
         ) : (
-          <div className="flex h-20 items-center justify-center gap-2 border-2 border-dashed border-neutral-400 bg-white text-neutral-500 group-hover:border-black group-hover:text-black">
+          <div className="flex h-20 items-center justify-center gap-2 border-2 border-dashed border-hairline bg-white text-stone group-hover:border-forest hover:text-forest">
             <ImagePlaceholderIcon className="h-5 w-5" />
-            <span className="font-jetbrains text-xs">Klik for at tilføje billede</span>
+            <span className="text-xs">Klik for at tilføje billede</span>
           </div>
         )}
       </button>
       {imageUrl && !isFocused && (
-        <p className="pt-1.5 font-jetbrains text-[11px] text-neutral-500">
+        <p className="pt-1.5 text-[11px] text-stone">
           {caption
             ? "Klik på billedet for at udskifte det og ændre alt-tekst, overskrift, pris, justering og størrelse."
             : "Klik på billedet for at udskifte det og ændre alt-tekst, justering og størrelse."}

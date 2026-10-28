@@ -10,6 +10,7 @@
 import { getSupabaseClient } from "@/lib/supabase";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { extractSearchWordCandidates, normalizeWord, type SearchWordCandidate } from "@/lib/searchWords";
+import { extractPlantForms } from "@/lib/productSync";
 
 // PostgREST begrænser som standard ét enkelt select-svar til 1000 rækker
 // (db-max-rows), uanset det faktiske antal rækker i tabellen – uden denne
@@ -106,12 +107,7 @@ export async function getCachedProducts(): Promise<CachedProductsResult> {
 // separat Supabase-forespørgsel/pagineringslogik at holde synkron med den).
 export async function getCachedPlantForms(): Promise<string[]> {
   const { products } = await getCachedProducts();
-  const forms = new Set<string>();
-  for (const product of products) {
-    const trimmed = product.plantForm?.trim();
-    if (trimmed) forms.add(trimmed);
-  }
-  return [...forms].sort((a, b) => a.localeCompare(b, "da"));
+  return extractPlantForms(products);
 }
 
 // Simpel, DETERMINISTISK tekstsøgning (ingen AI involveret) – bruges af

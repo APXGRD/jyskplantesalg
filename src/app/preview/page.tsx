@@ -231,10 +231,6 @@ export default function PreviewPage() {
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-forest" />
               <span className="text-xs font-semibold tracking-widest text-stone uppercase">Trin 02 / Nyhedsbrev</span>
-              <span className="text-stone/40">·</span>
-              <span className="rounded-xs bg-mint px-2 py-0.5 text-xs font-semibold tracking-[0.12em] text-forest-hover">
-                {result ? "Kladde klar til udsendelse" : "Intet udkast endnu"}
-              </span>
             </div>
             <h1 className="font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-forest md:text-4xl md:leading-[1.25]">
               Preview / Rediger

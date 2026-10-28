@@ -74,13 +74,21 @@ export async function POST(req: NextRequest) {
   const subjectText = typeof body.subject === "string" && body.subject.trim() ? body.subject.trim() : "Nyhedsbrev";
   const subject = `[TEST] ${subjectText}`.slice(0, 200);
 
+  // Uploadede billeder (logo, billedblokke, egne galleri-billeder) ligger som
+  // base64 data-URI'er direkte i HTML'en. Det gør mailen så stor, at Gmail
+  // klipper den efter det første billede ("[Meddelelse klippet]" – kun
+  // header/logo kommer med), og Gmail/Outlook viser slet ikke data-URI-
+  // billeder. De trækkes derfor ud som indlejrede vedhæftninger (cid:), som
+  // alle almindelige mailklienter viser, og HTML'en bliver lille.
+  const { html: newsletterHtml, attachments } = extractInlineImages(body.html);
+
   // Et komplet HTML-dokument omkring nyhedsbrevets tabel, med en neutral
   // baggrund – som en rigtig nyhedsbrevs-mail.
   const html = `<!DOCTYPE html>
 <html lang="da">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${escapeHtml(subject)}</title></head>
 <body style="margin:0;padding:24px 12px;background:#f4f4f2;">
-${body.html}
+${newsletterHtml}
 </body>
 </html>`;
 
@@ -94,6 +102,7 @@ ${body.html}
         subject,
         html,
         text: typeof body.text === "string" ? body.text : undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
       }),
     });
     const result = await resendResponse.json().catch(() => null);
@@ -109,6 +118,35 @@ ${body.html}
     console.error("Kunne ikke kontakte Resend:", err);
     return NextResponse.json({ error: "Kunne ikke kontakte mailtjenesten. Prøv igen." }, { status: 502 });
   }
+}
+
+interface InlineAttachment {
+  content: string;
+  filename: string;
+  content_type: string;
+  content_id: string;
+}
+
+const DATA_URI_SRC_PATTERN = /src="data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)"/g;
+
+// Erstatter hvert src="data:image/...;base64,..." med src="cid:…" og
+// returnerer billederne som Resend-vedhæftninger med content_id (indlejrede
+// billeder). Samme billede (fx logoet flere steder) vedhæftes kun én gang.
+function extractInlineImages(html: string): { html: string; attachments: InlineAttachment[] } {
+  const attachments: InlineAttachment[] = [];
+  const idsByContent = new Map<string, string>();
+  const replaced = html.replace(DATA_URI_SRC_PATTERN, (_match, mimeType: string, base64: string) => {
+    const content = base64.replace(/\s/g, "");
+    let contentId = idsByContent.get(content);
+    if (!contentId) {
+      contentId = `billede-${attachments.length + 1}`;
+      idsByContent.set(content, contentId);
+      const extension = mimeType.split("/")[1]?.replace("jpeg", "jpg").replace("svg+xml", "svg") || "png";
+      attachments.push({ content, filename: `${contentId}.${extension}`, content_type: mimeType, content_id: contentId });
+    }
+    return `src="cid:${contentId}"`;
+  });
+  return { html: replaced, attachments };
 }
 
 function escapeHtml(value: string): string {
