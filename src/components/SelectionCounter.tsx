@@ -4,9 +4,9 @@ interface SelectionCounterProps {
 
 export function SelectionCounter({ count }: SelectionCounterProps) {
   return (
-    <span className="text-[13px] whitespace-nowrap">
-      <span className="font-semibold text-ink">{count}</span>{" "}
-      <span className="text-ink-muted">valgt</span>
+    <span className="text-sm whitespace-nowrap">
+      <span className="font-semibold text-forest">{count}</span>{" "}
+      <span className="text-stone">valgt</span>
     </span>
   );
 }

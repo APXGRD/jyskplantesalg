@@ -10,7 +10,7 @@ import { ProductFilterBar } from "@/components/ProductFilterBar";
 import { ProductTable } from "@/components/ProductTable";
 import { SelectionCounter } from "@/components/SelectionCounter";
 import { SelectionFooter } from "@/components/SelectionFooter";
-import { StitchShell } from "@/components/StitchShell";
+import { EditorialShell } from "@/components/EditorialShell";
 import { useNewsletter } from "@/context/NewsletterContext";
 import { formatRelativeTime } from "@/lib/format";
 
@@ -154,7 +154,7 @@ export function ProduktvaelgerClient({
       type="button"
       onClick={handleSync}
       disabled={isSyncing}
-      className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium text-ink-muted hover:bg-surface-active hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex h-10 items-center gap-2 rounded-xs border-[0.5px] border-forest bg-transparent px-4 text-[11px] font-semibold tracking-[0.06em] text-forest uppercase transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-forest disabled:hover:bg-transparent disabled:hover:text-forest"
     >
       {isSyncing ? (
         <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -166,8 +166,8 @@ export function ProduktvaelgerClient({
   );
 
   return (
-    <StitchShell>
-      <div className="flex min-w-0 flex-1 flex-col bg-surface">
+    <EditorialShell>
+      <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-5 pb-16 md:px-12">
         <PageHeader
           title="Vælg produkter"
           subtitle="Markér de planter, der skal indgå i nyhedsbrevet"
@@ -175,19 +175,19 @@ export function ProduktvaelgerClient({
             <>
               <div className="flex items-center gap-3">
                 {syncedAt && (
-                  <span className="text-[12px] text-ink-faint">
+                  <span className="text-xs text-stone">
                     Sidst opdateret: {formatRelativeTime(new Date(syncedAt))}
                   </span>
                 )}
                 {syncButton}
               </div>
-              <div className="mx-1 h-5 w-px bg-border" />
+              <div className="mx-1 h-5 w-px bg-hairline" />
               <SelectionCounter count={selectedIds.size} />
               <button
                 type="button"
                 onClick={goToNextStep}
                 disabled={selectedIds.size === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:opacity-100"
+                className="inline-flex h-10 items-center gap-2 rounded-xs bg-plant px-5 text-[11px] font-semibold tracking-[0.06em] text-white uppercase transition-colors hover:bg-plant-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-plant"
               >
                 Næste
                 <ChevronRightIcon className="h-3.5 w-3.5" />
@@ -197,7 +197,7 @@ export function ProduktvaelgerClient({
         />
 
         {syncError && (
-          <p className="border-b border-border bg-surface px-4 py-2 text-[12px] text-red-600 md:px-8">{syncError}</p>
+          <p className="mb-4 rounded-xs bg-rose-bg px-4 py-2 text-sm text-rose-ink">{syncError}</p>
         )}
 
         {isLoading ? (
@@ -206,9 +206,9 @@ export function ProduktvaelgerClient({
           <ErrorCard title="Kunne ikke hente produkter" message={loadError} onRetry={retryLoadProducts} />
         ) : products.length === 0 ? (
           <div className="flex flex-1 items-center justify-center">
-            <div className="flex max-w-md flex-col items-center gap-3 rounded-xl border border-border bg-surface p-8 text-center">
-              <p className="text-sm font-semibold text-ink">Ingen produkter synkroniseret endnu</p>
-              <p className="text-sm text-ink-muted">
+            <div className="flex max-w-md flex-col items-center gap-3 rounded-xs border border-hairline bg-white p-8 text-center">
+              <h2 className="font-garamond text-2xl leading-[1.35] font-medium text-forest">Ingen produkter synkroniseret endnu</h2>
+              <p className="text-sm text-stone">
                 Klik på &quot;Synkroniser produkter&quot; for at hente jeres produkter fra Shopify. Det kan tage
                 lidt tid ved mange produkter.
               </p>
@@ -216,7 +216,7 @@ export function ProduktvaelgerClient({
                 type="button"
                 onClick={handleSync}
                 disabled={isSyncing}
-                className="mt-1 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-1 inline-flex h-10 items-center gap-2 rounded-xs bg-plant px-5 text-[11px] font-semibold tracking-[0.06em] text-white uppercase transition-colors hover:bg-plant-hover disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-plant"
               >
                 {isSyncing ? (
                   <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -257,7 +257,7 @@ export function ProduktvaelgerClient({
             />
           </>
         )}
-      </div>
-    </StitchShell>
+      </main>
+    </EditorialShell>
   );
 }

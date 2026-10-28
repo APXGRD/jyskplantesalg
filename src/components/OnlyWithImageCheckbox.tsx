@@ -9,12 +9,12 @@ interface OnlyWithImageCheckboxProps {
 
 export function OnlyWithImageCheckbox({ checked, onChange }: OnlyWithImageCheckboxProps) {
   return (
-    <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-ink-muted">
+    <label className="flex h-11 cursor-pointer items-center gap-2 rounded-xs border-[0.5px] border-forest bg-white px-3.5 text-sm text-ink-deep">
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-3.5 w-3.5 rounded-sm border-zinc-400 accent-ink"
+        className="h-4 w-4 accent-forest"
       />
       Kun med billede
     </label>
