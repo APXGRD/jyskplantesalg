@@ -197,15 +197,15 @@ export function NewsletterCard({
       return (
         <div className="px-8 py-3">
           <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-xl bg-surface-active">
-            <ImagePlaceholderIcon className="h-9 w-9 text-ink-faint" />
-            <p className="text-xs text-ink-faint">{image.altText}</p>
+            <ImagePlaceholderIcon className="h-9 w-9 text-stone" />
+            <p className="text-xs text-stone">{image.altText}</p>
           </div>
         </div>
       );
     }
     return (
       <div className="px-8 py-3">
-        <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-surface-active text-xs text-ink-faint">
+        <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-surface-active text-xs text-stone">
           Vælg produkter til galleriet
         </div>
       </div>
@@ -251,7 +251,7 @@ export function NewsletterCard({
         />
       ) : (
         <div
-          className="flex aspect-square w-full items-center justify-center bg-surface-active text-[10px] text-ink-faint"
+          className="flex aspect-square w-full items-center justify-center bg-surface-active text-[10px] text-stone"
           style={{ borderRadius: edgeToEdge ? 0 : cardRadius }}
         >
           Intet billede
@@ -379,7 +379,7 @@ export function NewsletterCard({
     return (
       <div className="px-8 py-3">
         <div
-          className={`rounded-md border border-dashed border-neutral-300 px-3 py-2 text-neutral-400 italic ${className}`}
+          className={`rounded-md border border-dashed border-neutral-300 px-3 py-2 text-stone italic ${className}`}
           style={{ fontFamily: block.fontFamily, textAlign: getTextAlign(block) }}
         >
           {block.placeholder}
@@ -470,8 +470,8 @@ export function NewsletterCard({
           return (
             <div className="px-8 py-3">
               <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-active">
-                <ImagePlaceholderIcon className="h-9 w-9 text-ink-faint" />
-                <p className="text-xs text-ink-faint">Upload dine egne billeder – i fuld bredde eller som masonry-gitter</p>
+                <ImagePlaceholderIcon className="h-9 w-9 text-stone" />
+                <p className="text-xs text-stone">Upload dine egne billeder – i fuld bredde eller som masonry-gitter</p>
               </div>
             </div>
           );
@@ -595,14 +595,14 @@ export function NewsletterCard({
         if (isShownInFooter(block, blocks)) {
           return onSelectBlock ? (
             <div className="px-8 py-2">
-              <p className="text-center text-[10px] text-neutral-400 italic">Sociale medier vises i footeren</p>
+              <p className="text-center text-[10px] text-stone italic">Sociale medier vises i footeren</p>
             </div>
           ) : null;
         }
         if (getSocialLinks(block).length === 0) {
           return (
             <div className="px-8 py-3">
-              <div className="rounded-md border border-dashed border-neutral-300 px-3 py-4 text-center text-xs text-neutral-400 italic">
+              <div className="rounded-md border border-dashed border-neutral-300 px-3 py-4 text-center text-xs text-stone italic">
                 Tilføj links til jeres sociale medier – fx Facebook og Instagram
               </div>
             </div>

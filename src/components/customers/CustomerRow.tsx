@@ -21,7 +21,7 @@ export function CustomerRow({ customer, onEdit, onUnsubscribe }: CustomerRowProp
 
   return (
     <tr className="transition-colors hover:bg-cream/80">
-      <td className="px-4 py-4 font-medium text-[#1a1a1a]">{fullName || <span className="text-stone/50">–</span>}</td>
+      <td className="px-4 py-4 font-medium text-[#1a1a1a]">{fullName || <span className="text-stone">–</span>}</td>
       <td className="px-4 py-4 text-sm text-stone">{customer.email}</td>
       <td className="px-4 py-4 text-sm text-ink-deep">{TYPE_LABEL[type]}</td>
       <td className="px-4 py-4">

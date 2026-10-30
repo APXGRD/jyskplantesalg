@@ -6,7 +6,7 @@
 import type { ReactNode } from "react";
 
 export const authFieldClassName =
-  "h-12 w-full rounded-sm border border-hairline bg-white px-4 text-base text-[#1a1a1a] transition-colors placeholder:text-stone/60 focus:border-forest focus:outline-none";
+  "h-12 w-full rounded-sm border border-field bg-white px-4 text-base text-[#1a1a1a] transition-colors placeholder:text-stone focus:border-forest focus:outline-none";
 export const authLabelClassName = "mb-1 block text-[11px] font-semibold tracking-wider text-stone uppercase";
 export const authButtonClassName =
   "flex h-12 w-full items-center justify-center gap-2 rounded-sm bg-[#36482e] px-8 text-xs font-semibold tracking-widest text-white uppercase shadow-sm transition-colors hover:bg-plant-hover active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60";

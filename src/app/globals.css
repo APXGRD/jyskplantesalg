@@ -74,6 +74,13 @@
   --color-track: #f0eee9;
   --color-sage: #4e6452;
   --color-mint: #ebf2ec;
+  /* Lys grøn-grå flade til skiftende sektioner (fx forsidens kort-bånd). */
+  --color-wash: #eef1ec;
+  /* Tilgængelighed (WCAG 1.4.11, min. 3:1 mod hvid og wash): kant på
+     inputfelter og baggrund på slukkede kontakter. Tynde streger/skillelinjer
+     bruger fortsat hairline. */
+  --color-field: #858b86;
+  --color-switch-off: #7a807b;
   --color-cream: #fbf9f4;
   --color-ash: #eae8e3;
   --color-sage-light: #b4cdb7;

@@ -21,23 +21,42 @@ interface OpsaetningClientProps {
 
 // Et nummereret trin i Stitch-designet: kort med hårfin kant, kursivt
 // nummer i EB Garamond, titel og en lille etiket til højre.
+// Trinene skilles af flader i stedet for streger: skiftevis hvid og lys
+// grøn-grå ("wash"). Felterne inde i et trin bruger den modsatte flade.
+// Accentfarven (forest) bruges kun på aktive/klikbare elementer – knapper,
+// valgte kort, tændte kontakter, fokus og hover – al statisk tekst er neutral.
+type StepTone = "white" | "wash";
+
+const SECTION_SURFACE: Record<StepTone, string> = {
+  white: "bg-white shadow-[0_1px_2px_rgba(22,51,40,0.06)]",
+  wash: "bg-wash",
+};
+
+// Flade til felter/rækker inde i et trin – modsat trinets egen flade.
+const INNER_SURFACE: Record<StepTone, string> = {
+  white: "bg-wash",
+  wash: "bg-white",
+};
+
 function StepSection({
   number,
   title,
   label,
+  tone,
   children,
 }: {
   number: string;
   title: string;
   label: string;
+  tone: StepTone;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-sm border border-hairline p-5 sm:p-8">
+    <section className={`rounded-sm p-5 sm:p-8 ${SECTION_SURFACE[tone]}`}>
       <div className="mb-4 flex items-baseline justify-between gap-4">
         <div className="flex items-baseline gap-2">
-          <span className="font-garamond text-2xl leading-[1.35] font-medium text-sage italic">{number}</span>
-          <h2 className="text-lg leading-[1.4] font-medium text-forest">{title}</h2>
+          <span className="font-garamond text-2xl leading-[1.35] font-medium text-stone italic">{number}</span>
+          <h2 className="text-lg leading-[1.4] font-medium text-ink-deep">{title}</h2>
         </div>
         <span className="hidden text-xs font-semibold tracking-[0.12em] text-stone sm:inline">{label}</span>
       </div>
@@ -63,20 +82,19 @@ function AudienceCard({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`flex flex-col rounded-sm bg-white p-4 text-left transition-all duration-200 ${
-        selected ? "border-2 border-forest" : "border border-hairline hover:border-sage"
+      className={`flex flex-col rounded-sm border-2 p-4 text-left transition-all duration-200 ${
+        selected ? "border-forest bg-white" : "border-transparent bg-wash hover:border-sage"
       }`}
     >
       <span className="flex items-center justify-between">
-        <span className="text-lg leading-[1.4] font-medium text-forest">{title}</span>
+        <span className={`text-lg leading-[1.4] font-medium ${selected ? "text-forest" : "text-ink-deep"}`}>{title}</span>
         {selected ? (
           <CheckCircleIcon className="h-5 w-5 text-forest" />
         ) : (
-          <span aria-hidden className="mr-[1.5px] size-[17px] rounded-full border-2 border-hairline" />
+          <span aria-hidden className="mr-[1.5px] size-[17px] rounded-full border-2 border-stone bg-white" />
         )}
       </span>
       <span className="mt-1 text-sm text-stone">{description}</span>
-      <span aria-hidden className="mt-4 border-t border-hairline pt-1" />
     </button>
   );
 }
@@ -92,7 +110,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (che
         aria-label={label}
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="peer absolute inset-0 m-0 cursor-pointer appearance-none rounded-full bg-[#e4e2dd] transition-colors duration-200 checked:bg-forest focus-visible:ring-2 focus-visible:ring-forest/40 focus-visible:ring-offset-2 focus-visible:outline-none"
+        className="peer absolute inset-0 m-0 cursor-pointer appearance-none rounded-full bg-switch-off transition-colors duration-200 checked:bg-forest focus-visible:ring-2 focus-visible:ring-forest/40 focus-visible:ring-offset-2 focus-visible:outline-none"
       />
       <span className="pointer-events-none absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-6" />
     </span>
@@ -365,21 +383,21 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
     <EditorialShell active="settings">
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-5 pb-12 md:px-12">
         {/* Titel + status */}
-        <header className="flex flex-col justify-between gap-4 border-b border-hairline py-8 md:flex-row md:items-end">
+        <header className="flex flex-col justify-between gap-4 pt-8 pb-4 md:flex-row md:items-end">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2 text-stone">
-              <span className="text-xs font-semibold tracking-[0.12em] text-sage uppercase">Trin 01 / Nyhedsbrev</span>
-              <span className="text-hairline">/</span>
+              <span className="text-xs font-semibold tracking-[0.12em] text-stone uppercase">Trin 01 / Nyhedsbrev</span>
+              <span aria-hidden className="text-stone">/</span>
               <span className="text-sm">Konfiguration &amp; Kuratering</span>
             </div>
-            <h1 className="font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-forest md:text-4xl md:leading-[1.25]">
+            <h1 className="font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-ink-deep md:text-4xl md:leading-[1.25]">
               Opsætning
             </h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden flex-col text-right sm:flex">
               <span className="text-xs font-semibold tracking-[0.12em] text-stone uppercase">Målgruppe</span>
-              <span className="text-sm font-medium text-forest">{audienceLabel}</span>
+              <span className="text-sm font-medium text-ink-deep">{audienceLabel}</span>
             </div>
           </div>
         </header>
@@ -415,7 +433,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
         <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-12">
           {/* Venstre: trinene */}
           <div className="flex flex-col gap-12 lg:col-span-7 xl:col-span-8">
-            <StepSection number="01" title="Målgruppe & Momsforhold" label="Segmentering">
+            <StepSection number="01" title="Målgruppe & Momsforhold" label="Segmentering" tone="white">
               <div role="radiogroup" aria-label="Målgruppe" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <AudienceCard
                   title="Privatkunder"
@@ -432,10 +450,10 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
               </div>
             </StepSection>
 
-            <StepSection number="02" title="Skabelon & Æstetik" label="Layout">
-              <div className="flex flex-col justify-between gap-4 rounded-sm border border-hairline p-4 sm:flex-row sm:items-center">
+            <StepSection number="02" title="Skabelon & Æstetik" label="Layout" tone="wash">
+              <div className={`flex flex-col justify-between gap-4 rounded-sm p-4 sm:flex-row sm:items-center ${INNER_SURFACE.wash}`}>
                 <div className="min-w-0">
-                  <span className="block truncate text-xs font-semibold tracking-wide text-forest uppercase">
+                  <span className="block truncate text-xs font-semibold tracking-wide text-ink-deep uppercase">
                     {selectedTemplate ? selectedTemplate.name : "Standard layout"}
                   </span>
                   <p className="mt-0.5 text-sm text-stone">
@@ -479,18 +497,18 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
               {deleteError && <p className="mt-2 text-sm text-red-700">{deleteError}</p>}
             </StepSection>
 
-            <StepSection number="03" title="Visningsregler & Produkter" label="Dendrologisk Udtræk">
-              <div className="grid grid-cols-1 gap-8 border-b border-hairline pb-8 md:grid-cols-2">
-                <label className="flex cursor-pointer items-center justify-between gap-2 rounded-sm border border-hairline p-4">
+            <StepSection number="03" title="Visningsregler & Produkter" label="Dendrologisk Udtræk" tone="white">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className={`flex cursor-pointer items-center justify-between gap-2 rounded-sm p-4 ${INNER_SURFACE.white}`}>
                   <span className="flex flex-col pr-2">
-                    <span className="text-sm font-medium text-forest">Kun produkter med billeder</span>
+                    <span className="text-sm font-medium text-ink-deep">Kun produkter med billeder</span>
                     <span className="text-xs text-stone">Udelukker produkter uden billede</span>
                   </span>
                   <Toggle checked={topicOnlyWithImage} onChange={setTopicOnlyWithImage} label="Kun produkter med billeder" />
                 </label>
-                <div className="flex items-center justify-between gap-2 rounded-sm border border-hairline p-4">
+                <div className={`flex items-center justify-between gap-2 rounded-sm p-4 ${INNER_SURFACE.white}`}>
                   <span className="flex flex-col">
-                    <label htmlFor="topic-max-results" className="text-sm font-medium text-forest">
+                    <label htmlFor="topic-max-results" className="text-sm font-medium text-ink-deep">
                       Maks. antal produkter
                     </label>
                     <span className="text-xs text-stone">Vises i nyhedsbrevet</span>
@@ -503,13 +521,13 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
                     value={topicMaxResults}
                     onChange={(event) => setTopicMaxResults(event.target.value)}
                     placeholder="1"
-                    className="h-10 w-20 rounded-xs border border-hairline bg-white text-center text-lg font-medium text-forest transition-colors focus:border-forest focus:outline-none"
+                    className="h-10 w-20 rounded-xs border border-field bg-white text-center text-lg font-medium text-ink-deep transition-colors focus:border-forest focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div aria-live="polite" className="mt-8 rounded-sm border border-hairline bg-white p-4">
-                <p className="mt-1 font-garamond text-2xl leading-[1.35] text-forest">
+              <div aria-live="polite" className={`mt-4 rounded-sm p-4 ${INNER_SURFACE.white}`}>
+                <p className="mt-1 font-garamond text-2xl leading-[1.35] text-ink-deep">
                   {!showMatchCountNote
                     ? "Beskriv nyhedsbrevet for at søge efter produkter."
                     : topicTotalMatchCount === 0
@@ -518,13 +536,13 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
                 </p>
                 {showMatchCountNote && topicTotalMatchCount !== 0 && (
                   <p className="mt-1 text-sm text-stone">
-                    Vises i nyhedsbrevet: <strong className="font-medium text-forest">De første {visibleCount}</strong>
+                    Vises i nyhedsbrevet: <strong className="font-medium text-ink-deep">De første {visibleCount}</strong>
                   </p>
                 )}
               </div>
             </StepSection>
 
-            <StepSection number="04" title="Beskriv dit nyhedsbrev" label="AI Prompt & Tonalitet">
+            <StepSection number="04" title="Beskriv dit nyhedsbrev" label="AI Prompt & Tonalitet" tone="wash">
               <label htmlFor="ai-prompt-input" className="sr-only">
                 Beskriv dit nyhedsbrev
               </label>
@@ -534,7 +552,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
                 onChange={(event) => setInstructions(event.target.value)}
                 placeholder="F.eks. 'Lav et nyhedsbrev i en professionel tone til vores erhvervskunder om vores blommetræer'"
                 rows={5}
-                className="w-full resize-y rounded-sm border border-hairline bg-white p-4 leading-relaxed text-forest transition-all placeholder:text-stone/60 focus:border-forest focus:outline-none"
+                className="w-full resize-y rounded-sm border border-field bg-white p-4 leading-relaxed text-ink-deep transition-all placeholder:text-stone focus:border-forest focus:outline-none"
               />
               <div className="mt-1 flex items-center justify-between gap-4 px-1 text-sm text-stone">
                 <span>Teksten bruges både som søgning og som AI-instruks</span>
@@ -543,7 +561,7 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
 
               {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
 
-              <div className="mt-12 flex flex-col items-stretch justify-between gap-4 border-t border-hairline pt-8 sm:flex-row sm:items-center">
+              <div className="mt-10 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                 <button
                   type="button"
                   onClick={handleBlankTemplate}
@@ -573,11 +591,11 @@ export function OpsaetningClient({ initialTemplates, initialPlantForms, initialP
 
           {/* Højre: planteform-filter */}
           <aside className="flex flex-col gap-8 lg:col-span-5 xl:col-span-4">
-            <div className="rounded-sm border border-hairline p-5 sm:p-8">
-              <div className="mb-4 flex items-center justify-between border-b border-hairline pb-2">
+            <div className="rounded-sm bg-white p-5 shadow-[0_1px_2px_rgba(22,51,40,0.06)] sm:p-8">
+              <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <FilterIcon className="h-5 w-5 text-forest" />
-                  <h3 className="text-lg leading-[1.4] font-medium text-forest">Planteform</h3>
+                  <FilterIcon className="h-5 w-5 text-stone" />
+                  <h3 className="text-lg leading-[1.4] font-medium text-ink-deep">Planteform</h3>
                 </div>
                 <button
                   type="button"
