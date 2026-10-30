@@ -6,6 +6,7 @@ import {
   CTA_PADDING_PX,
   IMAGE_ALIGN_CSS,
   getTextAlign,
+  getCtaAlignment,
   getFooterSocialsBlock,
   PRODUCT_CARD_GAP_PX,
   RICH_TEXT_BLOCK_TYPES,
@@ -522,15 +523,22 @@ function renderBlockHtml(
       // midten UDEN at være afhængig af align/text-align/margin:auto – som
       // Gmail-appen på iPhone ikke respekterer for knappen (den lagde sig i
       // venstre side, mens al tekst stod korrekt i midten).
+      // Venstre-/højrestillet knap: samme princip med én tom sidecelle på
+      // 100 % på den modsatte side (centreret er uændret 50/50).
       const href = escapeAttr(block.ctaUrl || "#");
+      const ctaAlignment = getCtaAlignment(block);
+      const spacerCell = (width: number) =>
+        `<td width="${width}%" style="width:${width}%;font-size:0;line-height:0;">&nbsp;</td>`;
+      const leftSpacer = ctaAlignment === "center" ? spacerCell(50) : ctaAlignment === "hoejre" ? spacerCell(100) : "";
+      const rightSpacer = ctaAlignment === "center" ? spacerCell(50) : ctaAlignment === "venstre" ? spacerCell(100) : "";
       return `<tr><td style="padding:12px 32px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:separate;border-spacing:0;">
           <tr>
-            <td width="50%" style="width:50%;font-size:0;line-height:0;">&nbsp;</td>
+            ${leftSpacer}
             <td${cellBgcolorAttr} align="center" style="${cellFillStyle}${radiusStyle}${paddingStyle}font-family:${fontFamily};white-space:nowrap;text-align:center;">
               <a href="${href}" style="color:${textColor};text-decoration:none;font-family:${fontFamily};font-weight:600;font-size:${fontSize};line-height:19.5px;display:inline-block;white-space:nowrap;">${label}</a>
             </td>
-            <td width="50%" style="width:50%;font-size:0;line-height:0;">&nbsp;</td>
+            ${rightSpacer}
           </tr>
         </table>
       </td></tr>`;

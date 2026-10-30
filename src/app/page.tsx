@@ -14,10 +14,9 @@ import {
 } from "./HomeClientParts";
 
 export default async function HomePage() {
-  // Firmanavn, farver, skrifttype og tone følger Indstillinger-siden, så en
-  // anden virksomhed kan bruge appen under sit eget navn.
+  // Farver, skrifttype og tone følger Indstillinger-siden, så en anden
+  // virksomhed kan bruge appen under sit eget navn.
   const settings = await getBrandSettings();
-  const companyName = settings.company_name.trim();
 
   // Kundetallet SKAL være det rigtige, aktuelle antal – samme kilde
   // (fetchShopifyCustomers) og samme "aktiv"-definition (isActiveCustomer),
@@ -43,13 +42,11 @@ export default async function HomePage() {
   return (
     <EditorialShell active="home">
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-5 pb-16 md:px-12">
-        <div className="border-b border-hairline pt-8 pb-10">
-          <h1
-            className={`font-garamond text-[1.75rem] leading-[1.3] tracking-tight text-forest wrap-break-word md:text-4xl md:leading-[1.25] ${
-              companyName ? "" : "opacity-30"
-            }`}
-          >
-            {companyName || "Logo"}
+        {/* Forsidens formål i én sætning: hurtigt fra idé til nyhedsbrev.
+            Firmanavnet står allerede i topbaren. */}
+        <div className="border-b border-hairline pt-10 pb-12 md:pt-14 md:pb-14">
+          <h1 className="max-w-3xl font-garamond text-[2.25rem] leading-[1.15] tracking-tight text-forest wrap-break-word md:text-6xl md:leading-[1.08]">
+            Lav dit nyhedsbrev på få minutter
           </h1>
         </div>
 

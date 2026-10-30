@@ -1,16 +1,23 @@
 "use client";
 
-import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
+import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { formatPriceForCustomer, type CustomerType } from "@/lib/format";
 import { getUnsubscribeUrl } from "@/lib/unsubscribeUrl";
 import { ImagePlaceholderIcon, PencilIcon } from "@/components/icons";
+import { InlineTextEditor } from "@/components/preview/InlineTextEditor";
+import { InlinePlainText } from "@/components/preview/InlinePlainText";
 import type { GeneratedNewsletter } from "@/context/NewsletterContext";
 import {
   CTA_BORDER_RADIUS_PX,
   CTA_PADDING_PX,
   IMAGE_SIZE_PX,
   getTextAlign,
+  CTA_TEXT_MAX_LENGTH,
+  HEADING_TEXT_MAX_LENGTH,
+  buildPlainTextContent,
+  getCtaAlignment,
+  getPlainText,
   getFooterSocialsBlock,
   isShownInFooter,
   isEdgeToEdgeImage,
@@ -61,7 +68,17 @@ interface NewsletterCardProps {
   selectedBlockId?: string | null;
   onSelectBlock?: (id: string) => void;
   getBlockLabel?: (block: NewsletterBlock) => string;
+  // Sat i editoren: al TEKST (overskrift, brødtekst, tekst, knaptekst)
+  // skrives direkte i previewet – alle indstillinger (farver, skrift,
+  // justering, link …) rettes i sidepanelet.
+  onBlockContentChange?: (id: string, html: string) => void;
 }
+
+// Bloktyper med tekst, der redigeres inline i previewet.
+const INLINE_EDIT_TYPES = new Set(["overskrift", "brodtekst", "tekst", "cta"]);
+
+// Knappens placering i blokken (samme som eksportens sideceller).
+const CTA_JUSTIFY = { venstre: "justify-start", center: "justify-center", hoejre: "justify-end" } as const;
 
 // Sociale medier-blokkens overskrift + knapper, PRÆCIS som i nyhedsbrevet –
 // delt af NewsletterCard og blokkens forhåndsvisning i editorens sidepanel.
@@ -134,7 +151,17 @@ function productTextColor(block: NewsletterBlock): string {
   return block.sectionBgColor ? getContrastTextColor(block.sectionBgColor) : "#1a1a1a";
 }
 
-export function CtaButton({ block, asLink = true }: { block: NewsletterBlock; asLink?: boolean }) {
+// labelOverride: editoren (previewet) erstatter den viste tekst med et
+// inline-redigerbart felt (InlinePlainText) – knappens form/farver er uændrede.
+export function CtaButton({
+  block,
+  asLink = true,
+  labelOverride,
+}: {
+  block: NewsletterBlock;
+  asLink?: boolean;
+  labelOverride?: ReactNode;
+}) {
   const bgColor = block.bgColor || "#3a5837";
   const padding = CTA_PADDING_PX[block.ctaPadding ?? "normal"];
   const borderRadius = CTA_BORDER_RADIUS_PX[block.ctaBorderRadius ?? "afrundet"];
@@ -156,14 +183,13 @@ export function CtaButton({ block, asLink = true }: { block: NewsletterBlock; as
     ...(isOutline ? { backgroundColor: "transparent", border: `0.5px solid ${bgColor}` } : { backgroundColor: bgColor }),
   };
   const className = "inline-flex items-center gap-1 text-[13px] font-semibold [&_p]:m-0 [&_p]:inline";
-  const label =
-    isBlankContent(block.content) && block.placeholder ? (
+  const label = labelOverride ?? (isBlankContent(block.content) && block.placeholder ? (
       // Tom knap: vis knaptekstens placeholder i kursiv – i PRÆCIS den valgte
       // tekstfarve (ingen gennemsigtighed, som fik fx hvid til at se grå ud).
       <span className="italic">{block.placeholder}</span>
     ) : (
       <span dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />
-    );
+    ));
   if (!asLink) {
     return (
       <span style={ctaStyle} className={className}>
@@ -187,7 +213,10 @@ export function NewsletterCard({
   selectedBlockId,
   onSelectBlock,
   getBlockLabel,
+  onBlockContentChange,
 }: NewsletterCardProps) {
+  // Blokken, hvis tekst redigeres inline lige nu (én ad gangen).
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const brand = useBrandSettings();
   const audience = customerType === "erhverv" ? "registreret erhvervskunde" : "tilmeldt vores nyhedsbrev";
 
@@ -388,6 +417,56 @@ export function NewsletterCard({
     );
   }
 
+  const isInlineEditable = (block: NewsletterBlock) =>
+    Boolean(onBlockContentChange && onSelectBlock) && INLINE_EDIT_TYPES.has(block.type);
+
+  function startEditing(id: string) {
+    setEditingBlockId(id);
+    onSelectBlock?.(id);
+  }
+
+  function stopEditing(id: string) {
+    setEditingBlockId((current) => (current === id ? null : current));
+  }
+
+  // Rig tekst (brødtekst/tekst) – i editoren inline-redigerbar, ellers statisk.
+  function renderText(block: NewsletterBlock, className: string, style: CSSProperties): ReactNode {
+    if (isInlineEditable(block)) {
+      return (
+        <InlineTextEditor
+          content={block.content ?? ""}
+          onChange={(html) => onBlockContentChange?.(block.id, html)}
+          onFocus={() => startEditing(block.id)}
+          onBlur={() => stopEditing(block.id)}
+          editing={editingBlockId === block.id}
+          placeholder={block.placeholder}
+          ariaLabel={getBlockLabel?.(block) ?? block.type}
+          className={className}
+          style={style}
+        />
+      );
+    }
+    return <div className={className} style={style} dangerouslySetInnerHTML={{ __html: block.content ?? "" }} />;
+  }
+
+  // Ren tekst på én linje (overskrift, knaptekst) – inline-redigerbar.
+  function renderPlainText(block: NewsletterBlock, maxLength: number, display: "block" | "inline"): ReactNode {
+    return (
+      <InlinePlainText
+        html={block.content ?? ""}
+        text={getPlainText(block.content)}
+        maxLength={maxLength}
+        placeholder={block.placeholder}
+        ariaLabel={getBlockLabel?.(block) ?? block.type}
+        display={display}
+        editing={editingBlockId === block.id}
+        onStartEditing={() => startEditing(block.id)}
+        onStopEditing={() => stopEditing(block.id)}
+        onTextChange={(text) => onBlockContentChange?.(block.id, buildPlainTextContent(text))}
+      />
+    );
+  }
+
   function renderBlock(block: NewsletterBlock): ReactNode {
     switch (block.type) {
       case "header": {
@@ -411,42 +490,52 @@ export function NewsletterCard({
       }
 
       case "overskrift":
-        if (isBlankContent(block.content) && block.placeholder) {
+        if (isBlankContent(block.content) && block.placeholder && !isInlineEditable(block)) {
           return renderTextPlaceholder(block, "font-serif text-[22px] leading-[1.2]");
         }
         // Lidt ekstra luft over overskriften (28px i stedet for 12px) – samme
         // som den kopierede mail.
         return (
           <div className="px-8 pt-7 pb-3">
-            <div
-              className="font-serif text-[26px] leading-[1.2] text-ink [&_p]:m-0"
-              style={{
+            {isInlineEditable(block) ? (
+              <div
+                className="font-serif text-[26px] leading-[1.2] text-ink [&_p]:m-0"
+                style={{
+                  fontFamily: block.fontFamily,
+                  fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
+                  color: block.textColor,
+                  textAlign: getTextAlign(block),
+                }}
+              >
+                {renderPlainText(block, HEADING_TEXT_MAX_LENGTH, "block")}
+              </div>
+            ) : (
+              renderText(block, "font-serif text-[26px] leading-[1.2] text-ink [&_p]:m-0", {
                 fontFamily: block.fontFamily,
                 fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
                 color: block.textColor,
                 textAlign: getTextAlign(block),
-              }}
-              dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
-            />
+              })
+            )}
           </div>
         );
 
       case "brodtekst":
-        if (isBlankContent(block.content) && block.placeholder) {
+        if (isBlankContent(block.content) && block.placeholder && !isInlineEditable(block)) {
           return renderTextPlaceholder(block, "text-[13px] leading-normal");
         }
         return (
           <div className="px-8 py-3">
-            <div
-              className="text-[13px] leading-normal text-card-body-text [&_p]:m-0 [&_p]:mb-3.5 [&_p:last-child]:mb-0"
-              style={{
+            {renderText(
+              block,
+              "text-[13px] leading-normal text-card-body-text [&_p]:m-0 [&_p]:mb-3.5 [&_p:last-child]:mb-0",
+              {
                 fontFamily: block.fontFamily,
                 fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
                 color: block.textColor,
                 textAlign: getTextAlign(block),
-              }}
-              dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
-            />
+              },
+            )}
           </div>
         );
 
@@ -546,21 +635,17 @@ export function NewsletterCard({
         );
 
       case "tekst":
-        if (isBlankContent(block.content) && block.placeholder) {
+        if (isBlankContent(block.content) && block.placeholder && !isInlineEditable(block)) {
           return renderTextPlaceholder(block, "text-[13px] leading-relaxed");
         }
         return (
           <div className="px-8 py-3">
-            <div
-              className="text-[13px] leading-relaxed text-card-body-text [&_p]:m-0"
-              style={{
-                fontFamily: block.fontFamily,
-                fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
-                color: block.textColor,
-                textAlign: getTextAlign(block),
-              }}
-              dangerouslySetInnerHTML={{ __html: block.content ?? "" }}
-            />
+            {renderText(block, "text-[13px] leading-relaxed text-card-body-text [&_p]:m-0", {
+              fontFamily: block.fontFamily,
+              fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
+              color: block.textColor,
+              textAlign: getTextAlign(block),
+            })}
           </div>
         );
 
@@ -583,9 +668,20 @@ export function NewsletterCard({
       }
 
       case "cta":
+        // I editoren: ingen link (et klik må ikke åbne siden), og knapteksten
+        // skrives direkte (InlinePlainText). Link, farver, justering og form
+        // rettes i sidepanelet.
         return (
-          <div className="flex justify-center px-8 py-3">
-            <CtaButton block={block} />
+          <div className={`flex px-8 py-3 ${CTA_JUSTIFY[getCtaAlignment(block)]}`}>
+            {isInlineEditable(block) ? (
+              <CtaButton
+                block={block}
+                asLink={false}
+                labelOverride={renderPlainText(block, CTA_TEXT_MAX_LENGTH, "inline")}
+              />
+            ) : (
+              <CtaButton block={block} />
+            )}
           </div>
         );
 
@@ -662,10 +758,14 @@ export function NewsletterCard({
             );
           const isSelected = block.id === selectedBlockId;
           const label = getBlockLabel?.(block) ?? block.type;
+          // Blokke med inline-redigerbar tekst: Enter på blokken starter
+          // redigeringen (man tabber til blokken, ikke direkte ind i teksten).
+          const inline = isInlineEditable(block);
           function select(event: MouseEvent<HTMLDivElement>) {
             // I editoren vælger et klik blokken i stedet for at følge links
             // (CTA-knap, produktbilleder). Ctrl/Cmd-klik åbner stadig linket.
-            if ((event.target as HTMLElement).closest("a") && !event.metaKey && !event.ctrlKey) {
+            const link = (event.target as HTMLElement).closest("a");
+            if (link && event.currentTarget.contains(link) && !event.metaKey && !event.ctrlKey) {
               event.preventDefault();
             }
             onSelectBlock?.(block.id);
@@ -674,7 +774,8 @@ export function NewsletterCard({
             if (event.target !== event.currentTarget) return;
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
-              onSelectBlock?.(block.id);
+              if (inline && event.key === "Enter") startEditing(block.id);
+              else onSelectBlock?.(block.id);
             }
           }
           return (
@@ -683,7 +784,9 @@ export function NewsletterCard({
               role="button"
               tabIndex={0}
               aria-pressed={isSelected}
-              aria-label={`${label}${isSelected ? " – valgt" : ""}. Vælg for at redigere blokken`}
+              aria-label={`${label}${isSelected ? " – valgt" : ""}. ${
+                inline ? "Tryk Enter for at redigere teksten" : "Vælg for at redigere blokken"
+              }`}
               onClick={select}
               onKeyDown={handleKeyDown}
               style={sectionStyle}
@@ -705,7 +808,14 @@ export function NewsletterCard({
                 }`}
               >
                 <PencilIcon className="h-3 w-3" />
-                {isSelected ? `Redigerer · ${label}` : `Klik for at redigere · ${label}`}
+                {isSelected
+                  ? `Redigerer · ${label}`
+                  : inline
+                    ? `Klik i teksten for at skrive · ${label}`
+                    : `Klik for at redigere · ${label}`}
+                {/* Bred skærm: peg mod sidepanelet til højre (på smal skærm
+                    åbner bundpanelet af sig selv). */}
+                {isSelected && <span className="hidden lg:inline">· se sidepanelet →</span>}
               </span>
             </div>
           );

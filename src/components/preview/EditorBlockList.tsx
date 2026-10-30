@@ -64,6 +64,12 @@ import {
   SOCIAL_PLATFORMS,
   MEDIA_LAYOUT_OPTIONS,
   RICH_TEXT_BLOCK_TYPES,
+  CTA_TEXT_MAX_LENGTH,
+  HEADING_TEXT_MAX_LENGTH,
+  buildPlainTextContent,
+  getCtaAlignment,
+  getPlainText,
+  limitPlainText,
   type AddableBlockKind,
   type BlockType,
   type CtaBorderRadius,
@@ -324,6 +330,92 @@ function CtaAdvancedControls({
   );
 }
 
+// Ren tekst på én linje (overskrift, knaptekst) – samme regler og samme
+// block.content som inline-redigeringen i previewet, så de to altid viser
+// det samme. Tælleren vises, når grænsen nærmes (fra 80 %).
+function PlainTextField({
+  label,
+  content,
+  maxLength,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  content: string | undefined;
+  maxLength: number;
+  placeholder?: string;
+  onChange: (html: string) => void;
+}) {
+  const text = getPlainText(content);
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="flex items-baseline justify-between gap-2">
+        <span className={labelClassName}>{label}</span>
+        {text.length >= maxLength * 0.8 && (
+          <span className="text-[11px] text-stone tabular-nums">
+            {text.length}/{maxLength}
+          </span>
+        )}
+      </span>
+      <input
+        value={text}
+        onChange={(event) => onChange(buildPlainTextContent(limitPlainText(event.target.value, text, maxLength)))}
+        placeholder={placeholder}
+        className={fieldClassName}
+      />
+    </label>
+  );
+}
+
+// Skrifttype + størrelse for blokke uden rig tekst-editor i panelet.
+function FontFields({
+  fontFamily,
+  fontSize,
+  defaultFontSize,
+  onFontFamilyChange,
+  onFontSizeChange,
+}: {
+  fontFamily?: string;
+  fontSize?: number;
+  defaultFontSize: number;
+  onFontFamilyChange: (fontFamily: string) => void;
+  onFontSizeChange: (fontSize: number) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+      <label className="flex flex-col gap-1">
+        <span className={labelClassName}>Skrifttype:</span>
+        <select
+          value={fontFamily ?? ""}
+          onChange={(event) => onFontFamilyChange(event.target.value)}
+          className={fieldClassName}
+        >
+          <option value="">Standard</option>
+          {FONT_FAMILIES.map((font) => (
+            <option key={font.value} value={font.value}>
+              {font.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className={labelClassName}>Skriftstørrelse (px):</span>
+        <input
+          type="number"
+          min={10}
+          max={36}
+          value={fontSize ?? defaultFontSize}
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            if (Number.isFinite(value) && value >= 10 && value <= 36) onFontSizeChange(value);
+          }}
+          className={fieldClassName}
+        />
+      </label>
+    </div>
+  );
+}
+
 interface BlockContentProps {
   block: NewsletterBlock;
   onContentChange: (html: string) => void;
@@ -455,17 +547,19 @@ function BlockContent({
     case "overskrift":
       return (
         <div className="flex flex-col gap-3">
-          <TextBlockEditor
-            content={block.content ?? ""}
+          <PlainTextField
+            label="Overskrift:"
+            content={block.content}
+            maxLength={HEADING_TEXT_MAX_LENGTH}
+            placeholder={block.placeholder}
             onChange={onContentChange}
+          />
+          <FontFields
             fontFamily={block.fontFamily}
             fontSize={block.fontSize}
-            textColor={block.textColor}
-            backgroundColor={block.sectionBgColor}
+            defaultFontSize={26}
             onFontFamilyChange={onFontFamilyChange}
             onFontSizeChange={onFontSizeChange}
-            showColorPicker={false}
-            placeholder={block.placeholder}
           />
           <div className="flex flex-col gap-1.5">
             <span className={labelClassName}>Justering:</span>
@@ -494,6 +588,15 @@ function BlockContent({
             showColorPicker={false}
             placeholder={block.placeholder}
           />
+          {/* Altid synlige – editorens egen værktøjslinje vises kun, mens
+              der skrives i feltet herover (ikke ved inline-redigering). */}
+          <FontFields
+            fontFamily={block.fontFamily}
+            fontSize={block.fontSize}
+            defaultFontSize={13}
+            onFontFamilyChange={onFontFamilyChange}
+            onFontSizeChange={onFontSizeChange}
+          />
           <div className="flex flex-col gap-1.5">
             <span className={labelClassName}>Justering:</span>
             <SegmentedButtons
@@ -520,6 +623,15 @@ function BlockContent({
             onFontSizeChange={onFontSizeChange}
             showColorPicker={false}
             placeholder={block.placeholder}
+          />
+          {/* Altid synlige – editorens egen værktøjslinje vises kun, mens
+              der skrives i feltet herover (ikke ved inline-redigering). */}
+          <FontFields
+            fontFamily={block.fontFamily}
+            fontSize={block.fontSize}
+            defaultFontSize={13}
+            onFontFamilyChange={onFontFamilyChange}
+            onFontSizeChange={onFontSizeChange}
           />
           <div className="flex flex-col gap-1.5">
             <span className={labelClassName}>Justering:</span>
@@ -866,18 +978,26 @@ function BlockContent({
               className={fieldClassName}
             />
           </label>
-          <div className="flex flex-col gap-1">
-            <span className={labelClassName}>Knaptekst:</span>
-            <TextBlockEditor
-              content={block.content ?? ""}
-              onChange={onContentChange}
-              fontFamily={block.fontFamily}
-              fontSize={block.fontSize}
-              textColor={block.textColor}
-              onFontFamilyChange={onFontFamilyChange}
-              onFontSizeChange={onFontSizeChange}
-              showColorPicker={false}
-              placeholder={block.placeholder}
+          <PlainTextField
+            label="Knaptekst:"
+            content={block.content}
+            maxLength={CTA_TEXT_MAX_LENGTH}
+            placeholder={block.placeholder}
+            onChange={onContentChange}
+          />
+          <FontFields
+            fontFamily={block.fontFamily}
+            fontSize={block.fontSize}
+            defaultFontSize={13}
+            onFontFamilyChange={onFontFamilyChange}
+            onFontSizeChange={onFontSizeChange}
+          />
+          <div className="flex flex-col gap-1.5">
+            <span className={labelClassName}>Justering:</span>
+            <SegmentedButtons
+              options={TEXT_ALIGN_OPTIONS}
+              value={getCtaAlignment(block)}
+              onChange={onAlignmentChange}
             />
           </div>
           <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
@@ -1639,6 +1759,12 @@ export function EditorBlockList({
   const selectedHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousSelectedRef = useRef<string | null>(null);
   useEffect(() => {
+    // Skrives der allerede inline i previewet (overskrift, brødtekst,
+    // knaptekst …), må panelet ikke tage fokus fra teksten.
+    if ((document.activeElement as HTMLElement | null)?.isContentEditable) {
+      previousSelectedRef.current = selectedBlockId;
+      return;
+    }
     if (selectedBlockId) {
       selectedHeadingRef.current?.focus({ preventScroll: true });
     } else if (previousSelectedRef.current) {
@@ -1761,47 +1887,12 @@ export function EditorBlockList({
     );
   }
 
-  const regenerateProductNames = regenerateTextProducts.map((product) => product.title).filter(Boolean);
   const editorCardClassName = "flex w-full flex-col rounded-sm bg-white p-5 shadow-sm";
   const cardTitleClassName = "font-garamond text-2xl leading-[1.35] font-medium text-forest";
   const fieldLabelClassName = "text-xs font-semibold tracking-[0.12em] text-stone";
 
   return (
     <div className="@container flex w-full flex-col gap-6 font-sans">
-      {/* AI Tekstoptimering */}
-      <section className={`${editorCardClassName} gap-3`}>
-        <h3 className={cardTitleClassName}>AI Tekstoptimering</h3>
-        <p className="text-sm text-stone">
-          Generér overskrift og brødtekst på ny ud fra det valgte produkt
-          {regenerateProductNames.length > 0 ? (
-            <>
-              {" "}
-              (<span className="font-garamond text-forest italic">{regenerateProductNames.join(", ")}</span>)
-            </>
-          ) : null}
-          . Rører ikke ved blok-struktur, styling, billeder eller CTA-knappen.
-        </p>
-        <button
-          type="button"
-          onClick={handleRegenerateText}
-          disabled={regenerateTextProducts.length === 0 || isRegeneratingText}
-          title={
-            regenerateTextProducts.length === 0
-              ? "Vælg et produkt i en Billede & produktvisning-blok først"
-              : "Genererer Overskrift og Brødtekst på ny"
-          }
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xs bg-forest px-4 py-2.5 text-sm font-medium text-white shadow-xs transition-colors hover:bg-plant-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-forest"
-        >
-          {isRegeneratingText ? (
-            <SpinnerIcon className="h-[18px] w-[18px] animate-spin" />
-          ) : (
-            <RefreshIcon className="h-[18px] w-[18px]" />
-          )}
-          {isRegeneratingText ? "Regenererer tekst..." : "Regenerér tekst ud fra det valgte produkt"}
-        </button>
-        {regenerateTextError && <p className="text-sm text-red-700">{regenerateTextError}</p>}
-      </section>
-
       {/* Typografi & Stil for hele nyhedsbrevet */}
       <section className={`${editorCardClassName} gap-4`}>
         <h3 className={cardTitleClassName}>Typografi &amp; Stil</h3>
@@ -1893,6 +1984,27 @@ export function EditorBlockList({
             )}
           </div>
         </div>
+        {/* Generér overskrift og brødtekst på ny ud fra de viste produkter –
+            rører ikke ved blok-struktur, styling, billeder eller knappen. */}
+        <button
+          type="button"
+          onClick={handleRegenerateText}
+          disabled={regenerateTextProducts.length === 0 || isRegeneratingText}
+          title={
+            regenerateTextProducts.length === 0
+              ? "Vælg et produkt i en Billede & produktvisning-blok først"
+              : "Genererer Overskrift og Brødtekst på ny"
+          }
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xs bg-forest px-4 py-2.5 text-sm font-medium text-white shadow-xs transition-colors hover:bg-plant-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-forest"
+        >
+          {isRegeneratingText ? (
+            <SpinnerIcon className="h-[18px] w-[18px] animate-spin" />
+          ) : (
+            <RefreshIcon className="h-[18px] w-[18px]" />
+          )}
+          {isRegeneratingText ? "Regenererer tekst..." : "Regenerér tekst ud fra det valgte produkt"}
+        </button>
+        {regenerateTextError && <p className="text-sm text-red-700">{regenerateTextError}</p>}
       </section>
 
       {/* Sektioner i mailen */}

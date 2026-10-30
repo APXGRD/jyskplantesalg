@@ -935,6 +935,48 @@ export function isBlankContent(content: string | undefined): boolean {
   return !content || content.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
 }
 
+// CTA-knappens placering: centreret, medmindre andet er valgt (knapper fra
+// før justering fandtes har intet alignment-felt og forbliver centrerede).
+export function getCtaAlignment(block: Pick<NewsletterBlock, "alignment">): ImageAlignment {
+  return block.alignment ?? "center";
+}
+
+// Overskrift og CTA-knappens tekst er ren tekst på én linje – samme
+// grænser som AI-prompten (se prompts/newsletterPrompt.ts). Bruges af både
+// sidepanelets felter og inline-redigeringen i previewet.
+export const HEADING_TEXT_MAX_LENGTH = 60;
+export const CTA_TEXT_MAX_LENGTH = 25;
+
+// Blokkens tekst som ren tekst. block.content kan være AI'ens rene tekst
+// eller Tiptap-HTML fra før teksten blev ren tekst ("<p>Se udvalget</p>",
+// evt. med <strong> o.l.).
+export function getPlainText(content: string | undefined): string {
+  return (content ?? "")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ");
+}
+
+// Gemmes escapet, da eksporten og previewet indsætter block.content som HTML.
+export function buildPlainTextContent(text: string): string {
+  return escapeHtml(text);
+}
+
+// Én linje og maks. `max` tegn: nye tegn ud over grænsen afvises (forrige
+// tekst bevares), men en ældre, længere tekst kan stadig forkortes – den
+// afkortes ikke automatisk.
+export function limitPlainText(next: string, previous: string, max: number): string {
+  const singleLine = next.replace(/[\r\n]+/g, " ");
+  if (singleLine.length <= max || singleLine.length < previous.length) return singleLine;
+  return previous;
+}
+
 // "Blank skabelon" på Opsætning-siden: et nyhedsbrev, brugeren selv bygger
 // fra bunden – INGEN AI-generering og INGEN produktdata. Det har en typisk
 // nyhedsbrevs-opbygning med TOMME blokke, der hver viser en grå placeholder

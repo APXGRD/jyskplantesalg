@@ -60,7 +60,8 @@ const toolbarIconButtonClassName = (active: boolean) =>
     active ? "bg-forest text-white" : "text-stone-dark hover:bg-track hover:text-forest"
   }`;
 
-const EDITOR_EXTENSIONS = [
+// Delt med InlineTextEditor (preview), så begge læser/skriver samme HTML.
+export const EDITOR_EXTENSIONS = [
   StarterKit.configure({
     heading: false,
     blockquote: false,
