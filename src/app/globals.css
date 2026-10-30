@@ -115,6 +115,6 @@ body {
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   pointer-events: none;
-  color: #a3a3a3;
+  color: #5a605b;
   font-style: italic;
 }

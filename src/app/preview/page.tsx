@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ShopifyProduct } from "@/lib/mock/mockShopifyData";
 import { buildNewsletterHtml, buildNewsletterText } from "@/lib/newsletterExport";
 import { cropMasonryImagesForExport } from "@/lib/masonryExport";
 import { buildTemplateBlockStructure, isBlankContent } from "@/lib/newsletterBlocks";
+import { stripColorStyles } from "@/lib/brandColors";
+import { stripFontFamilyStyles, stripFontSizeStyles } from "@/lib/fontFamilies";
 import { EditorialShell } from "@/components/EditorialShell";
 import { NewsletterCard } from "@/components/preview/NewsletterCard";
 import { EditorBlockList, getBlockTitle } from "@/components/preview/EditorBlockList";
@@ -57,10 +59,27 @@ export default function PreviewPage() {
   // Kun på smal skærm, hvor sidepanelet er et panel i bunden: er det foldet
   // ud? (På bred skærm er sidepanelet altid synligt.)
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  // Panelets scroll-flader (bred skærm: selve <aside>; smal: bundpanelets
+  // indhold) – rulles til toppen, når en blok vælges, så blokkens
+  // indstillinger altid er synlige (fx footeren nederst i nyhedsbrevet).
+  const asideRef = useRef<HTMLElement>(null);
+  const panelBodyRef = useRef<HTMLDivElement>(null);
 
   function selectBlock(id: string | null) {
     setSelectedBlockId(id);
-    if (id) setIsPanelOpen(true);
+    if (id) {
+      setIsPanelOpen(true);
+      asideRef.current?.scrollTo({ top: 0 });
+      panelBodyRef.current?.scrollTo({ top: 0 });
+    }
+  }
+
+  // Inline-redigering af tekst i previewet. Indholdet renses for inline
+  // farve/skrifttype/størrelse præcis som sidepanelets tekstfelter – de er
+  // blok-felter, der rettes i sidepanelet.
+  function handleInlineContentChange(id: string, html: string) {
+    const content = stripFontSizeStyles(stripFontFamilyStyles(stripColorStyles(html)));
+    setBlocks((current) => current.map((block) => (block.id === id ? { ...block, content } : block)));
   }
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [copyState, setCopyState] = useState<CopyState>("idle");
@@ -355,10 +374,11 @@ export default function PreviewPage() {
                   selectedBlockId={selectedBlockId}
                   onSelectBlock={selectBlock}
                   getBlockLabel={(block) => getBlockTitle(block.type)}
+                  onBlockContentChange={handleInlineContentChange}
                 />
                 <p className={`mt-4 text-xs text-stone ${viewport === "mobil" ? "w-[375px]" : "w-[600px]"}`}>
-                  {viewport === "mobil" ? "Mobil bredde 375px" : "Standard bredde 600px"} · klik på en sektion for at
-                  redigere den
+                  {viewport === "mobil" ? "Mobil bredde 375px" : "Standard bredde 600px"} · klik i en tekst for at skrive
+                  direkte, eller på en sektion for flere valg
                 </p>
               </div>
             )}
@@ -369,9 +389,13 @@ export default function PreviewPage() {
               skærm et panel i bunden, der kan foldes ud/ind. */}
           {showEditor && (
             <aside
+              ref={asideRef}
               aria-label="Redigering af nyhedsbrevet"
-              className="fixed inset-x-0 bottom-0 z-30 flex max-h-[65vh] flex-col border-t border-hairline bg-plant-bg shadow-[0_-8px_24px_rgba(0,0,0,0.12)] lg:static lg:z-auto lg:max-h-none lg:border-t-0 lg:bg-transparent lg:shadow-none"
+              className="fixed inset-x-0 bottom-0 z-30 flex max-h-[65vh] flex-col border-t border-hairline bg-plant-bg shadow-[0_-8px_24px_rgba(0,0,0,0.12)] lg:sticky lg:top-20 lg:z-auto lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:border-t-0 lg:bg-transparent lg:shadow-none"
             >
+              {/* Bred skærm: panelet følger med ved scroll (sticky under
+                  topbaren) og scroller selv, så den valgte bloks indstillinger
+                  altid kan ses – også når man klikker på footeren nederst. */}
               <button
                 type="button"
                 onClick={() => setIsPanelOpen((open) => !open)}
@@ -385,6 +409,7 @@ export default function PreviewPage() {
                 <ChevronDownIcon className={`h-3.5 w-3.5 shrink-0 transition-transform ${isPanelOpen ? "" : "rotate-180"}`} />
               </button>
               <div
+                ref={panelBodyRef}
                 id="editor-panel"
                 className={`${isPanelOpen ? "block" : "hidden"} min-h-0 overflow-y-auto p-4 lg:block lg:overflow-visible lg:p-0`}
               >
