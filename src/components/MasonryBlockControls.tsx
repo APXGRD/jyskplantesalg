@@ -335,7 +335,7 @@ export function MasonryBlockControls({
                   onChange={(event) => updateAltText(image.id, event.target.value)}
                   placeholder="Alt-tekst (anbefalet) – beskriv billedet"
                   aria-label={`Alt-tekst for billede ${index + 1}`}
-                  className="min-w-0 flex-1 rounded-xs border border-hairline bg-white px-2 py-1.5 text-xs text-ink-deep placeholder:text-stone/60 focus:border-forest focus:outline-none"
+                  className="min-w-0 flex-1 rounded-xs border border-field bg-white px-2 py-1.5 text-xs text-ink-deep placeholder:text-stone focus:border-forest focus:outline-none"
                 />
                 <button
                   type="button"

@@ -133,7 +133,7 @@ export function TextBlockEditor({
           // fejl, ser det bare ud som om den per-blok størrelse-/
           // farve-vælger ikke gør noget i selve Edit-mode-listen.
           class:
-            "outline-none leading-relaxed border border-hairline bg-[var(--editor-surface,#ffffff)] p-3 focus:border-forest transition-colors",
+            "outline-none leading-relaxed border border-field bg-[var(--editor-surface,#ffffff)] p-3 focus:border-forest transition-colors",
         },
       },
       onUpdate: ({ editor }) => onChange(editor.getHTML()),

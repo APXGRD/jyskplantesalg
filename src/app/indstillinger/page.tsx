@@ -56,7 +56,7 @@ const MAX_LOGO_FILE_BYTES = 500 * 1024;
 
 // Stitch-designet: hvide felter med hårfin kant, skovgrøn ved fokus.
 const fieldClassName =
-  "h-11 w-full rounded-sm border border-hairline bg-white px-4 text-sm text-[#1a1a1a] placeholder:text-stone/60 transition-colors focus:border-forest focus:outline-none";
+  "h-11 w-full rounded-sm border border-field bg-white px-4 text-sm text-[#1a1a1a] placeholder:text-stone transition-colors focus:border-forest focus:outline-none";
 const subLabelClassName = "mb-1 block text-[11px] text-stone uppercase";
 
 // De to første farver bruges som appens primær-/sekundærfarve – resten er
@@ -85,7 +85,7 @@ function FieldBlock({
     <section>
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <div className="flex items-baseline gap-2">
-          <span className="font-garamond text-2xl leading-[1.35] font-medium text-stone/60 select-none">{number}</span>
+          <span className="font-garamond text-2xl leading-[1.35] font-medium text-stone select-none">{number}</span>
           <label htmlFor={htmlFor} className="text-xs font-semibold tracking-wider text-[#1a1a1a] uppercase">
             {label}
           </label>
@@ -409,7 +409,7 @@ export default function IndstillingerPage() {
                       )}
                     </div>
                     <div>
-                      <div className={`font-garamond text-base ${form.company_name.trim() ? "text-[#1a1a1a]" : "text-stone/60"}`}>
+                      <div className={`font-garamond text-base ${form.company_name.trim() ? "text-[#1a1a1a]" : "text-stone"}`}>
                         {form.company_name.trim() || "Firmanavn"}
                       </div>
                       <p className="text-xs text-stone">
@@ -497,7 +497,7 @@ export default function IndstillingerPage() {
                               onChange={(event) => updateColorAt(index, event.target.value)}
                               aria-label={`Hex-kode for farve ${index + 1}`}
                               placeholder={COLOR_EXAMPLES[index] ?? COLOR_EXAMPLES[0]}
-                              className="w-[5.5rem] rounded-xs bg-transparent px-2 py-1 text-right font-mono text-xs text-black uppercase placeholder:text-stone/50 focus:ring-1 focus:ring-forest focus:outline-none"
+                              className="w-[5.5rem] rounded-xs bg-transparent px-2 py-1 text-right font-mono text-xs text-black uppercase placeholder:text-stone focus:ring-1 focus:ring-forest focus:outline-none"
                             />
                             <button
                               type="button"
@@ -538,8 +538,8 @@ export default function IndstillingerPage() {
                     value={form.primary_font}
                     onChange={(event) => updateField("primary_font", event.target.value)}
                     style={{ fontFamily: selectedFont?.value }}
-                    className={`h-12 w-full cursor-pointer appearance-none rounded-sm border border-hairline bg-white pr-10 pl-4 transition-colors focus:border-forest focus:outline-none ${
-                      form.primary_font ? "text-[#1a1a1a]" : "text-stone/60"
+                    className={`h-12 w-full cursor-pointer appearance-none rounded-sm border border-field bg-white pr-10 pl-4 transition-colors focus:border-forest focus:outline-none ${
+                      form.primary_font ? "text-[#1a1a1a]" : "text-stone"
                     }`}
                   >
                     <option value="" disabled>
@@ -571,7 +571,7 @@ export default function IndstillingerPage() {
                     onChange={(event) => updateField("brand_tone", event.target.value)}
                     placeholder="F.eks. varm, venlig og faglig – vi fremhæver kvalitet og giver gode råd om pleje"
                     rows={4}
-                    className="w-full resize-none border-0 bg-transparent p-1 leading-relaxed text-[#1a1a1a] placeholder:text-stone/60 focus:ring-0 focus:outline-none"
+                    className="w-full resize-none border-0 bg-transparent p-1 leading-relaxed text-[#1a1a1a] placeholder:text-stone focus:ring-0 focus:outline-none"
                   />
                   <div className="mt-2 border-t border-hairline/60 pt-2 text-xs text-stone">
                     Bruges i AI-prompten, når nyhedsbreve genereres.

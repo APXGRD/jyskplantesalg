@@ -8,7 +8,7 @@ interface UploadCaptionFieldsProps {
 }
 
 const inputClassName =
-  "w-full rounded-xs border border-hairline bg-white px-2 py-1.5 text-xs text-ink-deep placeholder:text-stone/60 focus:border-forest focus:outline-none";
+  "w-full rounded-xs border border-field bg-white px-2 py-1.5 text-xs text-ink-deep placeholder:text-stone focus:border-forest focus:outline-none";
 
 // Valgfri overskrift og pris til et UPLOADET billede i Billede-/Galleri-
 // blokken – vises under billedet i samme kort-stil som et produkts navn/pris

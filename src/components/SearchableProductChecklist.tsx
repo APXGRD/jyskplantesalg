@@ -52,7 +52,7 @@ export function SearchableProductChecklist({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full rounded-xs border border-hairline bg-white py-2 pr-9 pl-3 text-xs text-ink-deep placeholder:text-stone/60 focus:border-forest focus:outline-none"
+            className="w-full rounded-xs border border-field bg-white py-2 pr-9 pl-3 text-xs text-ink-deep placeholder:text-stone focus:border-forest focus:outline-none"
           />
           <SearchIcon className="pointer-events-none absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 text-stone" />
         </div>

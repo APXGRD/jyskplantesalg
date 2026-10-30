@@ -161,7 +161,7 @@ function Badge({ type }: { type: BlockBadge }) {
 }
 
 const fieldClassName =
-  "w-full rounded-xs border border-hairline bg-white px-3 py-2 text-xs text-ink-deep focus:border-forest focus:outline-none";
+  "w-full rounded-xs border border-field bg-white px-3 py-2 text-xs text-ink-deep focus:border-forest focus:outline-none";
 
 // Feltetiketter i blokkene ("Antal billeder:", "Tekstfarve:" …).
 const labelClassName = "text-xs text-stone-dark";
@@ -571,7 +571,7 @@ function BlockContent({
             <span
               aria-hidden
               className={`relative h-6 w-11 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-forest peer-focus-visible:ring-offset-1 ${
-                showImage ? "bg-forest" : "bg-[#e4e2dd]"
+                showImage ? "bg-forest" : "bg-switch-off"
               }`}
             >
               <span

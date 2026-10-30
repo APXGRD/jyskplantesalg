@@ -15,7 +15,7 @@ export const dialogDescriptionClassName = "pt-1 text-sm leading-relaxed text-sto
 export const dialogLabelClassName = "text-[11px] font-semibold tracking-wider text-stone uppercase";
 
 export const dialogFieldClassName =
-  "w-full rounded-xs border-[0.5px] border-forest bg-white px-3.5 py-2.5 text-sm text-ink-deep transition-colors placeholder:text-stone/60 focus:ring-1 focus:ring-forest/30 focus:outline-none";
+  "w-full rounded-xs border-[0.5px] border-forest bg-white px-3.5 py-2.5 text-sm text-ink-deep transition-colors placeholder:text-stone focus:ring-1 focus:ring-forest/30 focus:outline-none";
 
 export const dialogCancelButtonClassName =
   "flex h-11 flex-1 items-center justify-center rounded-xs border-[0.5px] border-forest bg-transparent px-4 text-[11px] font-semibold tracking-[0.06em] text-forest uppercase transition-colors hover:border-plant-hover hover:bg-plant-hover hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-forest disabled:hover:bg-transparent disabled:hover:text-forest";

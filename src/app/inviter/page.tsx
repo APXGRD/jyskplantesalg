@@ -51,7 +51,7 @@ export default async function InviterPage({
             <section>
               <div className="mb-2 flex items-baseline justify-between gap-2">
                 <div className="flex items-baseline gap-2">
-                  <span className="font-garamond text-2xl leading-[1.35] font-medium text-stone/60 select-none">01</span>
+                  <span className="font-garamond text-2xl leading-[1.35] font-medium text-stone select-none">01</span>
                   <label htmlFor="email" className="text-xs font-semibold tracking-wider text-[#1a1a1a] uppercase">
                     Email <span className="align-middle text-red-700">*</span>
                   </label>
@@ -67,7 +67,7 @@ export default async function InviterPage({
                   type="email"
                   required
                   placeholder="F.eks. kollega@firma.dk"
-                  className="h-12 w-full rounded-sm border border-hairline bg-white px-4 text-base text-[#1a1a1a] transition-colors placeholder:text-stone/60 focus:border-forest focus:outline-none"
+                  className="h-12 w-full rounded-sm border border-field bg-white px-4 text-base text-[#1a1a1a] transition-colors placeholder:text-stone focus:border-forest focus:outline-none"
                 />
                 <div className="mt-3 border-t border-hairline/60 pt-2 text-xs text-stone">
                   Personen modtager et link på mail og vælger selv sin adgangskode.
